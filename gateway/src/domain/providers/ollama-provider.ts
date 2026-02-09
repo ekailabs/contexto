@@ -31,23 +31,14 @@ interface OllamaResponse {
 export class OllamaProvider extends BaseProvider {
   readonly name = 'ollama';
 
-  // Ollama exposes an OpenAI-compatible API at /v1
   protected get baseUrl(): string {
     return getConfig().providers.ollama.baseUrl;
   }
 
-  // Ollama doesn't require an API key by default, but we return a
-  // dummy value so BaseProvider.isConfigured() stays true when the
-  // base URL is set.  Users can optionally supply a real key if they
-  // put Ollama behind an auth proxy.
   protected get apiKey(): string | undefined {
     return getConfig().providers.ollama.apiKey || 'ollama';
   }
 
-  /**
-   * Ollama is considered configured when the user has explicitly
-   * enabled it by setting OLLAMA_BASE_URL (even without an API key).
-   */
   isConfigured(): boolean {
     return getConfig().providers.ollama.enabled;
   }
