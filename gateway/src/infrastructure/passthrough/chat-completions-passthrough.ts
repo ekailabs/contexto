@@ -118,7 +118,25 @@ export class ChatCompletionsPassthrough {
     }
   }
 
+  private oauthToken: string | undefined;
+
+  private async resolveOAuthToken(): Promise<string | undefined> {
+    const provider = this.config.provider;
+    if (provider !== 'openai' && provider !== 'google') return undefined;
+
+    try {
+      const oauthProvider = provider === 'openai' ? 'openai' : undefined;
+      if (!oauthProvider) return undefined;
+      const { getValidAccessToken } = await import('../auth/oauth-service.js');
+      return await getValidAccessToken(oauthProvider);
+    } catch {
+      return undefined;
+    }
+  }
+
   private get apiKey(): string | undefined {
+    if (this.oauthToken) return this.oauthToken;
+
     const auth = this.config.auth;
     if (!auth) return undefined;
     const token = process.env[auth.envVar];
@@ -130,6 +148,11 @@ export class ChatCompletionsPassthrough {
 
   private buildAuthHeader(): string | undefined {
     const auth = this.config.auth;
+
+    if (this.oauthToken) {
+      return `Bearer ${this.oauthToken}`;
+    }
+
     if (!auth) return undefined;
 
     const { scheme, template } = auth;
@@ -146,7 +169,7 @@ export class ChatCompletionsPassthrough {
     return token;
   }
 
-  private buildHeaders(): Record<string, string> {
+  private async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -155,9 +178,12 @@ export class ChatCompletionsPassthrough {
       Object.assign(headers, this.config.staticHeaders);
     }
 
+    this.oauthToken = await this.resolveOAuthToken();
+
     const authHeader = this.buildAuthHeader();
-    if (authHeader && this.config.auth) {
-      headers[this.config.auth.header] = authHeader;
+    if (authHeader) {
+      const headerName = this.config.auth?.header ?? 'Authorization';
+      headers[headerName] = authHeader;
     }
 
     return headers;
@@ -214,7 +240,7 @@ export class ChatCompletionsPassthrough {
     try {
       response = await fetchFunction(this.config.baseUrl, {
         method: 'POST',
-        headers: this.buildHeaders(),
+        headers: await this.buildHeaders(),
         body: JSON.stringify(this.buildPayload(body, stream)),
       });
     } catch (error) {

@@ -79,7 +79,16 @@ export class AppConfig {
     usageTracking: this.getBoolean('ENABLE_USAGE_TRACKING', true),
   };
 
-  // Memory service configuration (FIFO file backend by default)
+  readonly oauth = {
+    openai: {
+      clientId: this.getString('OPENAI_OAUTH_CLIENT_ID', ''),
+      enabled: this.has('OPENAI_OAUTH_CLIENT_ID'),
+    },
+    anthropic: {
+      enabled: true,
+    },
+  };
+
   readonly memory = {
     backend: this.getString('MEMORY_BACKEND', 'file'),
     maxItems: this.getNumber('MEMORY_MAX_ITEMS', 20),
@@ -126,12 +135,14 @@ export class AppConfig {
   validate(): void {
     const hasApiKeys = Object.values(this.providers).some(p => p.enabled);
     const hasX402 = this.x402.enabled;
+    const hasOAuth = this.oauth.openai.enabled || this.oauth.anthropic.enabled;
 
-    if (!hasApiKeys && !hasX402) {
+    if (!hasApiKeys && !hasX402 && !hasOAuth) {
       throw new Error(
         'No authentication configured. Set either:\n' +
         '  1. At least one provider API key (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)\n' +
-        '  2. PRIVATE_KEY for x402 payment mode'
+        '  2. PRIVATE_KEY for x402 payment mode\n' +
+        '  3. OAuth configuration (OPENAI_OAUTH_CLIENT_ID)'
       );
     }
   }

@@ -13,7 +13,21 @@ export class OpenAIResponsesPassthrough implements ResponsesPassthrough {
     return this.config.baseUrl;
   }
 
+  private oauthToken: string | undefined;
+
+  private async resolveOAuthToken(): Promise<string | undefined> {
+    if (this.config.provider !== 'openai') return undefined;
+    try {
+      const { getValidAccessToken } = await import('../auth/oauth-service.js');
+      return await getValidAccessToken('openai');
+    } catch {
+      return undefined;
+    }
+  }
+
   private get apiKey(): string {
+    if (this.oauthToken) return this.oauthToken;
+
     const envVar = this.config.auth?.envVar;
     if (envVar) {
       const token = process.env[envVar];
@@ -27,6 +41,10 @@ export class OpenAIResponsesPassthrough implements ResponsesPassthrough {
   }
 
   private buildAuthHeader(): string {
+    if (this.oauthToken) {
+      return `Bearer ${this.oauthToken}`;
+    }
+
     const token = this.apiKey;
     const { auth } = this.config;
     if (!auth) {
@@ -44,11 +62,13 @@ export class OpenAIResponsesPassthrough implements ResponsesPassthrough {
     return token;
   }
 
-  private buildHeaders(): Record<string, string> {
+  private async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...this.config.staticHeaders,
     };
+
+    this.oauthToken = await this.resolveOAuthToken();
 
     const headerName = this.config.auth?.header ?? 'Authorization';
     headers[headerName] = this.buildAuthHeader();
@@ -69,8 +89,8 @@ export class OpenAIResponsesPassthrough implements ResponsesPassthrough {
   private async makeRequest(body: any, stream: boolean): Promise<globalThis.Response> {
     const response = await fetch(this.baseUrl, {
       method: 'POST',
-      headers: this.buildHeaders(),
-      body: JSON.stringify({ ...body, stream, store: false }) // Not storing responses
+      headers: await this.buildHeaders(),
+      body: JSON.stringify({ ...body, stream, store: false }),
     });
 
     if (!response.ok) {

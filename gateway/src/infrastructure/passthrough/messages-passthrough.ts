@@ -100,7 +100,23 @@ export class MessagesPassthrough {
     return this.config.baseUrl;
   }
 
+  private oauthToken: string | undefined;
+
+  private async resolveOAuthToken(): Promise<string | undefined> {
+    const provider = this.config.provider;
+    if (provider !== 'anthropic') return undefined;
+
+    try {
+      const { getValidAccessToken } = await import('../auth/oauth-service.js');
+      return await getValidAccessToken('anthropic');
+    } catch {
+      return undefined;
+    }
+  }
+
   private get apiKey(): string | undefined {
+    if (this.oauthToken) return this.oauthToken;
+
     if (!this.config.auth) return undefined;
     const envVar = this.config.auth.envVar;
     const token = process.env[envVar];
@@ -111,10 +127,14 @@ export class MessagesPassthrough {
   }
 
   private buildAuthHeader(): string | undefined {
+    if (this.oauthToken) {
+      return `Bearer ${this.oauthToken}`;
+    }
+
     if (!this.config.auth) return undefined;
     const { scheme, template } = this.config.auth;
     const token = this.apiKey;
-    
+
     if (!token) return undefined;
 
     if (template) {
@@ -128,14 +148,18 @@ export class MessagesPassthrough {
     return token;
   }
 
-  private buildHeaders(): Record<string, string> {
+  private async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...this.config.staticHeaders,
     };
 
-    // Only add auth header if auth is configured (not x402 mode)
-    if (this.config.auth) {
+    this.oauthToken = await this.resolveOAuthToken();
+
+    if (this.oauthToken && this.config.provider === 'anthropic') {
+      headers['Authorization'] = `Bearer ${this.oauthToken}`;
+      headers['anthropic-beta'] = 'oauth-2025-04-20';
+    } else if (this.config.auth) {
       const authHeader = this.buildAuthHeader();
       if (authHeader) {
         headers[this.config.auth.header] = authHeader;
@@ -284,7 +308,7 @@ export class MessagesPassthrough {
 
       response = await fetchFunction(this.resolveBaseUrl(), {
         method: 'POST',
-        headers: this.buildHeaders(),
+        headers: await this.buildHeaders(),
         body: payloadJson,
       });
     } catch (error) {
