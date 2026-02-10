@@ -5,6 +5,7 @@ import { OpenRouterProvider } from '../providers/openrouter-provider.js';
 import { XAIProvider } from '../providers/xai-provider.js';
 import { ZAIProvider } from '../providers/zai-provider.js';
 import { GoogleProvider } from '../providers/google-provider.js';
+import { OllamaProvider } from '../providers/ollama-provider.js';
 
 export enum Provider {
   ANTHROPIC = 'anthropic',
@@ -12,7 +13,8 @@ export enum Provider {
   OPENROUTER = 'openrouter',
   XAI = 'xAI',
   ZAI = 'zai',
-  GOOGLE = 'google'
+  GOOGLE = 'google',
+  OLLAMA = 'ollama'
 }
 
 export interface ProviderSelectionRule {
@@ -83,6 +85,7 @@ export function createDefaultProviderRegistry(): ProviderRegistry {
     { id: Provider.XAI, create: () => new XAIProvider(), selectionRules: [{ match: model => model.includes('grok-') || model.includes('grok_beta') }] },
     { id: Provider.ZAI, create: () => new ZAIProvider() },
     { id: Provider.GOOGLE, create: () => new GoogleProvider(), selectionRules: [{ match: model => model.toLowerCase().includes('gemini') }] },
+    { id: Provider.OLLAMA, create: () => new OllamaProvider(), selectionRules: [{ match: model => model.startsWith('ollama/') }] },
   ];
 
   return new ProviderRegistry(plugins);

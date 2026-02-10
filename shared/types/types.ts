@@ -31,7 +31,7 @@ export interface ChatCompletionResponse {
 }
 
 
-export type ProviderName = 'openai' | 'openrouter' | 'anthropic';
+export type ProviderName = 'openai' | 'openrouter' | 'anthropic' | 'ollama';
 
 // Removed conversation types - no conversation storage
 

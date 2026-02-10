@@ -1,5 +1,6 @@
 import { ResponsesPassthrough, ResponsesPassthroughConfig } from './responses-passthrough.js';
 import { OpenAIResponsesPassthrough } from './openai-responses-passthrough.js';
+import { OllamaResponsesPassthrough } from './ollama-responses-passthrough.js';
 import { loadResponsesProviderDefinitions, ResponsesProviderDefinition } from './responses-provider-config.js';
 import { logger } from '../utils/logger.js';
 
@@ -10,6 +11,7 @@ interface ProviderEntry {
 
 const passthroughFactories: Record<string, (config: ResponsesPassthroughConfig) => ResponsesPassthrough> = {
   openai: (config) => new OpenAIResponsesPassthrough(config),
+  ollama: (config) => new OllamaResponsesPassthrough(config),
 };
 
 export class ResponsesPassthroughRegistry {

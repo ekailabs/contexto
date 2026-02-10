@@ -54,6 +54,11 @@ export class AppConfig {
       apiKey: this.getOptionalString('GOOGLE_API_KEY'),
       enabled: this.has('GOOGLE_API_KEY'),
     },
+    ollama: {
+      baseUrl: this.getString('OLLAMA_BASE_URL', 'http://localhost:11434/v1'),
+      apiKey: this.getOptionalString('OLLAMA_API_KEY'),
+      enabled: this.has('OLLAMA_BASE_URL'),
+    },
   };
 
   // Telemetry configuration
