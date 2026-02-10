@@ -12,6 +12,7 @@ import { CanonicalRequest } from 'shared/types/index.js';
 import { createChatCompletionsPassthroughRegistry } from '../../infrastructure/passthrough/chat-completions-passthrough-registry.js';
 import { createMessagesPassthroughRegistry } from '../../infrastructure/passthrough/messages-passthrough-registry.js';
 import { createResponsesPassthroughRegistry } from '../../infrastructure/passthrough/responses-passthrough-registry.js';
+import { getResponsesProviderForModel } from '../../infrastructure/passthrough/responses-provider-config.js';
 import { budgetService } from '../../domain/services/budget-service.js';
 
 type ClientFormat = 'openai' | 'anthropic' | 'openai_responses';
@@ -60,9 +61,7 @@ export class ChatHandler {
       let canonicalRequest: CanonicalRequest;
 
       if (clientFormat === 'openai_responses') {
-        // For responses, we always want to use OpenAI provider (responses API is OpenAI-specific)
-        // But we still need to check if passthrough should be used
-        providerName = 'openai';
+        providerName = getResponsesProviderForModel(req.body.model || '');
         canonicalRequest = this.adapters[clientFormat].toCanonical(req.body);
 
         logger.debug('Processing OpenAI Responses request', {

@@ -16,6 +16,7 @@ interface RawResponsesProviderCatalog {
 
 interface RawResponsesProviderEntry {
   provider: string;
+  models?: string[];
   responses: RawResponsesConfig;
 }
 
@@ -90,4 +91,32 @@ export function loadResponsesProviderDefinitions(): ResponsesProviderDefinition[
     });
     return [];
   }
+}
+
+const modelToProviderCache = new Map<string, string>();
+
+function buildModelToProviderMap(): Map<string, string> {
+  if (modelToProviderCache.size > 0) return modelToProviderCache;
+  try {
+    const rawContent = fs.readFileSync(CATALOG_PATH, 'utf-8');
+    const parsed = JSON.parse(rawContent) as RawResponsesProviderCatalog;
+    if (!Array.isArray(parsed.providers)) return modelToProviderCache;
+    for (const entry of parsed.providers) {
+      const models = entry.models || [];
+      for (const model of models) {
+        modelToProviderCache.set(model.toLowerCase(), entry.provider);
+      }
+    }
+  } catch {}
+  return modelToProviderCache;
+}
+
+export function getResponsesProviderForModel(model: string): string {
+  const normalized = model.toLowerCase().trim();
+  const map = buildModelToProviderMap();
+  const provider = map.get(normalized);
+  if (provider) return provider;
+  if (normalized.includes('grok')) return 'xai';
+  if (['llama', 'gemma', 'qwen', 'deepseek', 'phi', 'mistral', 'mixtral', 'codellama', 'starcoder'].some(p => normalized.includes(p))) return 'ollama';
+  return 'openai';
 }
