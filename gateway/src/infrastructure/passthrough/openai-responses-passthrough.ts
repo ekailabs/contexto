@@ -13,42 +13,42 @@ export class OpenAIResponsesPassthrough implements ResponsesPassthrough {
     return this.config.baseUrl;
   }
 
+  private resolvedKey: string | undefined;
+
   private get apiKey(): string {
+    if (this.resolvedKey) return this.resolvedKey;
     const envVar = this.config.auth?.envVar;
     if (envVar) {
       const token = process.env[envVar];
       if (token) return token;
     }
-
     const fallback = getConfig().providers.openai.apiKey;
     if (fallback) return fallback;
-
     throw new AuthenticationError('OpenAI API key not configured', { provider: this.config.provider });
   }
 
   private buildAuthHeader(): string {
+    if (this.resolvedKey) return `Bearer ${this.resolvedKey}`;
     const token = this.apiKey;
     const { auth } = this.config;
-    if (!auth) {
-      return `Bearer ${token}`;
-    }
-
-    if (auth.template) {
-      return auth.template.replace('{{token}}', token);
-    }
-
-    if (auth.scheme) {
-      return `${auth.scheme} ${token}`.trim();
-    }
-
+    if (!auth) return `Bearer ${token}`;
+    if (auth.template) return auth.template.replace('{{token}}', token);
+    if (auth.scheme) return `${auth.scheme} ${token}`.trim();
     return token;
   }
 
-  private buildHeaders(): Record<string, string> {
+  private async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...this.config.staticHeaders,
     };
+
+    try {
+      const { resolveKeyForProvider } = await import('../auth/key-manager.js');
+      this.resolvedKey = await resolveKeyForProvider(this.config.provider);
+    } catch {
+      this.resolvedKey = undefined;
+    }
 
     const headerName = this.config.auth?.header ?? 'Authorization';
     headers[headerName] = this.buildAuthHeader();
@@ -69,8 +69,8 @@ export class OpenAIResponsesPassthrough implements ResponsesPassthrough {
   private async makeRequest(body: any, stream: boolean): Promise<globalThis.Response> {
     const response = await fetch(this.baseUrl, {
       method: 'POST',
-      headers: this.buildHeaders(),
-      body: JSON.stringify({ ...body, stream, store: false }) // Not storing responses
+      headers: await this.buildHeaders(),
+      body: JSON.stringify({ ...body, stream, store: false }),
     });
 
     if (!response.ok) {

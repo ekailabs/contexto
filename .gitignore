@@ -63,6 +63,9 @@ Thumbs.db
 *.tmp
 *.temp
 
+# Key and token storage
+.ekai/
+
 # AI configurations
 CLAUDE.md
 AGENTS.md

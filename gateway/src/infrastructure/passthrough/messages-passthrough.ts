@@ -100,7 +100,10 @@ export class MessagesPassthrough {
     return this.config.baseUrl;
   }
 
+  private resolvedKey: string | undefined;
+
   private get apiKey(): string | undefined {
+    if (this.resolvedKey) return this.resolvedKey;
     if (!this.config.auth) return undefined;
     const envVar = this.config.auth.envVar;
     const token = process.env[envVar];
@@ -111,11 +114,13 @@ export class MessagesPassthrough {
   }
 
   private buildAuthHeader(): string | undefined {
+    const token = this.resolvedKey || this.apiKey;
+    if (!token) return undefined;
+
+    if (this.resolvedKey) return `Bearer ${this.resolvedKey}`;
+
     if (!this.config.auth) return undefined;
     const { scheme, template } = this.config.auth;
-    const token = this.apiKey;
-    
-    if (!token) return undefined;
 
     if (template) {
       return template.replace('{{token}}', token);
@@ -128,14 +133,22 @@ export class MessagesPassthrough {
     return token;
   }
 
-  private buildHeaders(): Record<string, string> {
+  private async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...this.config.staticHeaders,
     };
 
-    // Only add auth header if auth is configured (not x402 mode)
-    if (this.config.auth) {
+    try {
+      const { resolveKeyForProvider } = await import('../auth/key-manager.js');
+      this.resolvedKey = await resolveKeyForProvider(this.config.provider);
+    } catch {
+      this.resolvedKey = undefined;
+    }
+
+    if (this.resolvedKey && this.config.provider === 'anthropic') {
+      headers['x-api-key'] = this.resolvedKey;
+    } else if (this.config.auth) {
       const authHeader = this.buildAuthHeader();
       if (authHeader) {
         headers[this.config.auth.header] = authHeader;
@@ -284,7 +297,7 @@ export class MessagesPassthrough {
 
       response = await fetchFunction(this.resolveBaseUrl(), {
         method: 'POST',
-        headers: this.buildHeaders(),
+        headers: await this.buildHeaders(),
         body: payloadJson,
       });
     } catch (error) {

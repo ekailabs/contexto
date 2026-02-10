@@ -32,6 +32,7 @@ import { handleUsageRequest } from './app/handlers/usage-handler.js';
 import { handleConfigStatus } from './app/handlers/config-handler.js';
 import { handleModelsRequest } from './app/handlers/models-handler.js';
 import { handleGetBudget, handleUpdateBudget } from './app/handlers/budget-handler.js';
+import { handleListKeys, handleAddKey, handleRemoveKey, handleUpdateKeyPriority } from './app/handlers/key-handler.js';
 import { logger } from './infrastructure/utils/logger.js';
 import { requestContext } from './infrastructure/middleware/request-context.js';
 import { requestLogging } from './infrastructure/middleware/request-logging.js';
@@ -91,6 +92,11 @@ async function bootstrap(): Promise<void> {
   app.get('/config/status', handleConfigStatus);
   app.get('/budget', handleGetBudget);
   app.put('/budget', handleUpdateBudget);
+
+  app.get('/keys', handleListKeys);
+  app.post('/keys', handleAddKey);
+  app.delete('/keys/:id', handleRemoveKey);
+  app.put('/keys/:id/priority', handleUpdateKeyPriority);
 
   // Error handler MUST be last middleware
   app.use(errorHandler);

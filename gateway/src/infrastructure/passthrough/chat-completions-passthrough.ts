@@ -118,7 +118,10 @@ export class ChatCompletionsPassthrough {
     }
   }
 
+  private resolvedKey: string | undefined;
+
   private get apiKey(): string | undefined {
+    if (this.resolvedKey) return this.resolvedKey;
     const auth = this.config.auth;
     if (!auth) return undefined;
     const token = process.env[auth.envVar];
@@ -130,10 +133,13 @@ export class ChatCompletionsPassthrough {
 
   private buildAuthHeader(): string | undefined {
     const auth = this.config.auth;
-    if (!auth) return undefined;
+    const token = this.resolvedKey || this.apiKey;
+    if (!token) return undefined;
 
+    if (this.resolvedKey) return `Bearer ${this.resolvedKey}`;
+
+    if (!auth) return undefined;
     const { scheme, template } = auth;
-    const token = this.apiKey!;
 
     if (template) {
       return template.replace('{{token}}', token);
@@ -146,7 +152,7 @@ export class ChatCompletionsPassthrough {
     return token;
   }
 
-  private buildHeaders(): Record<string, string> {
+  private async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -155,9 +161,17 @@ export class ChatCompletionsPassthrough {
       Object.assign(headers, this.config.staticHeaders);
     }
 
+    try {
+      const { resolveKeyForProvider } = await import('../auth/key-manager.js');
+      this.resolvedKey = await resolveKeyForProvider(this.config.provider);
+    } catch {
+      this.resolvedKey = undefined;
+    }
+
     const authHeader = this.buildAuthHeader();
-    if (authHeader && this.config.auth) {
-      headers[this.config.auth.header] = authHeader;
+    if (authHeader) {
+      const headerName = this.config.auth?.header ?? 'Authorization';
+      headers[headerName] = authHeader;
     }
 
     return headers;
@@ -214,7 +228,7 @@ export class ChatCompletionsPassthrough {
     try {
       response = await fetchFunction(this.config.baseUrl, {
         method: 'POST',
-        headers: this.buildHeaders(),
+        headers: await this.buildHeaders(),
         body: JSON.stringify(this.buildPayload(body, stream)),
       });
     } catch (error) {
