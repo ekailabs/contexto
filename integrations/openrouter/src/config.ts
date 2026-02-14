@@ -1,9 +1,20 @@
 import dotenv from 'dotenv';
-import { resolve, dirname } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: resolve(__dirname, '../../../.env') });
+
+function findProjectRoot(startPath: string): string {
+  let cur = startPath;
+  while (cur !== dirname(cur)) {
+    if (existsSync(join(cur, '.env.example')) && existsSync(join(cur, 'package.json'))) return cur;
+    cur = dirname(cur);
+  }
+  return process.cwd();
+}
+
+dotenv.config({ path: join(findProjectRoot(__dirname), '.env') });
 
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 if (!OPENROUTER_API_KEY) {
