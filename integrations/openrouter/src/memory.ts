@@ -98,3 +98,20 @@ export function injectMemory(
     messages.unshift({ role: 'system', content: memoryBlock });
   }
 }
+
+/**
+ * Fire-and-forget: send messages to the memory service for ingestion.
+ * Never awaited — failures are logged and swallowed.
+ */
+export function ingestMessages(
+  messages: Array<{ role: string; content: string }>,
+  profile: string,
+): void {
+  fetch(`${MEMORY_URL}/v1/ingest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, profile }),
+  }).catch((err) => {
+    console.warn(`[memory] ingest failed: ${err.message}`);
+  });
+}

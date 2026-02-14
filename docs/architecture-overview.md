@@ -31,6 +31,16 @@ Returns payment parameters, settles fees on-chain to the x402 facilitator, and f
 A web dashboard that visualizes request volume, token usage, and cost per provider.\
 It connects to the SQLite database populated by the gateway.
 
+### Memory Service (port 4005)
+
+Provides persistent memory across conversations.\
+When a request arrives at the OpenRouter proxy, two things happen in parallel:
+
+1. **Recall** — The last user message is sent to `/v1/search`. Matching memories are injected into the system prompt so the LLM can reference prior context.
+2. **Ingestion** — The original conversation messages (before memory injection) are sent fire-and-forget to `/v1/ingest` so they become available for future recall.
+
+Memory is additive and never blocking: if the service is unreachable, requests proceed normally without recall or ingestion.
+
 ### Storage
 
 Usage data and request logs are stored in a local SQLite database (by default `data/usage.db`).\

@@ -1,6 +1,6 @@
 import express from 'express';
 import { PORT } from './config.js';
-import { fetchMemoryContext, formatMemoryBlock, injectMemory } from './memory.js';
+import { fetchMemoryContext, formatMemoryBlock, ingestMessages, injectMemory } from './memory.js';
 import { proxyToOpenRouter } from './proxy.js';
 
 const app = express();
@@ -29,6 +29,9 @@ app.post('/v1/chat/completions', async (req, res) => {
               .join(' ')
           : null;
 
+    // Save original messages before memory injection mutates them
+    const originalMessages = body.messages.map((m: any) => ({ ...m }));
+
     // Fetch memory context (non-blocking on failure)
     if (query) {
       const results = await fetchMemoryContext(query, profile);
@@ -37,6 +40,9 @@ app.post('/v1/chat/completions', async (req, res) => {
         injectMemory(body.messages, block);
       }
     }
+
+    // Fire-and-forget: ingest original messages for future recall
+    ingestMessages(originalMessages, profile);
 
     await proxyToOpenRouter(body, res);
   } catch (err: any) {
