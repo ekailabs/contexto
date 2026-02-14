@@ -13,7 +13,11 @@ app.get('/health', (_req, res) => {
 app.post('/v1/chat/completions', async (req, res) => {
   try {
     const body = req.body;
-    const profile = (req.headers['x-memory-profile'] as string) || 'default';
+    // Profile from body.user (PydanticAI openai_user), header, or default
+    const profile = body.user || (req.headers['x-memory-profile'] as string) || 'default';
+    // Pass through client's API key if provided, otherwise proxy.ts falls back to env
+    const authHeader = req.headers['authorization'] as string | undefined;
+    const clientKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
     // Extract last user message for memory query
     const lastUserMsg = [...(body.messages || [])]
@@ -44,7 +48,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     // Fire-and-forget: ingest original messages for future recall
     ingestMessages(originalMessages, profile);
 
-    await proxyToOpenRouter(body, res);
+    await proxyToOpenRouter(body, res, clientKey);
   } catch (err: any) {
     console.error(`[server] unhandled error: ${err.message}`);
     if (!res.headersSent) {

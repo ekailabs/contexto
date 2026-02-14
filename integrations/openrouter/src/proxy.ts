@@ -7,11 +7,12 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
  * Proxy a chat completions request to OpenRouter.
  * Handles both streaming (SSE) and non-streaming responses.
  */
-export async function proxyToOpenRouter(body: any, res: Response): Promise<void> {
+export async function proxyToOpenRouter(body: any, res: Response, apiKey?: string): Promise<void> {
+  const key = apiKey || OPENROUTER_API_KEY;
   const response = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://ekailabs.xyz',
       'X-Title': 'Ekai Gateway',
