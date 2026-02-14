@@ -124,11 +124,14 @@ codex
 
 ```
 ekai-gateway/
-├── gateway/          # Backend API and routing
-├── ui/              # Dashboard frontend
-├── memory/          # Agent memory service
-├── shared/          # Shared types and utilities
-└── package.json     # Root package configuration
+├── gateway/              # Backend API and routing
+├── ui/dashboard/         # Dashboard frontend (Next.js)
+├── memory/               # Agent memory service
+├── integrations/
+│   └── openrouter/       # OpenRouter integration service
+├── scripts/
+│   └── launcher.js       # Unified service launcher
+└── package.json          # Root workspace configuration
 ```
 
 ## API Endpoints
@@ -190,32 +193,32 @@ The proxy uses **cost-based optimization** to automatically select the cheapest 
 
 **Multi-client proxy**: Web apps, mobile apps, and scripts share conversations across providers with automatic cost tracking and optimization.
 
-## Production Commands
+## Running Services
+
+A unified launcher starts all 4 services by default (gateway, dashboard, memory, openrouter). Disable any service with an env var:
 
 ```bash
-npm run build  # Build TypeScript for production
-npm start      # Start gateway, dashboard, and memory service
+npm run dev    # Development mode — all services with hot-reload
+npm start      # Production mode — all services from built output
 ```
 
-**Individual services (ports configurable via `PORT` and `MEMORY_PORT` in `.env`):**
+**Disable individual services** by setting `ENABLE_<NAME>=false`:
+
 ```bash
-npm run start:gateway  # Gateway API only (default: 3001)
-npm run start:ui       # Dashboard UI only (default: 3000)
-npm run start:memory   # Memory service only (default: 4005)
+ENABLE_DASHBOARD=false npm run dev           # Skip the dashboard
+ENABLE_OPENROUTER=false npm start            # Production without openrouter
+ENABLE_MEMORY=false ENABLE_DASHBOARD=false npm run dev  # Gateway + openrouter only
 ```
 
-## Development
+**Individual service scripts** (escape hatches):
 
 ```bash
-npm run dev      # Start gateway and dashboard in development mode
-npm run dev:all  # Start gateway, dashboard, and memory service
-```
-
-**Individual services:**
-```bash
-cd gateway && npm run dev    # Gateway only (port 3001)
-cd ui/dashboard && npm run dev    # Dashboard only (port 3000)
-cd memory && npm start       # Memory service only (port 4005)
+npm run dev:gateway     # Gateway only (port 3001)
+npm run dev:ui          # Dashboard only (port 3000)
+npm run dev:openrouter  # OpenRouter integration only (port 4006)
+npm run start:gateway   # Production gateway
+npm run start:ui        # Production dashboard
+npm run start:memory    # Memory service (port 4005)
 ```
 
 ## Contributing
