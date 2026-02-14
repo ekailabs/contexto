@@ -7,4 +7,4 @@ if (!OPENROUTER_API_KEY) {
 }
 
 export const MEMORY_URL = process.env.MEMORY_URL || 'http://localhost:4005';
-export const PORT = parseInt(process.env.PORT || '4010', 10);
+export const PORT = parseInt(process.env.OPENROUTER_PORT || '4010', 10);
