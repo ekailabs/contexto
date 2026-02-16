@@ -51,7 +51,7 @@ ENV NODE_ENV=production
   COPY --from=dashboard-build /app/ui/dashboard/.next ./.next
   COPY --from=dashboard-build /app/ui/dashboard/public ./public
   # Copy config files
-  COPY --from=dashboard-build /app/ui/dashboard/next.config.ts ./next.config.ts
+  COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./next.config.mjs
   COPY --from=dashboard-build /app/ui/dashboard/postcss.config.mjs ./postcss.config.mjs
   EXPOSE 3000
   CMD ["node_modules/.bin/next", "start", "-p", "3000"]
@@ -74,7 +74,7 @@ COPY ui/dashboard/package.json ui/dashboard/package-lock.json ./ui/dashboard/
 RUN cd ui/dashboard && npm install --omit=dev
   COPY --from=dashboard-build /app/ui/dashboard/.next ./ui/dashboard/.next
   COPY --from=dashboard-build /app/ui/dashboard/public ./ui/dashboard/public
-  COPY --from=dashboard-build /app/ui/dashboard/next.config.ts ./ui/dashboard/next.config.ts
+  COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./ui/dashboard/next.config.mjs
   COPY --from=dashboard-build /app/ui/dashboard/postcss.config.mjs ./ui/dashboard/postcss.config.mjs
   
 # Entrypoint for running both services

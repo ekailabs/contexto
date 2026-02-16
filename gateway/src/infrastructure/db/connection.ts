@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from '../utils/logger.js';
@@ -16,8 +16,12 @@ class DatabaseConnection {
 
   private initialize() {
     try {
-      // Create database file in the same directory as this file
-      const dbPath = join(__dirname, 'proxy.db');
+      // Use DATABASE_PATH env var, or default to data/proxy.db relative to cwd
+      // In Docker: cwd = /app/gateway/ → /app/gateway/data/proxy.db (matches volume mount)
+      // In dev:    cwd = gateway/     → gateway/data/proxy.db
+      const dbPath = process.env.DATABASE_PATH || join(process.cwd(), 'data', 'proxy.db');
+      const dbDir = dirname(dbPath);
+      if (!existsSync(dbDir)) mkdirSync(dbDir, { recursive: true });
       this.db = new Database(dbPath);
       
       // Enable WAL mode for better concurrency

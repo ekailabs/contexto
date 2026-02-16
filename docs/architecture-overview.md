@@ -43,7 +43,7 @@ Memory is additive and never blocking: if the service is unreachable, requests p
 
 ### Storage
 
-Usage data and request logs are stored in a local SQLite database (by default `data/usage.db`).\
+Usage data and request logs are stored in a local SQLite database (by default `data/proxy.db`).\
 No external database configuration is required.
 
 ***

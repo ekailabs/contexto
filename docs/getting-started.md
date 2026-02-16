@@ -75,6 +75,25 @@ docker compose --profile split up --build -d
 
 The `split` profile starts the `gateway` and `dashboard` services defined in `docker-compose.yaml`.
 
+### Data persistence
+
+Docker Compose uses named volumes to persist data across container restarts and recreates:
+
+| Volume | Container path | Contents |
+|---|---|---|
+| `gateway_db` | `/app/gateway/data/` | SQLite database (`proxy.db`) and WAL files |
+| `gateway_logs` | `/app/gateway/logs/` | Application logs (`gateway.log`) |
+
+To back up the database:
+```bash
+docker cp $(docker compose ps -q fullstack):/app/gateway/data/proxy.db ./backup.db
+```
+
+To remove all data and start fresh:
+```bash
+docker compose down -v
+```
+
 ---
 
 ## Environment Variables
@@ -88,7 +107,7 @@ The `split` profile starts the `gateway` and `dashboard` services defined in `do
 | `GOOGLE_API_KEY` | Key for Google Gemini models |
 | `PORT` | Gateway API port (default 3001) |
 | `MEMORY_PORT` | Memory service port (default 4005) |
-| `DATABASE_PATH` | SQLite file path (default `data/usage.db`) |
+| `DATABASE_PATH` | SQLite file path (default `data/proxy.db`) |
 
 The dashboard auto-detects the host from the browser and connects to the gateway and memory service on the same host using their default ports. No URL configuration needed for standard deployments.
 
