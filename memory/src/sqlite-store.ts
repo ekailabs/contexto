@@ -267,9 +267,9 @@ export class SqliteMemoryStore {
       }
     }
 
-    // --- Reflective ---
+    // --- Reflective (requires attribution — skip if no origin) ---
     const reflectiveInput = components.reflective;
-    const reflections = this.normalizeReflectiveInput(reflectiveInput);
+    const reflections = (origin?.originType) ? this.normalizeReflectiveInput(reflectiveInput) : [];
 
     for (const ref of reflections) {
       const embedding = await this.embed(ref.observation, 'reflective');
@@ -281,9 +281,9 @@ export class SqliteMemoryStore {
         createdAt,
         lastAccessed: createdAt,
         source,
-        originType: origin?.originType,
-        originActor: origin?.originActor ?? userId,
-        originRef: origin?.originRef,
+        originType: origin!.originType,
+        originActor: origin!.originActor ?? userId,
+        originRef: origin!.originRef,
       };
       this.insertReflectiveRow(refRow);
       rows.push({

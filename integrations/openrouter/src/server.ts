@@ -34,7 +34,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       const results = await fetchMemoryContext(query, profile);
       if (results) {
         const block = formatMemoryBlock(results);
-        injectMemory(body.messages, block);
+        body.messages = injectMemory(body.messages, block);
       }
     }
 

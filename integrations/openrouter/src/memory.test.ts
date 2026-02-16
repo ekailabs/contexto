@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatMemoryBlock } from './memory.js';
+import { formatMemoryBlock, injectMemory } from './memory.js';
 
 describe('formatMemoryBlock', () => {
   it('formats semantic facts under "What I know:"', () => {
@@ -109,5 +109,33 @@ describe('formatMemoryBlock', () => {
     expect(block).not.toContain('What I know:');
     expect(block).not.toContain('What I remember:');
     expect(block).not.toContain('How I do things:');
+  });
+});
+
+describe('injectMemory', () => {
+  it('does not mutate the original messages array', () => {
+    const messages = [{ role: 'user', content: 'hello' }];
+    const result = injectMemory(messages, '<memory>test</memory>');
+    expect(messages).toHaveLength(1);
+    expect(result).toHaveLength(2);
+    expect(result[0].role).toBe('system');
+  });
+
+  it('prepends memory before existing system message content', () => {
+    const messages = [
+      { role: 'system', content: 'You are helpful.' },
+      { role: 'user', content: 'hi' },
+    ];
+    const result = injectMemory(messages, '<memory>facts</memory>');
+    expect(result).toHaveLength(2);
+    expect(result[0].content).toBe('<memory>facts</memory>\n\nYou are helpful.');
+    // Original untouched
+    expect(messages[0].content).toBe('You are helpful.');
+  });
+
+  it('returns original array unchanged if memoryBlock is empty', () => {
+    const messages = [{ role: 'user', content: 'hello' }];
+    const result = injectMemory(messages, '');
+    expect(result).toBe(messages);
   });
 });

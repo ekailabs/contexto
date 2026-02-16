@@ -46,7 +46,7 @@ SEMANTIC — stable, context-free facts as subject-predicate-object triples:
   - Examples:
     * {"subject": "Sha", "predicate": "prefers", "object": "dark mode", "domain": "user"}
     * {"subject": "TypeScript", "predicate": "supports", "object": "type inference", "domain": "world"}
-    * {"subject": "I", "predicate": "am configured with", "object": "GPT-4 for extraction", "domain": "self"}
+    * {"subject": "this agent", "predicate": "uses", "object": "GPT-4 for extraction", "domain": "self"}
 
 PROCEDURAL — multi-step workflows or processes:
   - Must be a genuine multi-step process; if not, leave empty {}.

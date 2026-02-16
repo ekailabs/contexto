@@ -90,18 +90,22 @@ export function formatMemoryBlock(results: QueryResult[]): string {
 }
 
 /**
- * Inject a memory block into the messages array.
- * If messages[0] is a system message, prepend memory before existing content.
- * Otherwise, insert a new system message at index 0.
- * Memory goes BEFORE developer instructions so the developer prompt takes priority.
+ * Return a new messages array with memory injected.
+ * Memory is placed before the developer system prompt so the developer instructions
+ * appear last and take priority (LLM recency bias).
+ * Returns the original array unchanged if memoryBlock is empty.
  */
 export function injectMemory(
   messages: Array<{ role: string; content: string }>,
   memoryBlock: string,
-): void {
+): Array<{ role: string; content: string }> {
+  if (!memoryBlock) return messages;
+
   if (messages[0]?.role === 'system') {
-    messages[0].content = memoryBlock + '\n\n' + messages[0].content;
-  } else {
-    messages.unshift({ role: 'system', content: memoryBlock });
+    return [
+      { ...messages[0], content: memoryBlock + '\n\n' + messages[0].content },
+      ...messages.slice(1),
+    ];
   }
+  return [{ role: 'system', content: memoryBlock }, ...messages];
 }
