@@ -19,8 +19,6 @@
   FROM build-base AS gateway-build
   WORKDIR /app/gateway
   RUN npm run build
-  # Ensure schema.sql ships with compiled code
-  RUN if [ -f src/db/schema.sql ]; then mkdir -p dist/db && cp src/db/schema.sql dist/db/schema.sql; fi
   
 # ---------- dashboard build ----------
 FROM build-base AS dashboard-build
@@ -47,33 +45,36 @@ RUN npm run build
 FROM node:20-alpine AS dashboard-runtime
 WORKDIR /app/ui/dashboard
 COPY ui/dashboard/package.json ui/dashboard/package-lock.json ./
-RUN npm install
+RUN npm install --omit=dev
 ENV NODE_ENV=production
   # Copy production build output
   COPY --from=dashboard-build /app/ui/dashboard/.next ./.next
   COPY --from=dashboard-build /app/ui/dashboard/public ./public
   # Copy config files
-  COPY --from=dashboard-build /app/ui/dashboard/next.config.ts ./next.config.ts
+  COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./next.config.mjs
   COPY --from=dashboard-build /app/ui/dashboard/postcss.config.mjs ./postcss.config.mjs
   EXPOSE 3000
-  CMD ["npx", "next", "start", "-p", "3000"]
+  CMD ["node_modules/.bin/next", "start", "-p", "3000"]
   
 # ---------- fullstack runtime ----------
 FROM node:20-alpine AS ekai-gateway-runtime
 WORKDIR /app
-  
+
+# bash is needed for wait -n in the entrypoint script
+RUN apk add --no-cache bash
+
   # Gateway runtime bits
 COPY gateway/package.json gateway/package-lock.json ./gateway/
 RUN cd gateway && npm install --omit=dev
 COPY --from=gateway-build /app/gateway/dist ./gateway/dist
 RUN mkdir -p /app/gateway/data /app/gateway/logs
-  
+
   # Dashboard runtime bits
 COPY ui/dashboard/package.json ui/dashboard/package-lock.json ./ui/dashboard/
-RUN cd ui/dashboard && npm install
+RUN cd ui/dashboard && npm install --omit=dev
   COPY --from=dashboard-build /app/ui/dashboard/.next ./ui/dashboard/.next
   COPY --from=dashboard-build /app/ui/dashboard/public ./ui/dashboard/public
-  COPY --from=dashboard-build /app/ui/dashboard/next.config.ts ./ui/dashboard/next.config.ts
+  COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./ui/dashboard/next.config.mjs
   COPY --from=dashboard-build /app/ui/dashboard/postcss.config.mjs ./ui/dashboard/postcss.config.mjs
   
 # Entrypoint for running both services

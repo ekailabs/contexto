@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -euo pipefail
 
 GATEWAY_DIR="/app/gateway"
@@ -41,7 +41,7 @@ node dist/gateway/src/index.js &
 GW_PID=$!
 
 cd "$DASHBOARD_DIR"
-npx next start -p "$UI_PORT" -H 0.0.0.0 &
+node_modules/.bin/next start -p "$UI_PORT" -H 0.0.0.0 &
 UI_PID=$!
 
 wait -n "$GW_PID" "$UI_PID"
