@@ -56,12 +56,23 @@ docker run --env-file .env -p 3001:3001 -p 3000:3000 ghcr.io/ekailabs/ekai-gatew
 Important: The dashboard is initially empty. After setup, send a query using your own client/tool (IDE, app, or API) through the gateway; usage appears once at least one request is processed.
 
 **Access Points (default ports, configurable in `.env`):**
-- Gateway API: port `3001` (`PORT`)
-- Dashboard UI: port `3000`
-- Memory Service: port `4005` (`MEMORY_PORT`)
-- Detailed setup steps live in `docs/getting-started.md`; check `docs/` for additional guides.
+- Gateway API: port `3001` (`PORT`) - OpenAI/Anthropic compatible endpoints
+- Dashboard UI: port `3000` (`UI_PORT`) - Usage analytics and cost tracking
+- Memory Service: port `4005` (`MEMORY_PORT`) - Agent memory and context storage
+- OpenRouter Integration: port `4010` (`OPENROUTER_PORT`) - OpenRouter proxy service
 
 The dashboard auto-detects the host and connects to the gateway and memory service on the same host using their configured ports. No extra URL configuration needed.
+
+**Docker Service Configuration:**
+All services run in a single Docker container. Control which services start via `.env`:
+```bash
+ENABLE_GATEWAY=true       # API server (default: true)
+ENABLE_DASHBOARD=true     # Web dashboard (default: true)
+ENABLE_MEMORY=true        # Memory service (default: true)
+ENABLE_OPENROUTER=true    # OpenRouter integration (default: true)
+```
+
+Detailed setup steps live in `docs/getting-started.md`; check `docs/` for additional guides.
 
 ### Build the Image Yourself (optional)
 
@@ -195,7 +206,9 @@ The proxy uses **cost-based optimization** to automatically select the cheapest 
 
 ## Running Services
 
-A unified launcher starts all 4 services by default (gateway, dashboard, memory, openrouter). Disable any service with an env var:
+### With npm (local development)
+
+A unified launcher starts all 4 services by default (gateway, dashboard, memory, openrouter):
 
 ```bash
 npm run dev    # Development mode — all services with hot-reload
@@ -215,11 +228,23 @@ ENABLE_MEMORY=false ENABLE_DASHBOARD=false npm run dev  # Gateway + openrouter o
 ```bash
 npm run dev:gateway     # Gateway only (port 3001)
 npm run dev:ui          # Dashboard only (port 3000)
-npm run dev:openrouter  # OpenRouter integration only (port 4006)
+npm run dev:openrouter  # OpenRouter integration only (port 4010)
 npm run start:gateway   # Production gateway
 npm run start:ui        # Production dashboard
 npm run start:memory    # Memory service (port 4005)
 ```
+
+### With Docker
+
+All services run together in a single container. The entrypoint script manages service lifecycle and ensures all enabled services stay running:
+
+```bash
+docker compose up -d    # Start all services
+docker compose logs -f  # View logs from all services
+docker compose down     # Stop all services
+```
+
+Services are controlled via `.env` file `ENABLE_*` variables. The Docker container will restart automatically on failure (see `docker-compose.yaml` for `restart: unless-stopped`).
 
 ## Contributing
 

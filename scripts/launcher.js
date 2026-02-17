@@ -32,7 +32,7 @@ const SERVICES = {
     port: gatewayPort,
   },
   dashboard: {
-    dev: `npx -w ui/dashboard next dev --turbopack -p ${dashboardPort}`,
+    dev: `npx -w ui/dashboard next dev -p ${dashboardPort}`,
     start: `npx -w ui/dashboard next start -p ${dashboardPort} -H 0.0.0.0`,
     label: "dashboard",
     color: "magenta",
