@@ -19,7 +19,7 @@ Deploy your own private ekai-gateway instance on Oasis Network using ROFL (Runti
 ## Prerequisites
 
 1. **Oasis CLI** (v0.18.x+)
-   Install from [L15 CLI Reference](https://cli.oasis.io), then verify:
+   Install from [CLI Reference](https://cli.oasis.io), then verify:
    ```bash
    oasis --version
    ```

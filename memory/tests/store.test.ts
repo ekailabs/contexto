@@ -66,8 +66,8 @@ describe('SqliteMemoryStore (single-user mode)', () => {
     store = createStore();
   });
 
-  // ─── 1. Ingest all 4 sectors ──────────────────────────────────────
-  it('ingests all 4 sectors and returns correct sector labels', async () => {
+  // ─── 1. Ingest active sectors ────────────────────────────────────
+  it('ingests episodic, semantic, procedural and skips reflective', async () => {
     const rows = await store.ingest(
       {
         episodic: 'deployed v2 to staging',
@@ -83,9 +83,9 @@ describe('SqliteMemoryStore (single-user mode)', () => {
       { origin: { originType: 'conversation', originActor: 'test' } },
     );
 
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(3);
     const sectors = rows.map((r) => r.sector).sort();
-    expect(sectors).toEqual(['episodic', 'procedural', 'reflective', 'semantic']);
+    expect(sectors).toEqual(['episodic', 'procedural', 'semantic']);
   });
 
   // ─── 2. Query returns results matching dashboard shape ────────────
@@ -197,22 +197,18 @@ describe('SqliteMemoryStore (single-user mode)', () => {
         episodic: 'deployed v2 to staging',
         semantic: { subject: 'Sha', predicate: 'prefers', object: 'dark mode' },
         procedural: { trigger: 'deploy to prod', steps: ['build', 'deploy'] },
-        reflective: { observation: 'user prefers concise answers' },
       },
-      undefined,
-      { origin: { originType: 'conversation', originActor: 'test' } },
     );
 
     const summary = store.getSectorSummary();
 
-    // Should have all 4 sectors
-    expect(summary).toHaveLength(4);
+    // Should have 3 active sectors (reflective is disabled)
+    expect(summary).toHaveLength(3);
     const bySector = Object.fromEntries(summary.map((s) => [s.sector, s]));
 
     expect(bySector.episodic.count).toBe(1);
     expect(bySector.semantic.count).toBe(1);
     expect(bySector.procedural.count).toBe(1);
-    expect(bySector.reflective.count).toBe(1);
 
     // Each sector has lastCreatedAt
     for (const s of summary) {
@@ -249,19 +245,10 @@ describe('SqliteMemoryStore (single-user mode)', () => {
       },
     );
 
-    t = NOW + 3000;
-    await store1.ingest(
-      {
-        reflective: { observation: 'this is a reflection' },
-      },
-      undefined,
-      { origin: { originType: 'conversation', originActor: 'test' } },
-    );
-
     const recent = store1.getRecent(undefined, 10);
 
-    // Should return all 4 items
-    expect(recent.length).toBe(4);
+    // Should return 3 items (reflective is disabled)
+    expect(recent.length).toBe(3);
 
     // Descending order by createdAt
     for (let i = 0; i < recent.length - 1; i++) {
@@ -296,31 +283,17 @@ describe('SqliteMemoryStore (single-user mode)', () => {
     expect(Array.isArray(procItem!.details.steps)).toBe(true);
   });
 
-  // ─── 7. Reflective requires attribution ───────────────────────────
-  it('skips reflective without origin, stores with origin', async () => {
-    // Without origin → should skip reflective
-    const rows1 = await store.ingest({
-      reflective: { observation: 'this is a reflection' },
-    });
-    const reflectiveRows1 = rows1.filter((r) => r.sector === 'reflective');
-    expect(reflectiveRows1).toHaveLength(0);
-
-    const summary1 = store.getSectorSummary();
-    expect(summary1.find((s) => s.sector === 'reflective')!.count).toBe(0);
-
-    // With origin → should store
-    const rows2 = await store.ingest(
+  // ─── 7. Reflective is always skipped (disabled) ─────────────────
+  it('skips reflective even with origin', async () => {
+    const rows = await store.ingest(
       {
         reflective: { observation: 'this is a reflection' },
       },
       undefined,
       { origin: { originType: 'conversation', originActor: 'test', originRef: 'conv-123' } },
     );
-    const reflectiveRows2 = rows2.filter((r) => r.sector === 'reflective');
-    expect(reflectiveRows2).toHaveLength(1);
-
-    const summary2 = store.getSectorSummary();
-    expect(summary2.find((s) => s.sector === 'reflective')!.count).toBe(1);
+    const reflectiveRows = rows.filter((r) => r.sector === 'reflective');
+    expect(reflectiveRows).toHaveLength(0);
   });
 
   // ─── 8. Empty ingest ──────────────────────────────────────────────
@@ -351,12 +324,9 @@ describe('SqliteMemoryStore (single-user mode)', () => {
         episodic: 'deployed v2 to staging',
         semantic: { subject: 'Sha', predicate: 'prefers', object: 'dark mode' },
         procedural: { trigger: 'deploy to prod', steps: ['build', 'deploy'] },
-        reflective: { observation: 'user prefers concise answers' },
       },
-      undefined,
-      { origin: { originType: 'conversation', originActor: 'test' } },
     );
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(3);
 
     // deleteById — remove the episodic row
     const episodicRow = rows.find((r) => r.sector === 'episodic')!;
@@ -369,11 +339,10 @@ describe('SqliteMemoryStore (single-user mode)', () => {
     // Others still present
     expect(summaryAfterDelete.find((s) => s.sector === 'semantic')!.count).toBe(1);
     expect(summaryAfterDelete.find((s) => s.sector === 'procedural')!.count).toBe(1);
-    expect(summaryAfterDelete.find((s) => s.sector === 'reflective')!.count).toBe(1);
 
-    // deleteAll — clears all 4 sector tables
+    // deleteAll — clears all sector tables
     const totalDeleted = store.deleteAll();
-    expect(totalDeleted).toBe(3); // 3 remaining after episodic was deleted
+    expect(totalDeleted).toBe(2); // 2 remaining after episodic was deleted
 
     const summaryAfterDeleteAll = store.getSectorSummary();
     for (const s of summaryAfterDeleteAll) {

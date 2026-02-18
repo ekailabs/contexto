@@ -19,7 +19,7 @@ import { cosineSimilarity, DEFAULT_PROFILE, normalizeProfileSlug } from './utils
 import { filterAndCapWorkingMemory } from './wm.js';
 import { SemanticGraphTraversal } from './semantic-graph.js';
 
-const SECTORS: SectorName[] = ['episodic', 'semantic', 'procedural', 'reflective'];
+const SECTORS: SectorName[] = ['episodic', 'semantic', 'procedural'];
 const PER_SECTOR_K = 4;
 const WORKING_MEMORY_CAP = 8;
 const SECTOR_SCAN_LIMIT = 200; // simple scan instead of ANN for v0
@@ -267,37 +267,6 @@ export class SqliteMemoryStore {
       }
     }
 
-    // --- Reflective (requires attribution — skip if no origin) ---
-    const reflectiveInput = components.reflective;
-    const reflections = (origin?.originType) ? this.normalizeReflectiveInput(reflectiveInput) : [];
-
-    for (const ref of reflections) {
-      const embedding = await this.embed(ref.observation, 'reflective');
-      const refRow: ReflectiveMemoryRecord = {
-        id: randomUUID(),
-        observation: ref.observation,
-        profileId,
-        embedding,
-        createdAt,
-        lastAccessed: createdAt,
-        source,
-        originType: origin!.originType,
-        originActor: origin!.originActor ?? userId,
-        originRef: origin!.originRef,
-      };
-      this.insertReflectiveRow(refRow);
-      rows.push({
-        id: refRow.id,
-        sector: 'reflective',
-        content: ref.observation,
-        embedding,
-        profileId,
-        createdAt,
-        lastAccessed: createdAt,
-        source,
-      });
-    }
-
     return rows;
   }
 
@@ -317,7 +286,6 @@ export class SqliteMemoryStore {
       episodic: [],
       semantic: [],
       procedural: [],
-      reflective: [],
     };
 
     for (const sector of SECTORS) {
@@ -372,14 +340,6 @@ export class SqliteMemoryStore {
       )
       .get({ profileId }) as { sector: SectorName; count: number; lastCreatedAt: number | null };
 
-    const reflectiveRow = this.db
-      .prepare(
-        `select 'reflective' as sector, count(*) as count, max(created_at) as lastCreatedAt
-         from reflective_memory
-         where profile_id = @profileId`,
-      )
-      .get({ profileId }) as { sector: SectorName; count: number; lastCreatedAt: number | null };
-
     const defaults = SECTORS.map((s) => ({
       sector: s,
       count: 0,
@@ -389,7 +349,6 @@ export class SqliteMemoryStore {
     const map = new Map(rows.map((r) => [r.sector, r]));
     if (proceduralRow) map.set('procedural', proceduralRow);
     if (semanticRow) map.set('semantic', semanticRow);
-    if (reflectiveRow) map.set('reflective', reflectiveRow);
     return defaults.map((d) => map.get(d.sector) ?? d);
   }
 
@@ -414,12 +373,6 @@ export class SqliteMemoryStore {
          from semantic_memory
          where profile_id = @profileId
            and (valid_to is null or valid_to > @now)
-         union all
-         select id, 'reflective' as sector, observation as content, embedding, created_at as createdAt, last_accessed as lastAccessed,
-                '{}' as details,
-                null as eventStart, null as eventEnd, 0 as retrievalCount
-         from reflective_memory
-         where profile_id = @profileId
          order by createdAt desc
          limit @limit`,
       )
@@ -500,12 +453,6 @@ export class SqliteMemoryStore {
          from semantic_memory
          where profile_id = @profileId and user_scope = @userId
            and (valid_to is null or valid_to > @now)
-         union all
-         select id, 'reflective' as sector, observation as content, embedding, created_at as createdAt, last_accessed as lastAccessed,
-                '{}' as details,
-                null as eventStart, null as eventEnd, 0 as retrievalCount
-         from reflective_memory
-         where profile_id = @profileId and origin_actor = @userId
          order by createdAt desc
          limit @limit`,
       )
@@ -781,16 +728,6 @@ export class SqliteMemoryStore {
           lastAccessed: r.updatedAt,
           details: { subject: r.subject, predicate: r.predicate, object: r.object, validFrom: r.validFrom, validTo: r.validTo, domain: r.domain },
         } as any));
-      case 'reflective':
-        return this.getReflectiveRows(profileId, SECTOR_SCAN_LIMIT).map((r) => ({
-          id: r.id,
-          sector: 'reflective' as SectorName,
-          content: r.observation,
-          embedding: r.embedding,
-          profileId: r.profileId,
-          createdAt: r.createdAt,
-          lastAccessed: r.lastAccessed,
-        }));
       default:
         return this.getRowsForSector(sector, profileId, SECTOR_SCAN_LIMIT, userId);
     }
@@ -862,7 +799,6 @@ export class SqliteMemoryStore {
     const table =
       sector === 'procedural' ? 'procedural_memory'
         : sector === 'semantic' ? 'semantic_memory'
-        : sector === 'reflective' ? 'reflective_memory'
         : 'memory';
     const timeCol = sector === 'semantic' ? 'updated_at' : 'last_accessed';
 

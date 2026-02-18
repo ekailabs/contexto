@@ -1,4 +1,4 @@
-import type { IngestComponents, SemanticTripleInput, ReflectiveInput } from '../types.js';
+import type { IngestComponents, SemanticTripleInput } from '../types.js';
 import { EXTRACT_PROMPT } from './prompt.js';
 import { buildUrl, getApiKey, getModel, resolveProvider } from './registry.js';
 
@@ -23,34 +23,13 @@ function normalizeSemantic(raw: any): SemanticTripleInput[] {
   }));
 }
 
-/**
- * Normalize reflective output: string → array of ReflectiveInput, filter empty.
- */
-function normalizeReflective(raw: any): ReflectiveInput[] {
-  if (!raw) return [];
-  if (typeof raw === 'string') {
-    return raw.trim() ? [{ observation: raw.trim() }] : [];
-  }
-  const arr = Array.isArray(raw) ? raw : [raw];
-  return arr.filter(
-    (r: any) =>
-      r &&
-      typeof r === 'object' &&
-      typeof r.observation === 'string' && r.observation.trim(),
-  ).map((r: any) => ({
-    observation: r.observation.trim(),
-  }));
-}
-
 function parseResponse(parsed: any): IngestComponents {
   const semantic = normalizeSemantic(parsed.semantic);
-  const reflective = normalizeReflective(parsed.reflective);
 
   return {
     episodic: typeof parsed.episodic === 'string' ? parsed.episodic : '',
     semantic: semantic.length ? semantic : [],
     procedural: parsed.procedural ?? '',
-    reflective: reflective.length ? reflective : [],
   };
 }
 

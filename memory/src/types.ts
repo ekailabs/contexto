@@ -1,4 +1,4 @@
-export type SectorName = 'episodic' | 'semantic' | 'procedural' | 'reflective';
+export type SectorName = 'episodic' | 'semantic' | 'procedural';
 
 export type SemanticDomain = 'user' | 'world' | 'self';
 

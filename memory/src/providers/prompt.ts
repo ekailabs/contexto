@@ -20,15 +20,10 @@ Return ONLY valid JSON with these keys:
     "result": "",
     "context": ""
   },
-  "reflective": [
-    {
-      "observation": ""
-    }
-  ]
 }
 
 RULES:
-- If a field does not apply, return "" for episodic, [] for semantic/reflective, {} for procedural.
+- If a field does not apply, return "" for episodic, [] for semantic, {} for procedural.
 - Do NOT repeat information across fields.
 
 EPISODIC — events with time context, place, or uncertain/one-off claims:
@@ -50,13 +45,5 @@ SEMANTIC — stable, context-free facts as subject-predicate-object triples:
 
 PROCEDURAL — multi-step workflows or processes:
   - Must be a genuine multi-step process; if not, leave empty {}.
-
-REFLECTIVE — meta-cognitive observations about my own behavior or patterns:
-  - Return an ARRAY of observations.
-  - Things I notice about how I'm performing, patterns in my interactions, lessons learned.
-  - Examples:
-    * {"observation": "I tend to give overly detailed answers when a short response would suffice"}
-    * {"observation": "Sha responds better when I lead with the conclusion before the reasoning"}
-  - Only include genuine insights, not restating conversation content.
 
 - NEVER output anything outside the JSON.`;
