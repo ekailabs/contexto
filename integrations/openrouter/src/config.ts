@@ -23,4 +23,4 @@ if (!OPENROUTER_API_KEY) {
 }
 
 export const MEMORY_DB_PATH = process.env.MEMORY_DB_PATH ?? './memory.db';
-export const PORT = parseInt(process.env.OPENROUTER_PORT || '4010', 10);
+export const PORT = parseInt(process.env.OPENROUTER_PORT || process.env.PORT || '4010', 10);

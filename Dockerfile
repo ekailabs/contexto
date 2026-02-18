@@ -95,7 +95,7 @@ EXPOSE 4010
 CMD ["node", "dist/server.js"]
 
 # ---------- openrouter + dashboard Cloud Run runtime (single container) ----------
-FROM node:20-alpine AS openrouter-cloudrun
+FROM node:20-alpine AS ekai-cloudrun
 WORKDIR /app
 ENV NODE_ENV=production
 

@@ -1,12 +1,6 @@
-# OpenRouter + Memory — Quick Start
+# Add Memory to Your OpenRouter Proxy
 
-## Build
-
-```sh
-docker build --target openrouter-cloudrun -t ekai-openrouter .
-```
-
-## Run
+## Quick Start (pre-built image)
 
 ```sh
 docker run -d --name ekai \
@@ -14,7 +8,31 @@ docker run -d --name ekai \
   -e MEMORY_EMBED_PROVIDER=openrouter \
   -e MEMORY_EXTRACT_PROVIDER=openrouter \
   -p 4010:4010 \
-  ekai-openrouter
+  ghcr.io/ekailabs/ekai-cloudrun:latest
+```
+
+## Build from Source
+
+```sh
+docker build --target ekai-cloudrun -t ekai-cloudrun .
+docker run -d --name ekai \
+  -e OPENROUTER_API_KEY=sk-or-... \
+  -e MEMORY_EMBED_PROVIDER=openrouter \
+  -e MEMORY_EXTRACT_PROVIDER=openrouter \
+  -p 4010:4010 \
+  ekai-cloudrun
+```
+
+## Deploy to Cloud Run
+
+```sh
+gcloud run deploy ekai-cloudrun \
+  --image ghcr.io/ekailabs/ekai-cloudrun:latest \
+  --region us-central1 \
+  --set-env-vars OPENROUTER_API_KEY=sk-or-... \
+  --set-env-vars MEMORY_EMBED_PROVIDER=openrouter \
+  --set-env-vars MEMORY_EXTRACT_PROVIDER=openrouter \
+  --allow-unauthenticated
 ```
 
 ### Environment
