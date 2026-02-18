@@ -57,8 +57,9 @@ By decoupling your context from any single provider or interface, the Gateway ma
 - **OpenAI and Anthropic Compatibility:** Works with standard API formats used by most clients  
 - **Self-Hosted Control:** Run locally or in your own environment; no external dependencies  
 - **Usage Analytics:** Built-in dashboard for tracking tokens, requests, and costs  
-- **Context Portability:** Maintain continuity when switching models or interfaces  
-- **Cost-Optimized Routing:** Automatically select the most efficient provider for each model  
+- **Context Portability:** Maintain continuity when switching models or interfaces
+- **Memory Loop:** Conversations are automatically ingested and recalled across sessions — no client changes needed
+- **Cost-Optimized Routing:** Automatically select the most efficient provider for each model
 - **Transparent Billing:** Use your own API keys for full visibility and ownership  
 
 

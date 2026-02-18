@@ -1,47 +1,75 @@
-#!/bin/sh
+#!/bin/bash
 set -euo pipefail
-
-GATEWAY_DIR="/app/gateway"
-DASHBOARD_DIR="/app/ui/dashboard"
 
 PORT="${PORT:-3001}"
 UI_PORT="${UI_PORT:-3000}"
+MEMORY_PORT="${MEMORY_PORT:-4005}"
+OPENROUTER_PORT="${OPENROUTER_PORT:-4010}"
 
-# Runtime API URL detection
-if [ -n "${NEXT_PUBLIC_API_BASE_URL:-}" ]; then
-  # If NEXT_PUBLIC_API_BASE_URL is set at runtime, use it
-  API_URL="$NEXT_PUBLIC_API_BASE_URL"
-else
-  # Default for local development
-  API_URL="http://localhost:${PORT}"
-fi
+# Service toggles (all enabled by default)
+ENABLE_GATEWAY="${ENABLE_GATEWAY:-true}"
+ENABLE_DASHBOARD="${ENABLE_DASHBOARD:-true}"
+ENABLE_MEMORY="${ENABLE_MEMORY:-true}"
+ENABLE_OPENROUTER="${ENABLE_OPENROUTER:-true}"
 
-echo "Configuring API URL: $API_URL"
-
-# Replace placeholder in Next.js built files
-cd "$DASHBOARD_DIR"
-if [ "$API_URL" != "__API_URL_PLACEHOLDER__" ]; then
-  echo "Replacing placeholder with $API_URL in Next.js build files..."
-  find .next -type f \( -name "*.js" -o -name "*.json" \) -exec sed -i "s|__API_URL_PLACEHOLDER__|$API_URL|g" {} + 2>/dev/null || true
-fi
+PIDS=()
 
 cleanup() {
-  if [ -n "${GW_PID:-}" ] && kill -0 "$GW_PID" 2>/dev/null; then
-    kill "$GW_PID" 2>/dev/null || true
-  fi
-  if [ -n "${UI_PID:-}" ] && kill -0 "$UI_PID" 2>/dev/null; then
-    kill "$UI_PID" 2>/dev/null || true
-  fi
+  for pid in "${PIDS[@]}"; do
+    kill "$pid" 2>/dev/null || true
+  done
 }
-
 trap cleanup INT TERM
 
-cd "$GATEWAY_DIR"
-node dist/gateway/src/index.js &
-GW_PID=$!
+# Runtime API URL replacement for Next.js
+if [ "$ENABLE_DASHBOARD" != "false" ] && [ "$ENABLE_DASHBOARD" != "0" ]; then
+  API_URL="${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${PORT}}"
+  echo "Configuring API URL: $API_URL"
+  cd /app/ui/dashboard
+  if [ "$API_URL" != "__API_URL_PLACEHOLDER__" ]; then
+    find .next -type f \( -name "*.js" -o -name "*.json" \) -exec sed -i "s|__API_URL_PLACEHOLDER__|$API_URL|g" {} + 2>/dev/null || true
+  fi
+fi
 
-cd "$DASHBOARD_DIR"
-npx next start -p "$UI_PORT" -H 0.0.0.0 &
-UI_PID=$!
+# Start services
+echo ""
+echo "  ekai-gateway (docker)"
+echo ""
 
-wait -n "$GW_PID" "$UI_PID"
+if [ "$ENABLE_GATEWAY" != "false" ] && [ "$ENABLE_GATEWAY" != "0" ]; then
+  echo "  Starting gateway on :${PORT}"
+  cd /app/gateway
+  PORT="$PORT" node dist/gateway/src/index.js &
+  PIDS+=($!)
+fi
+
+if [ "$ENABLE_DASHBOARD" != "false" ] && [ "$ENABLE_DASHBOARD" != "0" ]; then
+  echo "  Starting dashboard on :${UI_PORT}"
+  cd /app/ui/dashboard
+  node_modules/.bin/next start -p "$UI_PORT" -H 0.0.0.0 &
+  PIDS+=($!)
+fi
+
+if [ "$ENABLE_MEMORY" != "false" ] && [ "$ENABLE_MEMORY" != "0" ]; then
+  echo "  Starting memory on :${MEMORY_PORT}"
+  cd /app/memory
+  MEMORY_PORT="$MEMORY_PORT" MEMORY_DB_PATH="${MEMORY_DB_PATH:-/app/memory/data/memory.db}" node dist/server.js &
+  PIDS+=($!)
+fi
+
+if [ "$ENABLE_OPENROUTER" != "false" ] && [ "$ENABLE_OPENROUTER" != "0" ]; then
+  echo "  Starting openrouter on :${OPENROUTER_PORT}"
+  cd /app/integrations/openrouter
+  PORT="$OPENROUTER_PORT" node dist/server.js &
+  PIDS+=($!)
+fi
+
+echo ""
+
+if [ ${#PIDS[@]} -eq 0 ]; then
+  echo "  No services enabled."
+  exit 0
+fi
+
+# Wait for all children to exit (or indefinitely if restart=unless-stopped)
+wait

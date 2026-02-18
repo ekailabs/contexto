@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { formatMemoryBlock, injectMemory } from './memory.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock config before importing memory module
+vi.mock('./config.js', () => ({
+  MEMORY_URL: 'http://localhost:4005',
+}));
+
+import { fetchMemoryContext, formatMemoryBlock, ingestMessages, injectMemory } from './memory.js';
 
 describe('formatMemoryBlock', () => {
   it('formats semantic facts under "What I know:"', () => {
@@ -109,6 +115,57 @@ describe('formatMemoryBlock', () => {
     expect(block).not.toContain('What I know:');
     expect(block).not.toContain('What I remember:');
     expect(block).not.toContain('How I do things:');
+  });
+});
+
+describe('ingestMessages', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('POSTs messages and profile to /v1/ingest', async () => {
+    const mockFetch = vi.mocked(fetch);
+    mockFetch.mockResolvedValueOnce(new Response('ok', { status: 200 }));
+
+    const messages = [
+      { role: 'user', content: 'My dog is named Luna' },
+    ];
+
+    ingestMessages(messages, 'test-profile');
+
+    // Let the fire-and-forget promise settle
+    await vi.waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:4005/v1/ingest');
+    expect(options).toMatchObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const body = JSON.parse(options!.body as string);
+    expect(body.messages).toEqual(messages);
+    expect(body.profile).toBe('test-profile');
+  });
+
+  it('logs and swallows fetch errors', async () => {
+    const mockFetch = vi.mocked(fetch);
+    mockFetch.mockRejectedValueOnce(new Error('connection refused'));
+
+    ingestMessages([{ role: 'user', content: 'hello' }], 'default');
+
+    await vi.waitFor(() => {
+      expect(console.warn).toHaveBeenCalledWith(
+        '[memory] ingest failed: connection refused',
+      );
+    });
   });
 });
 

@@ -19,9 +19,7 @@ Multi-provider AI proxy with usage dashboard supporting Anthropic, OpenAI, Googl
 
 ## 🎥 Demo Video
 
-<a href="https://youtu.be/hZC1Y_dWdhI" target="_blank">
-  <img src="https://img.youtube.com/vi/hZC1Y_dWdhI/0.jpg" alt="Demo Video" width="560" height="315">
-</a>
+{% embed url="https://www.youtube.com/watch?v=sLg9YmYtg64" %}
 
 ## Quick Start (Beta)
 
@@ -56,12 +54,23 @@ docker run --env-file .env -p 3001:3001 -p 3000:3000 ghcr.io/ekailabs/ekai-gatew
 Important: The dashboard is initially empty. After setup, send a query using your own client/tool (IDE, app, or API) through the gateway; usage appears once at least one request is processed.
 
 **Access Points (default ports, configurable in `.env`):**
-- Gateway API: port `3001` (`PORT`)
-- Dashboard UI: port `3000`
-- Memory Service: port `4005` (`MEMORY_PORT`)
-- Detailed setup steps live in `docs/getting-started.md`; check `docs/` for additional guides.
+- Gateway API: port `3001` (`PORT`) - OpenAI/Anthropic compatible endpoints
+- Dashboard UI: port `3000` (`UI_PORT`) - Usage analytics and cost tracking
+- Memory Service: port `4005` (`MEMORY_PORT`) - Agent memory and context storage
+- OpenRouter Integration: port `4010` (`OPENROUTER_PORT`) - OpenRouter proxy service
 
 The dashboard auto-detects the host and connects to the gateway and memory service on the same host using their configured ports. No extra URL configuration needed.
+
+**Docker Service Configuration:**
+All services run in a single Docker container. Control which services start via `.env`:
+```bash
+ENABLE_GATEWAY=true       # API server (default: true)
+ENABLE_DASHBOARD=true     # Web dashboard (default: true)
+ENABLE_MEMORY=true        # Memory service (default: true)
+ENABLE_OPENROUTER=true    # OpenRouter integration (default: true)
+```
+
+Detailed setup steps live in `docs/getting-started.md`; check `docs/` for additional guides.
 
 ### Build the Image Yourself (optional)
 
@@ -124,11 +133,14 @@ codex
 
 ```
 ekai-gateway/
-├── gateway/          # Backend API and routing
-├── ui/              # Dashboard frontend
-├── memory/          # Agent memory service
-├── shared/          # Shared types and utilities
-└── package.json     # Root package configuration
+├── gateway/              # Backend API and routing
+├── ui/dashboard/         # Dashboard frontend (Next.js)
+├── memory/               # Agent memory service
+├── integrations/
+│   └── openrouter/       # OpenRouter integration service
+├── scripts/
+│   └── launcher.js       # Unified service launcher
+└── package.json          # Root workspace configuration
 ```
 
 ## API Endpoints
@@ -190,33 +202,47 @@ The proxy uses **cost-based optimization** to automatically select the cheapest 
 
 **Multi-client proxy**: Web apps, mobile apps, and scripts share conversations across providers with automatic cost tracking and optimization.
 
-## Production Commands
+## Running Services
+
+### With npm (local development)
+
+A unified launcher starts all 4 services by default (gateway, dashboard, memory, openrouter):
 
 ```bash
-npm run build  # Build TypeScript for production
-npm start      # Start gateway, dashboard, and memory service
+npm run dev    # Development mode — all services with hot-reload
+npm start      # Production mode — all services from built output
 ```
 
-**Individual services (ports configurable via `PORT` and `MEMORY_PORT` in `.env`):**
-```bash
-npm run start:gateway  # Gateway API only (default: 3001)
-npm run start:ui       # Dashboard UI only (default: 3000)
-npm run start:memory   # Memory service only (default: 4005)
-```
-
-## Development
+**Disable individual services** by setting `ENABLE_<NAME>=false`:
 
 ```bash
-npm run dev      # Start gateway and dashboard in development mode
-npm run dev:all  # Start gateway, dashboard, and memory service
+ENABLE_DASHBOARD=false npm run dev           # Skip the dashboard
+ENABLE_OPENROUTER=false npm start            # Production without openrouter
+ENABLE_MEMORY=false ENABLE_DASHBOARD=false npm run dev  # Gateway + openrouter only
 ```
 
-**Individual services:**
+**Individual service scripts** (escape hatches):
+
 ```bash
-cd gateway && npm run dev    # Gateway only (port 3001)
-cd ui/dashboard && npm run dev    # Dashboard only (port 3000)
-cd memory && npm start       # Memory service only (port 4005)
+npm run dev:gateway     # Gateway only (port 3001)
+npm run dev:ui          # Dashboard only (port 3000)
+npm run dev:openrouter  # OpenRouter integration only (port 4010)
+npm run start:gateway   # Production gateway
+npm run start:ui        # Production dashboard
+npm run start:memory    # Memory service (port 4005)
 ```
+
+### With Docker
+
+All services run together in a single container. The entrypoint script manages service lifecycle and ensures all enabled services stay running:
+
+```bash
+docker compose up -d    # Start all services
+docker compose logs -f  # View logs from all services
+docker compose down     # Stop all services
+```
+
+Services are controlled via `.env` file `ENABLE_*` variables. The Docker container will restart automatically on failure (see `docker-compose.yaml` for `restart: unless-stopped`).
 
 ## Contributing
 

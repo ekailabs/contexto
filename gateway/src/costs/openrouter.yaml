@@ -2822,16 +2822,6 @@ models:
     input: 1.2
     output: 1.2
     original_provider: nvidia
-  inflection/inflection-3-pi:
-    id: inflection/inflection-3-pi
-    input: 2.5
-    output: 10
-    original_provider: inflection
-  inflection-3-pi:
-    id: inflection/inflection-3-pi
-    input: 2.5
-    output: 10
-    original_provider: inflection
   inflection/inflection-3-productivity:
     id: inflection/inflection-3-productivity
     input: 2.5
@@ -2839,6 +2829,16 @@ models:
     original_provider: inflection
   inflection-3-productivity:
     id: inflection/inflection-3-productivity
+    input: 2.5
+    output: 10
+    original_provider: inflection
+  inflection/inflection-3-pi:
+    id: inflection/inflection-3-pi
+    input: 2.5
+    output: 10
+    original_provider: inflection
+  inflection-3-pi:
+    id: inflection/inflection-3-pi
     input: 2.5
     output: 10
     original_provider: inflection
@@ -2852,26 +2852,6 @@ models:
     input: 0.17
     output: 0.43
     original_provider: thedrummer
-  meta-llama/llama-3.2-3b-instruct:free:
-    id: meta-llama/llama-3.2-3b-instruct:free
-    input: 0
-    output: 0
-    original_provider: meta-llama
-  llama-3.2-3b-instruct:free:
-    id: meta-llama/llama-3.2-3b-instruct:free
-    input: 0
-    output: 0
-    original_provider: meta-llama
-  meta-llama/llama-3.2-3b-instruct:
-    id: meta-llama/llama-3.2-3b-instruct
-    input: 0.02
-    output: 0.02
-    original_provider: meta-llama
-  llama-3.2-3b-instruct:
-    id: meta-llama/llama-3.2-3b-instruct
-    input: 0.02
-    output: 0.02
-    original_provider: meta-llama
   meta-llama/llama-3.2-1b-instruct:
     id: meta-llama/llama-3.2-1b-instruct
     input: 0.027
@@ -2891,6 +2871,26 @@ models:
     id: meta-llama/llama-3.2-11b-vision-instruct
     input: 0.049
     output: 0.049
+    original_provider: meta-llama
+  meta-llama/llama-3.2-3b-instruct:free:
+    id: meta-llama/llama-3.2-3b-instruct:free
+    input: 0
+    output: 0
+    original_provider: meta-llama
+  llama-3.2-3b-instruct:free:
+    id: meta-llama/llama-3.2-3b-instruct:free
+    input: 0
+    output: 0
+    original_provider: meta-llama
+  meta-llama/llama-3.2-3b-instruct:
+    id: meta-llama/llama-3.2-3b-instruct
+    input: 0.02
+    output: 0.02
+    original_provider: meta-llama
+  llama-3.2-3b-instruct:
+    id: meta-llama/llama-3.2-3b-instruct
+    input: 0.02
+    output: 0.02
     original_provider: meta-llama
   qwen/qwen-2.5-72b-instruct:
     id: qwen/qwen-2.5-72b-instruct
@@ -3022,15 +3022,15 @@ models:
     input: 4
     output: 4
     original_provider: meta-llama
-  meta-llama/llama-3.1-8b-instruct:
-    id: meta-llama/llama-3.1-8b-instruct
-    input: 0.02
-    output: 0.05
+  meta-llama/llama-3.1-70b-instruct:
+    id: meta-llama/llama-3.1-70b-instruct
+    input: 0.4
+    output: 0.4
     original_provider: meta-llama
-  llama-3.1-8b-instruct:
-    id: meta-llama/llama-3.1-8b-instruct
-    input: 0.02
-    output: 0.05
+  llama-3.1-70b-instruct:
+    id: meta-llama/llama-3.1-70b-instruct
+    input: 0.4
+    output: 0.4
     original_provider: meta-llama
   meta-llama/llama-3.1-405b-instruct:
     id: meta-llama/llama-3.1-405b-instruct
@@ -3042,15 +3042,15 @@ models:
     input: 4
     output: 4
     original_provider: meta-llama
-  meta-llama/llama-3.1-70b-instruct:
-    id: meta-llama/llama-3.1-70b-instruct
-    input: 0.4
-    output: 0.4
+  meta-llama/llama-3.1-8b-instruct:
+    id: meta-llama/llama-3.1-8b-instruct
+    input: 0.02
+    output: 0.05
     original_provider: meta-llama
-  llama-3.1-70b-instruct:
-    id: meta-llama/llama-3.1-70b-instruct
-    input: 0.4
-    output: 0.4
+  llama-3.1-8b-instruct:
+    id: meta-llama/llama-3.1-8b-instruct
+    input: 0.02
+    output: 0.05
     original_provider: meta-llama
   mistralai/mistral-nemo:
     id: mistralai/mistral-nemo
@@ -3392,15 +3392,15 @@ models:
     input: 0.06
     output: 0.06
     original_provider: gryphe
-  openai/gpt-4-0314:
-    id: openai/gpt-4-0314
-    input: 30
-    output: 60
+  openai/gpt-3.5-turbo:
+    id: openai/gpt-3.5-turbo
+    input: 0.5
+    output: 1.5
     original_provider: openai
-  gpt-4-0314:
-    id: openai/gpt-4-0314
-    input: 30
-    output: 60
+  gpt-3.5-turbo:
+    id: openai/gpt-3.5-turbo
+    input: 0.5
+    output: 1.5
     original_provider: openai
   openai/gpt-4:
     id: openai/gpt-4
@@ -3412,15 +3412,15 @@ models:
     input: 30
     output: 60
     original_provider: openai
-  openai/gpt-3.5-turbo:
-    id: openai/gpt-3.5-turbo
-    input: 0.5
-    output: 1.5
+  openai/gpt-4-0314:
+    id: openai/gpt-4-0314
+    input: 30
+    output: 60
     original_provider: openai
-  gpt-3.5-turbo:
-    id: openai/gpt-3.5-turbo
-    input: 0.5
-    output: 1.5
+  gpt-4-0314:
+    id: openai/gpt-4-0314
+    input: 30
+    output: 60
     original_provider: openai
 metadata:
   last_updated: '2026-02-16'

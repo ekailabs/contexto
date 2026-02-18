@@ -12,9 +12,7 @@ Deploy your own private ekai-gateway instance on Oasis Network using ROFL (Runti
 
 ## Demo
 
-[![ROFL Deployment Demo Video](https://img.youtube.com/vi/hZC1Y_dWdhI/maxresdefault.jpg)](https://www.youtube.com/watch?v=hZC1Y_dWdhI)
-
-Watch the deployment walkthrough: [ROFL Deployment Demo](https://www.youtube.com/watch?v=hZC1Y_dWdhI)
+{% embed url="https://www.youtube.com/watch?v=sLg9YmYtg64" %}
 
 ---
 

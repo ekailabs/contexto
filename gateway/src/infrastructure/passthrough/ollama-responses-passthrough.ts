@@ -4,7 +4,6 @@ import { ProviderError } from '../../shared/errors/index.js';
 import { CONTENT_TYPES } from '../../domain/types/provider.js';
 import { getConfig } from '../config/app-config.js';
 import { ResponsesPassthrough, ResponsesPassthroughConfig } from './responses-passthrough.js';
-import { injectMemoryContext, persistMemory } from '../memory/memory-helper.js';
 
 export class OllamaResponsesPassthrough implements ResponsesPassthrough {
   constructor(private readonly config: ResponsesPassthroughConfig) {}
@@ -159,18 +158,7 @@ export class OllamaResponsesPassthrough implements ResponsesPassthrough {
     this.eventBuffer = '';
     this.assistantResponseBuffer = '';
 
-    injectMemoryContext(request, {
-      provider: this.config.provider,
-      defaultUserId: 'default',
-      extractCurrentUserInputs: req => extractResponsesUserInputs(req),
-      applyMemoryContext: (req, context) => {
-        if (req.instructions) {
-          req.instructions = `${context}\n\n---\n\n${req.instructions}`;
-        } else {
-          req.instructions = context;
-        }
-      }
-    });
+    // TODO: Add memory context injection when memory service is implemented
 
     if (request.stream) {
       const response = await this.makeRequest(request, true);
@@ -195,15 +183,7 @@ export class OllamaResponsesPassthrough implements ResponsesPassthrough {
       }
       res.end();
 
-      persistMemory(request, this.assistantResponseBuffer, {
-        provider: this.config.provider,
-        defaultUserId: 'default',
-        extractUserContent: req => req.input || '',
-        metadataBuilder: req => ({
-          model: req.model,
-          provider: this.config.provider,
-        }),
-      });
+      // TODO: Persist memory when memory service is implemented
     } else {
       const response = await this.makeRequest(request, false);
       const json = await response.json();
@@ -227,23 +207,9 @@ export class OllamaResponsesPassthrough implements ResponsesPassthrough {
         }).catch(() => {});
       }
 
-      const assistantResponse = json?.output?.[0]?.content?.[0]?.text || json?.output_text || '';
-      persistMemory(request, assistantResponse, {
-        provider: this.config.provider,
-        defaultUserId: 'default',
-        extractUserContent: req => req.input || '',
-        metadataBuilder: req => ({
-          model: req.model,
-          provider: this.config.provider,
-        }),
-      });
+      // TODO: Persist memory when memory service is implemented
 
       res.json(json);
     }
   }
-}
-
-function extractResponsesUserInputs(request: any): string[] {
-  const content = (request.input || '').trim();
-  return content ? [content] : [];
 }
