@@ -7,9 +7,11 @@ import type {
   MemoryRecord,
   ProceduralMemoryRecord,
   SemanticMemoryRecord,
+  ReflectiveMemoryRecord,
   QueryResult,
   SectorName,
-  ConsolidationAction,
+  SemanticTripleInput,
+  ReflectiveInput,
 } from './types.js';
 import { determineConsolidationAction } from './consolidation.js';
 import { PBWM_SECTOR_WEIGHTS, scoreRowPBWM } from './scoring.js';
@@ -17,12 +19,7 @@ import { cosineSimilarity, DEFAULT_PROFILE, normalizeProfileSlug } from './utils
 import { filterAndCapWorkingMemory } from './wm.js';
 import { SemanticGraphTraversal } from './semantic-graph.js';
 
-const SECTORS: SectorName[] = ['episodic', 'semantic', 'procedural'];
-const DEFAULT_WEIGHTS: Record<SectorName, number> = {
-  episodic: 1,
-  semantic: 1,
-  procedural: 1,
-};
+const SECTORS: SectorName[] = ['episodic', 'semantic', 'procedural', 'reflective'];
 const PER_SECTOR_K = 4;
 const WORKING_MEMORY_CAP = 8;
 const SECTOR_SCAN_LIMIT = 200; // simple scan instead of ANN for v0
@@ -47,125 +44,193 @@ export class SqliteMemoryStore {
     this.ensureProfileExists(profileId);
     const createdAt = this.now();
     const rows: MemoryRecord[] = [];
-    const normalized = normalizeComponents(components);
     const source = options?.source;
     const dedup = options?.deduplicate === true;
+    const origin = options?.origin;
+    const userId = options?.userId;
 
-    for (const [sector, content] of Object.entries(normalized) as Array<[SectorName, string | any]>) {
-      // Skip empty content
-      if (!content) continue;
-      if (typeof content === 'string' && !content.trim()) continue;
-      // For procedural, check trigger; for semantic, check if object has valid fields
-      if (sector === 'procedural' && typeof content === 'object' && !content.trigger?.trim()) continue;
-      if (sector === 'semantic' && typeof content === 'object') {
-        // Skip if all semantic fields are empty
-        if (!content.subject?.trim() && !content.predicate?.trim() && !content.object?.trim()) continue;
-      }
+    // Upsert into agent_users when userId is provided
+    if (userId) {
+      this.upsertAgentUser(profileId, userId);
+    }
 
-      // Prepare content for embedding and storage
-      let textToEmbed = '';
-      let procRow: ProceduralMemoryRecord | undefined;
-      let semanticRow: SemanticMemoryRecord | undefined;
+    // --- Episodic ---
+    const episodic = components.episodic;
+    if (episodic && typeof episodic === 'string' && episodic.trim()) {
+      const embedding = await this.embed(episodic, 'episodic');
 
-      if (sector === 'procedural') {
-        if (typeof content === 'string') {
-          textToEmbed = content;
-          procRow = {
-            id: randomUUID(),
-            trigger: content,
+      if (dedup) {
+        const existingDup = this.findDuplicateMemory(embedding, 'episodic', profileId, 0.9);
+        if (existingDup) {
+          if (source && !existingDup.source) {
+            this.setMemorySource(existingDup.id, source);
+          }
+          rows.push({
+            id: existingDup.id,
+            sector: 'episodic',
+            content: existingDup.content,
+            embedding,
             profileId,
-            goal: '',
-            context: '',
-            result: '',
-            steps: [content],
-            embedding: [], // Will be set later
-            createdAt,
-            lastAccessed: createdAt,
-            source,
-          };
+            createdAt: existingDup.createdAt,
+            lastAccessed: existingDup.lastAccessed,
+            source: existingDup.source ?? source,
+          });
         } else {
-          textToEmbed = content.trigger;
-          procRow = {
-            id: randomUUID(),
-            trigger: content.trigger,
-            profileId,
-            goal: content.goal ?? '',
-            context: content.context ?? '',
-            result: content.result ?? '',
-            steps: Array.isArray(content.steps) ? content.steps : [],
-            embedding: [], // Will be set later
-            createdAt,
-            lastAccessed: createdAt,
-            source,
-          };
+          const row = this.buildEpisodicRow(episodic, embedding, profileId, createdAt, source, origin, userId);
+          this.insertRow(row);
+          rows.push(row);
         }
       } else {
-        textToEmbed = content as string;
-        if (sector === 'semantic') {
-          if (typeof content === 'string') {
-            // fallback: wrap string into a generic fact
-            semanticRow = {
-              id: randomUUID(),
-              subject: 'User',
-              predicate: 'statement',
-              object: textToEmbed,
-              profileId,
-              embedding: [],
-              validFrom: createdAt,
-              validTo: null,
-              createdAt,
-              updatedAt: createdAt,
-              strength: 1.0,
-              source,
-            };
+        const row = this.buildEpisodicRow(episodic, embedding, profileId, createdAt, source, origin, userId);
+        this.insertRow(row);
+        rows.push(row);
+      }
+    }
+
+    // --- Semantic (array of triples) ---
+    const semanticInput = components.semantic;
+    const triples = this.normalizeSemanticInput(semanticInput);
+
+    for (const triple of triples) {
+      const textToEmbed = `${triple.subject} ${triple.predicate} ${triple.object}`;
+      const embedding = await this.embed(textToEmbed, 'semantic');
+      const domain = triple.domain ?? 'world';
+      const userScope = domain === 'user' ? (userId ?? null) : null;
+
+      const semanticRow: SemanticMemoryRecord = {
+        id: randomUUID(),
+        subject: triple.subject,
+        predicate: triple.predicate,
+        object: triple.object,
+        profileId,
+        embedding,
+        validFrom: createdAt,
+        validTo: null,
+        createdAt,
+        updatedAt: createdAt,
+        strength: 1.0,
+        source,
+        domain,
+        originType: origin?.originType,
+        originActor: origin?.originActor ?? userId,
+        originRef: origin?.originRef,
+        userScope,
+      };
+
+      // Consolidation
+      const allFactsForSubject = this.findActiveFactsForSubject(triple.subject, profileId);
+      const matchingFacts = await this.findSemanticallyMatchingFacts(
+        triple.predicate,
+        allFactsForSubject,
+        0.9,
+      );
+      const action = determineConsolidationAction(
+        { subject: triple.subject, predicate: triple.predicate, object: triple.object },
+        matchingFacts,
+      );
+
+      switch (action.type) {
+        case 'merge':
+          if (dedup) {
+            if (source) this.setSemanticSource(action.targetId, source);
           } else {
-            // Ensure all three fields are populated for semantic triples
-            const subject = content.subject?.trim() || 'User';
-            const predicate = content.predicate?.trim() || 'hasProperty';
-            const object = content.object?.trim();
-
-            // Skip if object is missing (required for valid triple)
-            if (!object) {
-              continue;
-            }
-
-            semanticRow = {
-              id: randomUUID(),
-              subject,
-              predicate,
-              object,
-              profileId,
-              embedding: [],
-              validFrom: createdAt,
-              validTo: null,
-              createdAt,
-              updatedAt: createdAt,
-              strength: 1.0,
-              source,
-            };
-            // Embed the full triple to capture semantic relationships, not just the object
-            textToEmbed = `${subject} ${predicate} ${object}`;
+            this.strengthenFact(action.targetId);
           }
-        }
+          rows.push({
+            id: action.targetId,
+            sector: 'semantic',
+            content: triple.object,
+            embedding,
+            profileId,
+            createdAt,
+            lastAccessed: createdAt,
+            eventStart: null,
+            eventEnd: null,
+            source,
+          });
+          break;
+
+        case 'supersede':
+          this.supersedeFact(action.targetId);
+          // Fall through to insert
+
+        case 'insert':
+          this.insertSemanticRow(semanticRow);
+          rows.push({
+            id: semanticRow.id,
+            sector: 'semantic',
+            content: triple.object,
+            embedding,
+            profileId,
+            createdAt,
+            lastAccessed: createdAt,
+            eventStart: null,
+            eventEnd: null,
+            source,
+          });
+          break;
+      }
+    }
+
+    // --- Procedural ---
+    const procInput = components.procedural;
+    if (procInput) {
+      let textToEmbed = '';
+      let procRow: ProceduralMemoryRecord | undefined;
+
+      if (typeof procInput === 'string' && procInput.trim()) {
+        textToEmbed = procInput;
+        procRow = {
+          id: randomUUID(),
+          trigger: procInput,
+          profileId,
+          goal: '',
+          context: '',
+          result: '',
+          steps: [procInput],
+          embedding: [],
+          createdAt,
+          lastAccessed: createdAt,
+          source,
+          originType: origin?.originType,
+          originActor: origin?.originActor ?? userId,
+          originRef: origin?.originRef,
+          userScope: userId ?? null,
+        };
+      } else if (typeof procInput === 'object' && procInput.trigger?.trim()) {
+        textToEmbed = procInput.trigger;
+        procRow = {
+          id: randomUUID(),
+          trigger: procInput.trigger,
+          profileId,
+          goal: procInput.goal ?? '',
+          context: procInput.context ?? '',
+          result: procInput.result ?? '',
+          steps: Array.isArray(procInput.steps) ? procInput.steps : [],
+          embedding: [],
+          createdAt,
+          lastAccessed: createdAt,
+          source,
+          originType: origin?.originType,
+          originActor: origin?.originActor ?? userId,
+          originRef: origin?.originRef,
+          userScope: userId ?? null,
+        };
       }
 
-      const embedding = await this.embed(textToEmbed, sector);
-
-      if (sector === 'procedural' && procRow) {
+      if (textToEmbed && procRow) {
+        const embedding = await this.embed(textToEmbed, 'procedural');
         procRow.embedding = embedding;
-        procRow.profileId = profileId;
 
-        // Dedup: check for near-duplicate triggers
         if (dedup) {
           const existingDup = this.findDuplicateProcedural(embedding, profileId, 0.9);
           if (existingDup) {
-            // Optionally add source attribution to existing record
             if (source && !existingDup.source) {
               this.setProceduralSource(existingDup.id, source);
             }
             rows.push({
               id: existingDup.id,
-              sector,
+              sector: 'procedural',
               content: existingDup.trigger,
               embedding,
               profileId,
@@ -173,132 +238,73 @@ export class SqliteMemoryStore {
               lastAccessed: existingDup.lastAccessed,
               source: existingDup.source ?? source,
             });
-            continue;
-          }
-        }
-
-        this.insertProceduralRow(procRow);
-        rows.push({
-          id: procRow.id,
-          sector,
-          content: procRow.trigger,
-          embedding,
-          profileId,
-          createdAt,
-          lastAccessed: createdAt,
-          source,
-        });
-      } else if (sector === 'semantic' && semanticRow) {
-        semanticRow.embedding = embedding;
-        semanticRow.profileId = profileId;
-
-        // Consolidation: find semantically similar predicates (0.9 threshold)
-        const allFactsForSubject = this.findActiveFactsForSubject(
-          semanticRow.subject,
-          profileId
-        );
-        const matchingFacts = await this.findSemanticallyMatchingFacts(
-          semanticRow.predicate,
-          allFactsForSubject,
-          0.9 // Semantic similarity threshold
-        );
-        const action = determineConsolidationAction(
-          { subject: semanticRow.subject, predicate: semanticRow.predicate, object: semanticRow.object },
-          matchingFacts
-        );
-
-        switch (action.type) {
-          case 'merge':
-            if (dedup) {
-              // Document ingestion: skip strength bump, just add source attribution
-              if (source) {
-                this.setSemanticSource(action.targetId, source);
-              }
-            } else {
-              // Chat ingestion: strengthen as before
-              this.strengthenFact(action.targetId);
-            }
+          } else {
+            this.insertProceduralRow(procRow);
             rows.push({
-              id: action.targetId,
-              sector,
-              content: semanticRow.object,
+              id: procRow.id,
+              sector: 'procedural',
+              content: procRow.trigger,
               embedding,
               profileId,
               createdAt,
               lastAccessed: createdAt,
-              eventStart: null,
-              eventEnd: null,
               source,
             });
-            break;
-
-          case 'supersede':
-            // Different object: close old fact, then insert new
-            this.supersedeFact(action.targetId);
-            // Fall through to insert
-
-          case 'insert':
-            // Insert new semantic triple
-            this.insertSemanticRow(semanticRow);
-            rows.push({
-              id: semanticRow.id,
-              sector,
-              content: semanticRow.object,
-              embedding,
-              profileId,
-              createdAt,
-              lastAccessed: createdAt,
-              eventStart: null,
-              eventEnd: null,
-              source,
-            });
-            break;
-        }
-      } else {
-        // Episodic
-        if (dedup) {
-          const existingDup = this.findDuplicateMemory(embedding, sector as SectorName, profileId, 0.9);
-          if (existingDup) {
-            // Optionally add source attribution to existing record
-            if (source && !existingDup.source) {
-              this.setMemorySource(existingDup.id, source);
-            }
-            rows.push({
-              id: existingDup.id,
-              sector: sector as SectorName,
-              content: existingDup.content,
-              embedding,
-              profileId,
-              createdAt: existingDup.createdAt,
-              lastAccessed: existingDup.lastAccessed,
-              source: existingDup.source ?? source,
-            });
-            continue;
           }
+        } else {
+          this.insertProceduralRow(procRow);
+          rows.push({
+            id: procRow.id,
+            sector: 'procedural',
+            content: procRow.trigger,
+            embedding,
+            profileId,
+            createdAt,
+            lastAccessed: createdAt,
+            source,
+          });
         }
-
-        const row: MemoryRecord = {
-          id: randomUUID(),
-          sector,
-          content: textToEmbed,
-          embedding,
-          profileId,
-          createdAt,
-          lastAccessed: createdAt,
-          eventStart: sector === 'episodic' ? createdAt : null,
-          eventEnd: null,
-          source,
-        };
-        this.insertRow(row);
-        rows.push(row);
       }
     }
+
+    // --- Reflective (requires attribution — skip if no origin) ---
+    const reflectiveInput = components.reflective;
+    const reflections = (origin?.originType) ? this.normalizeReflectiveInput(reflectiveInput) : [];
+
+    for (const ref of reflections) {
+      const embedding = await this.embed(ref.observation, 'reflective');
+      const refRow: ReflectiveMemoryRecord = {
+        id: randomUUID(),
+        observation: ref.observation,
+        profileId,
+        embedding,
+        createdAt,
+        lastAccessed: createdAt,
+        source,
+        originType: origin!.originType,
+        originActor: origin!.originActor ?? userId,
+        originRef: origin!.originRef,
+      };
+      this.insertReflectiveRow(refRow);
+      rows.push({
+        id: refRow.id,
+        sector: 'reflective',
+        content: ref.observation,
+        embedding,
+        profileId,
+        createdAt,
+        lastAccessed: createdAt,
+        source,
+      });
+    }
+
     return rows;
   }
 
   async query(
     queryText: string,
     profile?: string,
+    userId?: string,
   ): Promise<{ workingMemory: QueryResult[]; perSector: Record<SectorName, QueryResult[]>; profileId: string }> {
     const profileId = normalizeProfileSlug(profile);
     this.ensureProfileExists(profileId);
@@ -311,45 +317,11 @@ export class SqliteMemoryStore {
       episodic: [],
       semantic: [],
       procedural: [],
+      reflective: [],
     };
 
     for (const sector of SECTORS) {
-      const candidates =
-        sector === 'procedural'
-          ? this.getProceduralRows(profileId, SECTOR_SCAN_LIMIT).map((r) => ({
-              id: r.id,
-              sector: 'procedural' as SectorName,
-              content: r.trigger,
-              embedding: r.embedding,
-              profileId: r.profileId,
-              createdAt: r.createdAt,
-              lastAccessed: r.lastAccessed,
-              details: {
-                trigger: r.trigger,
-                goal: r.goal,
-                context: r.context,
-                result: r.result,
-                steps: r.steps,
-              },
-            }))
-          : sector === 'semantic'
-            ? this.getSemanticRows(profileId, SECTOR_SCAN_LIMIT).map((r) => ({
-                id: r.id,
-                sector: 'semantic' as SectorName,
-                content: `${r.subject} ${r.predicate} ${r.object}`,
-                embedding: r.embedding ?? [],
-                profileId: r.profileId,
-                createdAt: r.createdAt,
-                lastAccessed: r.updatedAt,
-                details: {
-                  subject: r.subject,
-                  predicate: r.predicate,
-                  object: r.object,
-                  validFrom: r.validFrom,
-                  validTo: r.validTo,
-                },
-              }))
-          : this.getRowsForSector(sector, profileId, SECTOR_SCAN_LIMIT);
+      const candidates = this.getCandidatesForSector(sector, profileId, userId);
       const scored = candidates
         .filter((row) => cosineSimilarity(queryEmbeddings[sector], row.embedding) >= 0.2)
         .map((row) => scoreRowPBWM(row, queryEmbeddings[sector], PBWM_SECTOR_WEIGHTS[sector]))
@@ -364,7 +336,7 @@ export class SqliteMemoryStore {
           details: (row as any).details,
         }));
       perSectorResults[sector] = scored;
-      this.touchRows(scored.map((r) => r.id));
+      this.touchRows(scored.map((r) => r.id), sector);
     }
 
     const workingMemory = filterAndCapWorkingMemory(perSectorResults, WORKING_MEMORY_CAP);
@@ -400,6 +372,14 @@ export class SqliteMemoryStore {
       )
       .get({ profileId }) as { sector: SectorName; count: number; lastCreatedAt: number | null };
 
+    const reflectiveRow = this.db
+      .prepare(
+        `select 'reflective' as sector, count(*) as count, max(created_at) as lastCreatedAt
+         from reflective_memory
+         where profile_id = @profileId`,
+      )
+      .get({ profileId }) as { sector: SectorName; count: number; lastCreatedAt: number | null };
+
     const defaults = SECTORS.map((s) => ({
       sector: s,
       count: 0,
@@ -409,6 +389,7 @@ export class SqliteMemoryStore {
     const map = new Map(rows.map((r) => [r.sector, r]));
     if (proceduralRow) map.set('procedural', proceduralRow);
     if (semanticRow) map.set('semantic', semanticRow);
+    if (reflectiveRow) map.set('reflective', reflectiveRow);
     return defaults.map((d) => map.get(d.sector) ?? d);
   }
 
@@ -428,11 +409,17 @@ export class SqliteMemoryStore {
          where profile_id = @profileId
          union all
          select id, 'semantic' as sector, object as content, json('[]') as embedding, created_at as createdAt, updated_at as lastAccessed,
-                json_object('subject', subject, 'predicate', predicate, 'object', object, 'validFrom', valid_from, 'validTo', valid_to, 'strength', strength, 'metadata', metadata) as details,
+                json_object('subject', subject, 'predicate', predicate, 'object', object, 'validFrom', valid_from, 'validTo', valid_to, 'strength', strength, 'metadata', metadata, 'domain', domain) as details,
                 null as eventStart, null as eventEnd, 0 as retrievalCount
          from semantic_memory
          where profile_id = @profileId
            and (valid_to is null or valid_to > @now)
+         union all
+         select id, 'reflective' as sector, observation as content, embedding, created_at as createdAt, last_accessed as lastAccessed,
+                '{}' as details,
+                null as eventStart, null as eventEnd, 0 as retrievalCount
+         from reflective_memory
+         where profile_id = @profileId
          order by createdAt desc
          limit @limit`,
       )
@@ -447,7 +434,7 @@ export class SqliteMemoryStore {
         eventStart: row.eventStart ?? null,
         eventEnd: row.eventEnd ?? null,
       };
-      
+
       // Ensure steps is always an array if it exists
       if (parsed.details && parsed.details.steps) {
         if (typeof parsed.details.steps === 'string') {
@@ -461,18 +448,184 @@ export class SqliteMemoryStore {
           parsed.details.steps = [];
         }
       }
-      
+
       return parsed;
     });
+  }
+
+  // --- Agent Users ---
+
+  upsertAgentUser(agentId: string, userId: string): void {
+    const now = this.now();
+    this.db
+      .prepare(
+        `INSERT INTO agent_users (agent_id, user_id, first_seen, last_seen, interaction_count)
+         VALUES (@agentId, @userId, @now, @now, 1)
+         ON CONFLICT(agent_id, user_id) DO UPDATE SET
+           last_seen = @now,
+           interaction_count = interaction_count + 1`,
+      )
+      .run({ agentId, userId, now });
+  }
+
+  getAgentUsers(agentId: string): Array<{ userId: string; firstSeen: number; lastSeen: number; interactionCount: number }> {
+    return this.db
+      .prepare(
+        `SELECT user_id as userId, first_seen as firstSeen, last_seen as lastSeen, interaction_count as interactionCount
+         FROM agent_users
+         WHERE agent_id = @agentId
+         ORDER BY last_seen DESC`,
+      )
+      .all({ agentId }) as Array<{ userId: string; firstSeen: number; lastSeen: number; interactionCount: number }>;
+  }
+
+  getMemoriesForUser(profile: string, userId: string, limit: number = 50): (MemoryRecord & { details?: any })[] {
+    const profileId = normalizeProfileSlug(profile);
+    this.ensureProfileExists(profileId);
+    const rows = this.db
+      .prepare(
+        `select id, sector, content, embedding, created_at as createdAt, last_accessed as lastAccessed, '{}' as details, event_start as eventStart, event_end as eventEnd, retrieval_count as retrievalCount
+         from memory
+         where profile_id = @profileId and user_scope = @userId
+         union all
+         select id, 'procedural' as sector, trigger as content, embedding, created_at as createdAt, last_accessed as lastAccessed,
+                json_object('trigger', trigger, 'goal', goal, 'context', context, 'result', result, 'steps', json(steps)) as details,
+                null as eventStart, null as eventEnd, 0 as retrievalCount
+         from procedural_memory
+         where profile_id = @profileId and user_scope = @userId
+         union all
+         select id, 'semantic' as sector, object as content, json('[]') as embedding, created_at as createdAt, updated_at as lastAccessed,
+                json_object('subject', subject, 'predicate', predicate, 'object', object, 'validFrom', valid_from, 'validTo', valid_to, 'strength', strength, 'domain', domain) as details,
+                null as eventStart, null as eventEnd, 0 as retrievalCount
+         from semantic_memory
+         where profile_id = @profileId and user_scope = @userId
+           and (valid_to is null or valid_to > @now)
+         union all
+         select id, 'reflective' as sector, observation as content, embedding, created_at as createdAt, last_accessed as lastAccessed,
+                '{}' as details,
+                null as eventStart, null as eventEnd, 0 as retrievalCount
+         from reflective_memory
+         where profile_id = @profileId and origin_actor = @userId
+         order by createdAt desc
+         limit @limit`,
+      )
+      .all({ profileId, userId, limit, now: this.now() }) as Array<Omit<MemoryRecord, 'embedding' | 'profileId'> & { details: string }>;
+
+    return rows.map((row) => ({
+      ...row,
+      profileId,
+      embedding: JSON.parse((row as any).embedding) as number[],
+      details: row.details ? JSON.parse(row.details) : undefined,
+      eventStart: row.eventStart ?? null,
+      eventEnd: row.eventEnd ?? null,
+    }));
+  }
+
+  // --- Reflective ---
+
+  insertReflectiveRow(row: ReflectiveMemoryRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO reflective_memory (
+          id, observation, embedding, created_at, last_accessed, profile_id, source,
+          origin_type, origin_actor, origin_ref
+        ) VALUES (
+          @id, @observation, json(@embedding), @createdAt, @lastAccessed, @profileId, @source,
+          @originType, @originActor, @originRef
+        )`,
+      )
+      .run({
+        id: row.id,
+        observation: row.observation,
+        embedding: JSON.stringify(row.embedding),
+        createdAt: row.createdAt,
+        lastAccessed: row.lastAccessed,
+        profileId: row.profileId ?? DEFAULT_PROFILE,
+        source: row.source ?? null,
+        originType: row.originType ?? null,
+        originActor: row.originActor ?? null,
+        originRef: row.originRef ?? null,
+      });
+  }
+
+  getReflectiveRows(profileId: string, limit: number): ReflectiveMemoryRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, observation, embedding, created_at as createdAt, last_accessed as lastAccessed,
+                profile_id as profileId, source, origin_type as originType, origin_actor as originActor, origin_ref as originRef
+         FROM reflective_memory
+         WHERE profile_id = @profileId
+         ORDER BY last_accessed DESC
+         LIMIT @limit`,
+      )
+      .all({ profileId, limit }) as any[];
+
+    return rows.map((row: any) => ({
+      ...row,
+      embedding: JSON.parse(row.embedding) as number[],
+    }));
+  }
+
+  private buildEpisodicRow(
+    content: string,
+    embedding: number[],
+    profileId: string,
+    createdAt: number,
+    source?: string,
+    origin?: { originType?: string; originActor?: string; originRef?: string },
+    userId?: string,
+  ): MemoryRecord {
+    return {
+      id: randomUUID(),
+      sector: 'episodic' as SectorName,
+      content,
+      embedding,
+      profileId,
+      createdAt,
+      lastAccessed: createdAt,
+      eventStart: createdAt,
+      eventEnd: null,
+      source,
+      originType: origin?.originType,
+      originActor: origin?.originActor ?? userId,
+      originRef: origin?.originRef,
+      userScope: userId ?? null,
+    };
+  }
+
+  private normalizeSemanticInput(input: IngestComponents['semantic']): SemanticTripleInput[] {
+    if (!input) return [];
+    if (Array.isArray(input)) {
+      return input.filter((t) => t.subject?.trim() && t.predicate?.trim() && t.object?.trim());
+    }
+    // Single triple object
+    if (input.subject?.trim() && input.predicate?.trim() && input.object?.trim()) {
+      return [input];
+    }
+    return [];
+  }
+
+  private normalizeReflectiveInput(input: IngestComponents['reflective']): ReflectiveInput[] {
+    if (!input) return [];
+    if (Array.isArray(input)) {
+      return input.filter((r) => r.observation?.trim());
+    }
+    // Single object
+    if (input.observation?.trim()) {
+      return [input];
+    }
+    return [];
   }
 
   private insertRow(row: MemoryRecord) {
     this.db
       .prepare(
         `insert into memory (
-          id, sector, content, embedding, created_at, last_accessed, event_start, event_end, retrieval_count, profile_id, source
+          id, sector, content, embedding, created_at, last_accessed, event_start, event_end, retrieval_count, profile_id, source,
+          origin_type, origin_actor, origin_ref, user_scope
         ) values (
-          @id, @sector, @content, json(@embedding), @createdAt, @lastAccessed, @eventStart, @eventEnd, @retrievalCount, @profileId, @source
+          @id, @sector, @content, json(@embedding), @createdAt, @lastAccessed, @eventStart, @eventEnd, @retrievalCount, @profileId, @source,
+          @originType, @originActor, @originRef, @userScope
         )`,
       )
       .run({
@@ -487,6 +640,10 @@ export class SqliteMemoryStore {
         retrievalCount: (row as any).retrievalCount ?? DEFAULT_RETRIEVAL_COUNT,
         profileId: row.profileId ?? DEFAULT_PROFILE,
         source: row.source ?? null,
+        originType: row.originType ?? null,
+        originActor: row.originActor ?? null,
+        originRef: row.originRef ?? null,
+        userScope: row.userScope ?? null,
       });
   }
 
@@ -494,9 +651,11 @@ export class SqliteMemoryStore {
     this.db
       .prepare(
         `insert into procedural_memory (
-          id, trigger, goal, context, result, steps, embedding, created_at, last_accessed, profile_id, source
+          id, trigger, goal, context, result, steps, embedding, created_at, last_accessed, profile_id, source,
+          origin_type, origin_actor, origin_ref, user_scope
         ) values (
-          @id, @trigger, @goal, @context, @result, json(@steps), json(@embedding), @createdAt, @lastAccessed, @profileId, @source
+          @id, @trigger, @goal, @context, @result, json(@steps), json(@embedding), @createdAt, @lastAccessed, @profileId, @source,
+          @originType, @originActor, @originRef, @userScope
         )`,
       )
       .run({
@@ -511,6 +670,10 @@ export class SqliteMemoryStore {
         lastAccessed: row.lastAccessed,
         profileId: row.profileId ?? DEFAULT_PROFILE,
         source: row.source ?? null,
+        originType: row.originType ?? null,
+        originActor: row.originActor ?? null,
+        originRef: row.originRef ?? null,
+        userScope: row.userScope ?? null,
       });
   }
 
@@ -518,9 +681,11 @@ export class SqliteMemoryStore {
     this.db
       .prepare(
         `insert into semantic_memory (
-          id, subject, predicate, object, valid_from, valid_to, created_at, updated_at, embedding, metadata, profile_id, strength, source
+          id, subject, predicate, object, valid_from, valid_to, created_at, updated_at, embedding, metadata, profile_id, strength, source,
+          domain, origin_type, origin_actor, origin_ref, user_scope
         ) values (
-          @id, @subject, @predicate, @object, @validFrom, @validTo, @createdAt, @updatedAt, json(@embedding), json(@metadata), @profileId, @strength, @source
+          @id, @subject, @predicate, @object, @validFrom, @validTo, @createdAt, @updatedAt, json(@embedding), json(@metadata), @profileId, @strength, @source,
+          @domain, @originType, @originActor, @originRef, @userScope
         )`,
       )
       .run({
@@ -537,6 +702,11 @@ export class SqliteMemoryStore {
         profileId: row.profileId ?? DEFAULT_PROFILE,
         strength: row.strength ?? 1.0,
         source: row.source ?? null,
+        domain: row.domain ?? null,
+        originType: row.originType ?? null,
+        originActor: row.originActor ?? null,
+        originRef: row.originRef ?? null,
+        userScope: row.userScope ?? null,
       });
   }
 
@@ -587,17 +757,55 @@ export class SqliteMemoryStore {
     this.db.prepare('UPDATE semantic_memory SET source = @source WHERE id = @id').run({ id, source });
   }
 
-  private getRowsForSector(sector: SectorName, profileId: string, limit: number): MemoryRecord[] {
-    const rows = this.db
-      .prepare(
-        `select id, sector, content, embedding, created_at as createdAt, last_accessed as lastAccessed,
-                event_start as eventStart, event_end as eventEnd, retrieval_count as retrievalCount, profile_id as profileId, source
-         from memory
-         where sector = @sector and profile_id = @profileId
-         order by last_accessed desc
-         limit @limit`,
-      )
-      .all({ sector, limit, profileId }) as Array<Omit<MemoryRecord, 'embedding'>>;
+  private getCandidatesForSector(sector: SectorName, profileId: string, userId?: string): MemoryRecord[] {
+    switch (sector) {
+      case 'procedural':
+        return this.getProceduralRows(profileId, SECTOR_SCAN_LIMIT, userId).map((r) => ({
+          id: r.id,
+          sector: 'procedural' as SectorName,
+          content: r.trigger,
+          embedding: r.embedding,
+          profileId: r.profileId,
+          createdAt: r.createdAt,
+          lastAccessed: r.lastAccessed,
+          details: { trigger: r.trigger, goal: r.goal, context: r.context, result: r.result, steps: r.steps },
+        } as any));
+      case 'semantic':
+        return this.getSemanticRows(profileId, SECTOR_SCAN_LIMIT, userId).map((r) => ({
+          id: r.id,
+          sector: 'semantic' as SectorName,
+          content: `${r.subject} ${r.predicate} ${r.object}`,
+          embedding: r.embedding ?? [],
+          profileId: r.profileId,
+          createdAt: r.createdAt,
+          lastAccessed: r.updatedAt,
+          details: { subject: r.subject, predicate: r.predicate, object: r.object, validFrom: r.validFrom, validTo: r.validTo, domain: r.domain },
+        } as any));
+      case 'reflective':
+        return this.getReflectiveRows(profileId, SECTOR_SCAN_LIMIT).map((r) => ({
+          id: r.id,
+          sector: 'reflective' as SectorName,
+          content: r.observation,
+          embedding: r.embedding,
+          profileId: r.profileId,
+          createdAt: r.createdAt,
+          lastAccessed: r.lastAccessed,
+        }));
+      default:
+        return this.getRowsForSector(sector, profileId, SECTOR_SCAN_LIMIT, userId);
+    }
+  }
+
+  private getRowsForSector(sector: SectorName, profileId: string, limit: number, userId?: string): MemoryRecord[] {
+    const userFilter = userId ? 'and (user_scope is null or user_scope = @userId)' : '';
+    const rows = this.db.prepare(
+      `select id, sector, content, embedding, created_at as createdAt, last_accessed as lastAccessed,
+              event_start as eventStart, event_end as eventEnd, retrieval_count as retrievalCount, profile_id as profileId, source
+       from memory
+       where sector = @sector and profile_id = @profileId ${userFilter}
+       order by last_accessed desc
+       limit @limit`,
+    ).all({ sector, limit, profileId, userId }) as Array<Omit<MemoryRecord, 'embedding'>>;
 
     return rows.map((row) => ({
       ...row,
@@ -605,39 +813,38 @@ export class SqliteMemoryStore {
     }));
   }
 
-  private getSemanticRows(profileId: string, limit: number): SemanticMemoryRecord[] {
+  private getSemanticRows(profileId: string, limit: number, userId?: string): SemanticMemoryRecord[] {
     const now = this.now();
-    const rows = this.db
-      .prepare(
-        `select id, subject, predicate, object, valid_from as validFrom, valid_to as validTo,
-                created_at as createdAt, updated_at as updatedAt, embedding, metadata, profile_id as profileId,
-                strength
-         from semantic_memory
-         where profile_id = @profileId
-           and (valid_to is null or valid_to > @now)
-         order by strength desc, updated_at desc
-         limit @limit`,
-      )
-      .all({ limit, profileId, now }) as any[];
+    const userFilter = userId ? 'and (user_scope is null or user_scope = @userId)' : '';
+    const rows = this.db.prepare(
+      `select id, subject, predicate, object, valid_from as validFrom, valid_to as validTo,
+              created_at as createdAt, updated_at as updatedAt, embedding, metadata, profile_id as profileId,
+              strength, domain
+       from semantic_memory
+       where profile_id = @profileId
+         and (valid_to is null or valid_to > @now)
+         ${userFilter}
+       order by strength desc, updated_at desc
+       limit @limit`,
+    ).all({ limit, profileId, now, userId }) as any[];
 
-    return rows.map((row) => ({
+    return rows.map((row: any) => ({
       ...row,
-      embedding: JSON.parse((row as any).embedding) as number[],
-      metadata: row.metadata ? JSON.parse((row as any).metadata) : undefined,
+      embedding: JSON.parse(row.embedding) as number[],
+      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
       strength: row.strength ?? 1.0,
     }));
   }
 
-  private getProceduralRows(profileId: string, limit: number): ProceduralMemoryRecord[] {
-    const rows = this.db
-      .prepare(
-        `select id, trigger, goal, context, result, steps, embedding, created_at as createdAt, last_accessed as lastAccessed, profile_id as profileId, source
-         from procedural_memory
-         where profile_id = @profileId
-         order by last_accessed desc
-         limit @limit`,
-      )
-      .all({ limit, profileId }) as Array<Omit<ProceduralMemoryRecord, 'embedding' | 'steps'>>;
+  private getProceduralRows(profileId: string, limit: number, userId?: string): ProceduralMemoryRecord[] {
+    const userFilter = userId ? 'and (user_scope is null or user_scope = @userId)' : '';
+    const rows = this.db.prepare(
+      `select id, trigger, goal, context, result, steps, embedding, created_at as createdAt, last_accessed as lastAccessed, profile_id as profileId, source
+       from procedural_memory
+       where profile_id = @profileId ${userFilter}
+       order by last_accessed desc
+       limit @limit`,
+    ).all({ limit, profileId, userId }) as Array<Omit<ProceduralMemoryRecord, 'embedding' | 'steps'>>;
 
     return rows.map((row) => ({
       ...row,
@@ -646,16 +853,22 @@ export class SqliteMemoryStore {
     }));
   }
 
-  private touchRows(ids: string[]) {
+  private touchRows(ids: string[], sector?: SectorName) {
     if (!ids.length) return;
     const placeholders = ids.map(() => '?').join(',');
+    const now = this.now();
+
+    // Each sector lives in its own table
+    const table =
+      sector === 'procedural' ? 'procedural_memory'
+        : sector === 'semantic' ? 'semantic_memory'
+        : sector === 'reflective' ? 'reflective_memory'
+        : 'memory';
+    const timeCol = sector === 'semantic' ? 'updated_at' : 'last_accessed';
+
     this.db
-      .prepare(
-        `update memory
-         set last_accessed = ?
-         where id in (${placeholders})`,
-      )
-      .run(this.now(), ...ids);
+      .prepare(`update ${table} set ${timeCol} = ? where id in (${placeholders})`)
+      .run(now, ...ids);
   }
 
   private prepareSchema() {
@@ -715,11 +928,46 @@ export class SqliteMemoryStore {
       .run();
     this.db.prepare('create index if not exists idx_semantic_subject_pred on semantic_memory(subject, predicate)').run();
     this.db.prepare('create index if not exists idx_semantic_object on semantic_memory(object)').run();
+
+    // New tables
+    this.db
+      .prepare(
+        `create table if not exists reflective_memory (
+          id text primary key,
+          observation text not null,
+          embedding json not null,
+          created_at integer not null,
+          last_accessed integer not null,
+          profile_id text not null default '${DEFAULT_PROFILE}',
+          source text,
+          origin_type text,
+          origin_actor text,
+          origin_ref text
+        )`,
+      )
+      .run();
+    this.db.prepare('create index if not exists idx_reflective_profile on reflective_memory(profile_id, last_accessed)').run();
+
+    this.db
+      .prepare(
+        `create table if not exists agent_users (
+          agent_id text not null,
+          user_id text not null,
+          first_seen integer not null,
+          last_seen integer not null,
+          interaction_count integer not null default 1,
+          primary key (agent_id, user_id)
+        )`,
+      )
+      .run();
+    this.db.prepare('create index if not exists idx_agent_users_agent on agent_users(agent_id)').run();
+
     this.ensureProfileColumns();
     this.ensureProfileIndexes();
     this.ensureProfilesTable();
     this.ensureStrengthColumn();
     this.ensureSourceColumn();
+    this.ensureAttributionColumns();
   }
 
   /**
@@ -752,6 +1000,43 @@ export class SqliteMemoryStore {
   }
 
   /**
+   * Add attribution and user_scope columns to all memory tables.
+   * origin_type, origin_actor, origin_ref track where a memory came from.
+   * user_scope limits visibility to a specific user.
+   * domain on semantic_memory classifies facts.
+   */
+  private ensureAttributionColumns() {
+    const tablesWithUserScope = ['memory', 'procedural_memory', 'semantic_memory'];
+    for (const table of tablesWithUserScope) {
+      const columns = this.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (!columns.some((c) => c.name === 'origin_type')) {
+        this.db.prepare(`ALTER TABLE ${table} ADD COLUMN origin_type TEXT DEFAULT NULL`).run();
+      }
+      if (!columns.some((c) => c.name === 'origin_actor')) {
+        this.db.prepare(`ALTER TABLE ${table} ADD COLUMN origin_actor TEXT DEFAULT NULL`).run();
+      }
+      if (!columns.some((c) => c.name === 'origin_ref')) {
+        this.db.prepare(`ALTER TABLE ${table} ADD COLUMN origin_ref TEXT DEFAULT NULL`).run();
+      }
+      if (!columns.some((c) => c.name === 'user_scope')) {
+        this.db.prepare(`ALTER TABLE ${table} ADD COLUMN user_scope TEXT DEFAULT NULL`).run();
+      }
+    }
+
+    // Domain column on semantic_memory only
+    const semCols = this.db.prepare('PRAGMA table_info(semantic_memory)').all() as Array<{ name: string }>;
+    if (!semCols.some((c) => c.name === 'domain')) {
+      this.db.prepare("ALTER TABLE semantic_memory ADD COLUMN domain TEXT DEFAULT NULL").run();
+    }
+
+    // Indexes for user_scope filtering
+    this.db.prepare('CREATE INDEX IF NOT EXISTS idx_memory_user_scope ON memory(user_scope)').run();
+    this.db.prepare('CREATE INDEX IF NOT EXISTS idx_proc_user_scope ON procedural_memory(user_scope)').run();
+    this.db.prepare('CREATE INDEX IF NOT EXISTS idx_semantic_user_scope ON semantic_memory(user_scope)').run();
+    this.db.prepare('CREATE INDEX IF NOT EXISTS idx_semantic_domain ON semantic_memory(domain)').run();
+  }
+
+  /**
    * Find all active (non-expired) facts for a subject.
    * Used for semantic similarity matching during consolidation.
    */
@@ -764,7 +1049,7 @@ export class SqliteMemoryStore {
       .prepare(
         `SELECT id, predicate, object, updated_at as updatedAt
          FROM semantic_memory
-         WHERE subject = @subject 
+         WHERE subject = @subject
            AND profile_id = @profileId
            AND (valid_to IS NULL OR valid_to > @now)
          ORDER BY updated_at DESC`
@@ -786,22 +1071,22 @@ export class SqliteMemoryStore {
 
     // Embed the new predicate
     const newPredicateEmbedding = await this.embed(newPredicate, 'semantic');
-    
+
     // Get unique predicates to embed (avoid duplicate embedding calls)
     const uniquePredicates = [...new Set(existingFacts.map(f => f.predicate))];
     const predicateEmbeddings = new Map<string, number[]>();
-    
+
     for (const pred of uniquePredicates) {
       predicateEmbeddings.set(pred, await this.embed(pred, 'semantic'));
     }
 
     // Filter facts by predicate similarity
     const matchingFacts: Array<{ id: string; object: string; updatedAt: number; similarity: number }> = [];
-    
+
     for (const fact of existingFacts) {
       const factPredicateEmbedding = predicateEmbeddings.get(fact.predicate)!;
       const similarity = cosineSimilarity(newPredicateEmbedding, factPredicateEmbedding);
-      
+
       if (similarity >= threshold) {
         matchingFacts.push({
           id: fact.id,
@@ -828,8 +1113,8 @@ export class SqliteMemoryStore {
   strengthenFact(id: string, delta: number = 1.0): void {
     this.db
       .prepare(
-        `UPDATE semantic_memory 
-         SET strength = strength + @delta, 
+        `UPDATE semantic_memory
+         SET strength = strength + @delta,
              updated_at = @now
          WHERE id = @id`
       )
@@ -843,7 +1128,7 @@ export class SqliteMemoryStore {
   supersedeFact(id: string): void {
     this.db
       .prepare(
-        `UPDATE semantic_memory 
+        `UPDATE semantic_memory
          SET valid_to = @now,
              updated_at = @now
          WHERE id = @id`
@@ -922,10 +1207,10 @@ export class SqliteMemoryStore {
     }
 
     const targetSector = sector ?? existing.sector;
-    
+
     // Regenerate embedding with new content
     const embedding = await this.embed(content, targetSector);
-    
+
     // Update the record
     const stmt = this.db.prepare(
       'update memory set content = ?, sector = ?, embedding = json(?), last_accessed = ? where id = ? and profile_id = ?'
@@ -938,7 +1223,7 @@ export class SqliteMemoryStore {
       id,
       profileId,
     );
-    
+
     return res.changes > 0;
   }
 
@@ -948,7 +1233,8 @@ export class SqliteMemoryStore {
     const res1 = this.db.prepare('delete from memory where id = ? and profile_id = ?').run(id, profileId);
     const res2 = this.db.prepare('delete from procedural_memory where id = ? and profile_id = ?').run(id, profileId);
     const res3 = this.db.prepare('delete from semantic_memory where id = ? and profile_id = ?').run(id, profileId);
-    return (res1.changes ?? 0) + (res2.changes ?? 0) + (res3.changes ?? 0);
+    const res4 = this.db.prepare('delete from reflective_memory where id = ? and profile_id = ?').run(id, profileId);
+    return (res1.changes ?? 0) + (res2.changes ?? 0) + (res3.changes ?? 0) + (res4.changes ?? 0);
   }
 
   deleteAll(profile?: string): number {
@@ -957,7 +1243,8 @@ export class SqliteMemoryStore {
     const res1 = this.db.prepare('delete from memory where profile_id = ?').run(profileId);
     const res2 = this.db.prepare('delete from procedural_memory where profile_id = ?').run(profileId);
     const res3 = this.db.prepare('delete from semantic_memory where profile_id = ?').run(profileId);
-    return (res1.changes ?? 0) + (res2.changes ?? 0) + (res3.changes ?? 0);
+    const res4 = this.db.prepare('delete from reflective_memory where profile_id = ?').run(profileId);
+    return (res1.changes ?? 0) + (res2.changes ?? 0) + (res3.changes ?? 0) + (res4.changes ?? 0);
   }
 
   deleteProfile(profile?: string): number {
@@ -969,6 +1256,8 @@ export class SqliteMemoryStore {
     const deletedCount = this.deleteAll(profileId);
     // Delete the profile itself from the profiles table
     const res = this.db.prepare('delete from profiles where slug = ?').run(profileId);
+    // Delete agent_users entries for this profile
+    this.db.prepare('delete from agent_users where agent_id = ?').run(profileId);
     return deletedCount;
   }
 
@@ -996,12 +1285,4 @@ export class SqliteMemoryStore {
       )
       .run(this.now(), ...ids);
   }
-}
-
-function normalizeComponents(input: IngestComponents): Record<SectorName, string | any> {
-  return {
-    episodic: input.episodic ?? '',
-    semantic: input.semantic ?? '',
-    procedural: input.procedural ?? '',
-  };
 }

@@ -1,6 +1,58 @@
-import type { IngestComponents } from '../types.js';
+import type { IngestComponents, SemanticTripleInput, ReflectiveInput } from '../types.js';
 import { EXTRACT_PROMPT } from './prompt.js';
 import { buildUrl, getApiKey, getModel, resolveProvider } from './registry.js';
+
+/**
+ * Normalize semantic output: single object → array, filter invalid triples.
+ */
+function normalizeSemantic(raw: any): SemanticTripleInput[] {
+  if (!raw) return [];
+  const arr = Array.isArray(raw) ? raw : [raw];
+  return arr.filter(
+    (t: any) =>
+      t &&
+      typeof t === 'object' &&
+      typeof t.subject === 'string' && t.subject.trim() &&
+      typeof t.predicate === 'string' && t.predicate.trim() &&
+      typeof t.object === 'string' && t.object.trim(),
+  ).map((t: any) => ({
+    subject: t.subject.trim(),
+    predicate: t.predicate.trim(),
+    object: t.object.trim(),
+    domain: ['user', 'world', 'self'].includes(t.domain) ? t.domain : 'world',
+  }));
+}
+
+/**
+ * Normalize reflective output: string → array of ReflectiveInput, filter empty.
+ */
+function normalizeReflective(raw: any): ReflectiveInput[] {
+  if (!raw) return [];
+  if (typeof raw === 'string') {
+    return raw.trim() ? [{ observation: raw.trim() }] : [];
+  }
+  const arr = Array.isArray(raw) ? raw : [raw];
+  return arr.filter(
+    (r: any) =>
+      r &&
+      typeof r === 'object' &&
+      typeof r.observation === 'string' && r.observation.trim(),
+  ).map((r: any) => ({
+    observation: r.observation.trim(),
+  }));
+}
+
+function parseResponse(parsed: any): IngestComponents {
+  const semantic = normalizeSemantic(parsed.semantic);
+  const reflective = normalizeReflective(parsed.reflective);
+
+  return {
+    episodic: typeof parsed.episodic === 'string' ? parsed.episodic : '',
+    semantic: semantic.length ? semantic : [],
+    procedural: parsed.procedural ?? '',
+    reflective: reflective.length ? reflective : [],
+  };
+}
 
 export async function extract(text: string): Promise<IngestComponents> {
   const cfg = resolveProvider('extract');
@@ -23,12 +75,7 @@ export async function extract(text: string): Promise<IngestComponents> {
     }
     const json = (await resp.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
     const content = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
-    const parsed = JSON.parse(content) as any;
-    return {
-      episodic: parsed.episodic ?? '',
-      semantic: parsed.semantic ?? '',
-      procedural: parsed.procedural ?? '',
-    };
+    return parseResponse(JSON.parse(content));
   }
 
   const resp = await fetch(url, {
@@ -50,10 +97,5 @@ export async function extract(text: string): Promise<IngestComponents> {
   }
   const json = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
   const content = json.choices[0]?.message?.content ?? '{}';
-  const parsed = JSON.parse(content) as any;
-  return {
-    episodic: parsed.episodic ?? '',
-    semantic: parsed.semantic ?? '',
-    procedural: parsed.procedural ?? '',
-  };
+  return parseResponse(JSON.parse(content));
 }

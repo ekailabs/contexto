@@ -1,12 +1,27 @@
-export type SectorName = 'episodic' | 'semantic' | 'procedural';
+export type SectorName = 'episodic' | 'semantic' | 'procedural' | 'reflective';
+
+export type SemanticDomain = 'user' | 'world' | 'self';
+
+export interface SemanticTripleInput {
+  subject: string;
+  predicate: string;
+  object: string;
+  domain?: SemanticDomain;
+}
+
+export interface ReflectiveInput {
+  observation: string;
+}
+
+export interface MemoryOrigin {
+  originType: 'conversation' | 'document' | 'api' | 'reflection';
+  originActor?: string;   // userId or system identifier
+  originRef?: string;      // conversation id, document path, etc.
+}
 
 export interface IngestComponents {
   episodic?: string;
-  semantic?: string | {
-    subject: string;
-    predicate: string;
-    object: string;
-  };
+  semantic?: SemanticTripleInput | SemanticTripleInput[];
   procedural?: string | {
     trigger: string;
     goal?: string;
@@ -14,6 +29,7 @@ export interface IngestComponents {
     result?: string;
     context?: string;
   };
+  reflective?: ReflectiveInput | ReflectiveInput[];
 }
 
 export interface MemoryRecord {
@@ -27,6 +43,10 @@ export interface MemoryRecord {
   eventStart?: number | null;
   eventEnd?: number | null;
   source?: string;
+  originType?: string;
+  originActor?: string;
+  originRef?: string;
+  userScope?: string | null;
 }
 
 export interface ProceduralMemoryRecord {
@@ -41,6 +61,10 @@ export interface ProceduralMemoryRecord {
   createdAt: number;
   lastAccessed: number;
   source?: string;
+  originType?: string;
+  originActor?: string;
+  originRef?: string;
+  userScope?: string | null;
 }
 
 export interface SemanticMemoryRecord {
@@ -57,6 +81,24 @@ export interface SemanticMemoryRecord {
   strength: number;           // Evidence count from consolidation (starts at 1.0)
   source?: string;
   metadata?: Record<string, any>;
+  domain?: SemanticDomain;
+  originType?: string;
+  originActor?: string;
+  originRef?: string;
+  userScope?: string | null;
+}
+
+export interface ReflectiveMemoryRecord {
+  id: string;
+  observation: string;
+  profileId: string;
+  embedding: number[];
+  createdAt: number;
+  lastAccessed: number;
+  source?: string;
+  originType?: string;
+  originActor?: string;
+  originRef?: string;
 }
 
 /**
@@ -97,4 +139,6 @@ export interface GraphPath {
 export interface IngestOptions {
   source?: string;
   deduplicate?: boolean;
+  origin?: MemoryOrigin;
+  userId?: string;
 }

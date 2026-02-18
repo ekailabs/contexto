@@ -5,6 +5,7 @@ const DEFAULT_SECTOR_WEIGHTS: Record<SectorName, number> = {
   episodic: 1,
   semantic: 1,
   procedural: 1,
+  reflective: 0.8,
 };
 const RETRIEVAL_SOFTCAP = 10; // for normalization
 const RELEVANCE_WEIGHT = 1.0;

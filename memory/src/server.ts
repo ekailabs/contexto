@@ -48,7 +48,7 @@ async function main() {
     }
   });
 
-  app.delete('/v1/profiles/:slug', (req, res) => {
+  const handleDeleteProfile: express.RequestHandler = (req, res) => {
     try {
       const { slug } = req.params;
       const normalizedProfile = normalizeProfileSlug(slug);
@@ -63,39 +63,19 @@ async function main() {
       }
       res.status(500).json({ error: err.message ?? 'delete profile failed' });
     }
-  });
-
-  // Backward/compatibility alias (singular path)
-  app.delete('/v1/profile/:slug', (req, res) => {
-    try {
-      const { slug } = req.params;
-      const normalizedProfile = normalizeProfileSlug(slug);
-      const deleted = store.deleteProfile(normalizedProfile);
-      res.json({ deleted, profile: normalizedProfile });
-    } catch (err: any) {
-      if (err?.message === 'invalid_profile') {
-        return res.status(400).json({ error: 'invalid_profile' });
-      }
-      if (err?.message === 'cannot_delete_default_profile') {
-        return res.status(400).json({ error: 'default_profile_protected' });
-      }
-      res.status(500).json({ error: err.message ?? 'delete profile failed' });
-    }
-  });
+  };
+  app.delete('/v1/profiles/:slug', handleDeleteProfile);
 
   app.post('/v1/ingest', async (req, res) => {
-    const { messages, reasoning, feedback, metadata, profile, profileId } = req.body as {
+    const { messages, profile, userId } = req.body as {
       messages?: Array<{ role: 'user' | 'assistant' | string; content: string }>;
-      reasoning?: string;
-      feedback?: { type?: 'success' | 'failure'; value?: number; [key: string]: any };
-      metadata?: Record<string, any>;
       profile?: string;
-      profileId?: string;
+      userId?: string;
     };
 
     let normalizedProfile: string;
     try {
-      normalizedProfile = normalizeProfileSlug(profile ?? profileId);
+      normalizedProfile = normalizeProfileSlug(profile);
     } catch (err: any) {
       if (err?.message === 'invalid_profile') {
         return res.status(400).json({ error: 'invalid_profile' });
@@ -111,12 +91,16 @@ async function main() {
       return res.status(400).json({ error: 'at least one user message with content is required' });
     }
 
-    const sourceText = userMessages.map((m) => m.content.trim()).join('\n\n');
+    // Pass full conversation (user + assistant) to extraction for agent-centric reflection
+    const allMessages = messages.filter((m) => m.content?.trim());
+    const sourceText = allMessages
+      .map((m) => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content.trim()}`)
+      .join('\n\n');
+
     let finalComponents: IngestComponents | undefined;
 
     try {
       finalComponents = await extract(sourceText);
-      // TODO: incorporate reasoning/feedback into sector construction instead of ignoring them
     } catch (err: any) {
       return res.status(500).json({ error: err.message ?? 'extraction failed' });
     }
@@ -125,7 +109,10 @@ async function main() {
       return res.status(400).json({ error: 'unable to extract components from messages' });
     }
     try {
-      const rows = await store.ingest(finalComponents, normalizedProfile);
+      const rows = await store.ingest(finalComponents, normalizedProfile, {
+        origin: { originType: 'conversation', originActor: userId },
+        userId,
+      });
       res.json({ stored: rows.length, ids: rows.map((r) => r.id), profile: normalizedProfile });
     } catch (err: any) {
       res.status(500).json({ error: err.message ?? 'ingest failed' });
@@ -133,10 +120,9 @@ async function main() {
   });
 
   app.post('/v1/ingest/documents', async (req, res) => {
-    const { path: docPath, profile, profileId } = req.body as {
+    const { path: docPath, profile } = req.body as {
       path?: string;
       profile?: string;
-      profileId?: string;
     };
 
     if (!docPath || !docPath.trim()) {
@@ -145,7 +131,7 @@ async function main() {
 
     let normalizedProfile: string;
     try {
-      normalizedProfile = normalizeProfileSlug(profile ?? profileId);
+      normalizedProfile = normalizeProfileSlug(profile);
     } catch (err: any) {
       if (err?.message === 'invalid_profile') {
         return res.status(400).json({ error: 'invalid_profile' });
@@ -172,7 +158,7 @@ async function main() {
   app.get('/v1/summary', (req, res) => {
     try {
       const limit = Number(req.query.limit) || 50;
-      const profile = (req.query.profile as string) ?? (req.query.profileId as string);
+      const profile = req.query.profile as string;
       const normalizedProfile = normalizeProfileSlug(profile);
       const summary = store.getSectorSummary(normalizedProfile);
       const recent = store.getRecent(normalizedProfile, limit).map((r) => ({
@@ -197,8 +183,8 @@ async function main() {
   app.put('/v1/memory/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { content, sector, profile, profileId } = req.body as { content?: string; sector?: string; profile?: string; profileId?: string };
-      
+      const { content, sector, profile } = req.body as { content?: string; sector?: string; profile?: string };
+
       if (!id) return res.status(400).json({ error: 'id_required' });
       if (!content || !content.trim()) {
         return res.status(400).json({ error: 'content_required' });
@@ -206,7 +192,7 @@ async function main() {
 
       let normalizedProfile: string;
       try {
-        normalizedProfile = normalizeProfileSlug(profile ?? profileId);
+        normalizedProfile = normalizeProfileSlug(profile);
       } catch (err: any) {
         if (err?.message === 'invalid_profile') {
           return res.status(400).json({ error: 'invalid_profile' });
@@ -227,7 +213,7 @@ async function main() {
   app.delete('/v1/memory/:id', (req, res) => {
     try {
       const { id } = req.params;
-      const profile = (req.query.profile as string) ?? (req.query.profileId as string);
+      const profile = req.query.profile as string;
       if (!id) return res.status(400).json({ error: 'id_required' });
       let normalizedProfile: string;
       try {
@@ -253,7 +239,7 @@ async function main() {
 
   app.delete('/v1/memory', (req, res) => {
     try {
-      const profile = (req.query.profile as string) ?? (req.query.profileId as string);
+      const profile = req.query.profile as string;
       const normalizedProfile = normalizeProfileSlug(profile);
       const deleted = store.deleteAll(normalizedProfile);
       res.json({ deleted, profile: normalizedProfile });
@@ -269,7 +255,7 @@ async function main() {
   app.delete('/v1/graph/triple/:id', (req, res) => {
     try {
       const { id } = req.params;
-      const profile = (req.query.profile as string) ?? (req.query.profileId as string);
+      const profile = req.query.profile as string;
       if (!id) return res.status(400).json({ error: 'id_required' });
 
       const deleted = store.deleteSemanticById(id, profile);
@@ -287,12 +273,12 @@ async function main() {
   });
 
   app.post('/v1/search', async (req, res) => {
-    const { query, profile, profileId } = req.body as { query?: string; profile?: string; profileId?: string };
+    const { query, profile, userId } = req.body as { query?: string; profile?: string; userId?: string };
     if (!query || !query.trim()) {
       return res.status(400).json({ error: 'query is required' });
     }
     try {
-      const result = await store.query(query, profile ?? profileId);
+      const result = await store.query(query, profile, userId);
       res.json(result);
     } catch (err: any) {
       if (err?.message === 'invalid_profile') {
@@ -302,10 +288,55 @@ async function main() {
     }
   });
 
+  // --- Agent Users ---
+
+  app.get('/v1/users', (req, res) => {
+    try {
+      const profile = req.query.profile as string;
+      const normalizedProfile = normalizeProfileSlug(profile);
+      const users = store.getAgentUsers(normalizedProfile);
+      res.json({ users, profile: normalizedProfile });
+    } catch (err: any) {
+      if (err?.message === 'invalid_profile') {
+        return res.status(400).json({ error: 'invalid_profile' });
+      }
+      res.status(500).json({ error: err.message ?? 'failed to fetch users' });
+    }
+  });
+
+  app.get('/v1/users/:id/memories', (req, res) => {
+    try {
+      const { id: userId } = req.params;
+      const profile = req.query.profile as string;
+      const limit = Number(req.query.limit) || 50;
+      const normalizedProfile = normalizeProfileSlug(profile);
+
+      if (!userId) {
+        return res.status(400).json({ error: 'user_id_required' });
+      }
+
+      const memories = store.getMemoriesForUser(normalizedProfile, userId, limit).map((r) => ({
+        id: r.id,
+        sector: r.sector,
+        profile: r.profileId,
+        createdAt: r.createdAt,
+        lastAccessed: r.lastAccessed,
+        preview: r.content,
+        details: (r as any).details,
+      }));
+      res.json({ memories, userId, profile: normalizedProfile });
+    } catch (err: any) {
+      if (err?.message === 'invalid_profile') {
+        return res.status(400).json({ error: 'invalid_profile' });
+      }
+      res.status(500).json({ error: err.message ?? 'failed to fetch user memories' });
+    }
+  });
+
   // Graph traversal endpoints
   app.get('/v1/graph/triples', (req, res) => {
     try {
-      const { entity, direction, maxResults, predicate, profile, profileId } = req.query;
+      const { entity, direction, maxResults, predicate, profile } = req.query;
       if (!entity || typeof entity !== 'string') {
         return res.status(400).json({ error: 'entity query parameter is required' });
       }
@@ -313,7 +344,7 @@ async function main() {
       const options: any = {
         maxResults: maxResults ? Number(maxResults) : 100,
         predicateFilter: predicate as string | undefined,
-        profile: (profile as string) ?? (profileId as string),
+        profile: profile as string,
       };
 
       let triples;
@@ -336,12 +367,12 @@ async function main() {
 
   app.get('/v1/graph/neighbors', (req, res) => {
     try {
-      const { entity, profile, profileId } = req.query;
+      const { entity, profile } = req.query;
       if (!entity || typeof entity !== 'string') {
         return res.status(400).json({ error: 'entity query parameter is required' });
       }
 
-      const neighbors = Array.from(store.graph.findNeighbors(entity, { profile: (profile as string) ?? (profileId as string) }));
+      const neighbors = Array.from(store.graph.findNeighbors(entity, { profile: profile as string }));
       res.json({ entity, neighbors, count: neighbors.length });
     } catch (err: any) {
       if (err?.message === 'invalid_profile') {
@@ -353,14 +384,14 @@ async function main() {
 
   app.get('/v1/graph/paths', (req, res) => {
     try {
-      const { from, to, maxDepth, profile, profileId } = req.query;
+      const { from, to, maxDepth, profile } = req.query;
       if (!from || typeof from !== 'string' || !to || typeof to !== 'string') {
         return res.status(400).json({ error: 'from and to query parameters are required' });
       }
 
       const paths = store.graph.findPaths(from, to, {
         maxDepth: maxDepth ? Number(maxDepth) : 3,
-        profile: (profile as string) ?? (profileId as string),
+        profile: profile as string,
       });
 
       res.json({ from, to, paths, count: paths.length });
@@ -374,8 +405,8 @@ async function main() {
 
   app.get('/v1/graph/visualization', (req, res) => {
     try {
-      const { entity, maxDepth, maxNodes, profile, profileId, includeHistory } = req.query;
-      const profileValue = (profile as string) ?? (profileId as string);
+      const { entity, maxDepth, maxNodes, profile, includeHistory } = req.query;
+      const profileValue = profile as string;
       const normalizedProfile = normalizeProfileSlug(profileValue);
       const centerEntity = (entity as string) || null;
       const depth = maxDepth ? Number(maxDepth) : 2;

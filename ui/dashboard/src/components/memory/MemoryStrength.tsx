@@ -39,7 +39,7 @@ export function MemoryStrength({ data }: MemoryStrengthProps) {
               <div 
                 className="absolute inset-0 opacity-5 group-hover:opacity-10 transition-opacity"
                 style={{
-                  background: `radial-gradient(circle at center, ${sectorColors[sector.sector].includes('indigo') ? '#6366f1' : sectorColors[sector.sector].includes('emerald') ? '#10b981' : sectorColors[sector.sector].includes('amber') ? '#f59e0b' : '#f43f5e'} 0%, transparent 70%)`,
+                  background: `radial-gradient(circle at center, ${(sectorColors[sector.sector] ?? '').includes('indigo') ? '#6366f1' : (sectorColors[sector.sector] ?? '').includes('emerald') ? '#10b981' : (sectorColors[sector.sector] ?? '').includes('amber') ? '#f59e0b' : '#f43f5e'} 0%, transparent 70%)`,
                 }}
               ></div>
               <div className="relative z-10">
