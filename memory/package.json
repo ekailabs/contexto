@@ -1,5 +1,5 @@
 {
-  "name": "memory",
+  "name": "@ekai/memory",
   "version": "0.1.0",
   "description": "Neuroscience-inspired cognitive memory kernel",
   "private": true,

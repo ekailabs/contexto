@@ -3,13 +3,11 @@ set -euo pipefail
 
 PORT="${PORT:-3001}"
 UI_PORT="${UI_PORT:-3000}"
-MEMORY_PORT="${MEMORY_PORT:-4005}"
 OPENROUTER_PORT="${OPENROUTER_PORT:-4010}"
 
 # Service toggles (all enabled by default)
 ENABLE_GATEWAY="${ENABLE_GATEWAY:-true}"
 ENABLE_DASHBOARD="${ENABLE_DASHBOARD:-true}"
-ENABLE_MEMORY="${ENABLE_MEMORY:-true}"
 ENABLE_OPENROUTER="${ENABLE_OPENROUTER:-true}"
 
 PIDS=()
@@ -50,17 +48,10 @@ if [ "$ENABLE_DASHBOARD" != "false" ] && [ "$ENABLE_DASHBOARD" != "0" ]; then
   PIDS+=($!)
 fi
 
-if [ "$ENABLE_MEMORY" != "false" ] && [ "$ENABLE_MEMORY" != "0" ]; then
-  echo "  Starting memory on :${MEMORY_PORT}"
-  cd /app/memory
-  MEMORY_PORT="$MEMORY_PORT" MEMORY_DB_PATH="${MEMORY_DB_PATH:-/app/memory/data/memory.db}" node dist/server.js &
-  PIDS+=($!)
-fi
-
 if [ "$ENABLE_OPENROUTER" != "false" ] && [ "$ENABLE_OPENROUTER" != "0" ]; then
-  echo "  Starting openrouter on :${OPENROUTER_PORT}"
+  echo "  Starting openrouter on :${OPENROUTER_PORT} (memory embedded)"
   cd /app/integrations/openrouter
-  PORT="$OPENROUTER_PORT" node dist/server.js &
+  OPENROUTER_PORT="$OPENROUTER_PORT" MEMORY_DB_PATH="${MEMORY_DB_PATH:-/app/memory/data/memory.db}" node dist/server.js &
   PIDS+=($!)
 fi
 

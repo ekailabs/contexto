@@ -34,8 +34,10 @@ FROM build-base AS memory-build
 WORKDIR /app/memory
 RUN npm run build
 
-# ---------- openrouter build ----------
+# ---------- openrouter build (depends on memory being built first) ----------
 FROM build-base AS openrouter-build
+WORKDIR /app/memory
+RUN npm run build
 WORKDIR /app/integrations/openrouter
 RUN npm run build
 
@@ -63,24 +65,23 @@ COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./next.config.mjs
 EXPOSE 3000
 CMD ["node_modules/.bin/next", "start", "-p", "3000"]
 
-# ---------- memory runtime ----------
-FROM node:20-alpine AS memory-runtime
-WORKDIR /app/memory
-ENV NODE_ENV=production
-COPY memory/package.json ./
-RUN npm install --omit=dev
-COPY --from=memory-build /app/memory/dist ./dist
-RUN mkdir -p /app/memory/data
-EXPOSE 4005
-CMD ["node", "dist/server.js"]
-
-# ---------- openrouter runtime ----------
+# ---------- openrouter runtime (includes embedded memory) ----------
 FROM node:20-alpine AS openrouter-runtime
-WORKDIR /app/integrations/openrouter
+WORKDIR /app
 ENV NODE_ENV=production
-COPY integrations/openrouter/package.json ./
-RUN npm install --omit=dev
-COPY --from=openrouter-build /app/integrations/openrouter/dist ./dist
+
+# Memory package (workspace dependency of openrouter)
+COPY memory/package.json ./memory/
+RUN cd memory && npm install --omit=dev
+COPY --from=memory-build /app/memory/dist ./memory/dist
+
+# OpenRouter
+COPY integrations/openrouter/package.json ./integrations/openrouter/
+RUN cd integrations/openrouter && npm install --omit=dev
+COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
+
+RUN mkdir -p /app/memory/data
+WORKDIR /app/integrations/openrouter
 EXPOSE 4010
 CMD ["node", "dist/server.js"]
 
@@ -104,13 +105,13 @@ COPY --from=dashboard-build /app/ui/dashboard/.next ./ui/dashboard/.next
 COPY --from=dashboard-build /app/ui/dashboard/public ./ui/dashboard/public
 COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./ui/dashboard/next.config.mjs
 
-# Memory
+# Memory (workspace dependency of openrouter)
 COPY memory/package.json ./memory/
 RUN cd memory && npm install --omit=dev
 COPY --from=memory-build /app/memory/dist ./memory/dist
 RUN mkdir -p /app/memory/data
 
-# OpenRouter
+# OpenRouter (depends on memory package above)
 COPY integrations/openrouter/package.json ./integrations/openrouter/
 RUN cd integrations/openrouter && npm install --omit=dev
 COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
@@ -121,6 +122,6 @@ RUN chmod +x /app/start-docker-fullstack.sh
 
 ENV NODE_ENV=production
 
-EXPOSE 3001 3000 4005 4010
+EXPOSE 3001 3000 4010
 VOLUME ["/app/gateway/data", "/app/gateway/logs", "/app/memory/data"]
 CMD ["/app/start-docker-fullstack.sh"]

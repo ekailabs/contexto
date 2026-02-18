@@ -34,7 +34,7 @@ const buildUrl = (host: string, port: string): string => `${host}:${port}`;
 const baseHost = getBaseHost();
 
 export const GATEWAY_PORT = process.env.NEXT_PUBLIC_GATEWAY_PORT || '3001';
-export const MEMORY_PORT = process.env.NEXT_PUBLIC_MEMORY_PORT || '4005';
+export const MEMORY_PORT = process.env.NEXT_PUBLIC_MEMORY_PORT || '4010';
 
 export const API_CONFIG = {
   BASE_URL: buildUrl(baseHost, GATEWAY_PORT),

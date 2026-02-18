@@ -7,3 +7,4 @@ export * from './scoring.js';
 export * from './wm.js';
 export * from './utils.js';
 export * from './documents.js';
+export * from './router.js';

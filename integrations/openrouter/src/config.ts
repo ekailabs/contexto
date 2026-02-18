@@ -22,5 +22,5 @@ if (!OPENROUTER_API_KEY) {
   process.exit(1);
 }
 
-export const MEMORY_URL = process.env.MEMORY_URL || 'http://localhost:4005';
+export const MEMORY_DB_PATH = process.env.MEMORY_DB_PATH ?? './memory.db';
 export const PORT = parseInt(process.env.OPENROUTER_PORT || '4010', 10);

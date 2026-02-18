@@ -1,5 +1,3 @@
-import { MEMORY_URL } from './config.js';
-
 interface QueryResult {
   sector: 'episodic' | 'semantic' | 'procedural' | 'reflective';
   content: string;
@@ -15,46 +13,6 @@ interface QueryResult {
     steps?: string[];
     goal?: string;
   };
-}
-
-interface SearchResponse {
-  workingMemory: QueryResult[];
-  perSector: Record<string, QueryResult[]>;
-  profileId: string;
-}
-
-/**
- * Fetch memory context from the memory service.
- * Returns null on any failure — memory is additive, never blocking.
- */
-export async function fetchMemoryContext(
-  query: string,
-  profile: string,
-  userId?: string,
-): Promise<QueryResult[] | null> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-
-    const res = await fetch(`${MEMORY_URL}/v1/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, profile, userId }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      console.warn(`[memory] search returned ${res.status}`);
-      return null;
-    }
-
-    const data = (await res.json()) as SearchResponse;
-    return data.workingMemory?.length ? data.workingMemory : null;
-  } catch (err: any) {
-    console.warn(`[memory] search failed: ${err.message}`);
-    return null;
-  }
 }
 
 /**
@@ -108,21 +66,4 @@ export function injectMemory(
     ];
   }
   return [{ role: 'system', content: memoryBlock }, ...messages];
-}
-
-/**
- * Fire-and-forget: send messages to the memory service for ingestion.
- * Never awaited — failures are logged and swallowed.
- */
-export function ingestMessages(
-  messages: Array<{ role: string; content: string }>,
-  profile: string,
-): void {
-  fetch(`${MEMORY_URL}/v1/ingest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, profile }),
-  }).catch((err) => {
-    console.warn(`[memory] ingest failed: ${err.message}`);
-  });
 }

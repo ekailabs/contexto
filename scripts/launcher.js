@@ -20,7 +20,6 @@ try {
 // Resolve ports from env (each service owns its own port var)
 const gatewayPort = process.env.PORT || "3001";
 const dashboardPort = process.env.DASHBOARD_PORT || "3000";
-const memoryPort = process.env.MEMORY_PORT || "4005";
 const openrouterPort = process.env.OPENROUTER_PORT || "4010";
 
 const SERVICES = {
@@ -37,13 +36,6 @@ const SERVICES = {
     label: "dashboard",
     color: "magenta",
     port: dashboardPort,
-  },
-  memory: {
-    dev: `MEMORY_PORT=${memoryPort} npm run start -w memory`,
-    start: `MEMORY_PORT=${memoryPort} npm run start -w memory`,
-    label: "memory",
-    color: "green",
-    port: memoryPort,
   },
   openrouter: {
     dev: `OPENROUTER_PORT=${openrouterPort} npm run dev -w @ekai/openrouter`,

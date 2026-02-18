@@ -1,10 +1,28 @@
 import express from 'express';
-import { PORT } from './config.js';
-import { fetchMemoryContext, formatMemoryBlock, ingestMessages, injectMemory } from './memory.js';
+import cors from 'cors';
+import { SqliteMemoryStore, embed, createMemoryRouter } from '@ekai/memory';
+import { PORT, MEMORY_DB_PATH } from './config.js';
+import { initMemoryStore, fetchMemoryContext, ingestMessages } from './memory-client.js';
+import { formatMemoryBlock, injectMemory } from './memory.js';
 import { proxyToOpenRouter } from './proxy.js';
 
 const app = express();
+
+const corsOrigins =
+  process.env.MEMORY_CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) ?? '*';
+app.use(cors({ origin: corsOrigins }));
+app.options('*', cors({ origin: corsOrigins }));
 app.use(express.json({ limit: '10mb' }));
+
+// Initialize embedded memory store
+const store = new SqliteMemoryStore({
+  dbPath: MEMORY_DB_PATH,
+  embed,
+});
+initMemoryStore(store);
+
+// Mount memory admin routes (dashboard, graph, etc.)
+app.use(createMemoryRouter(store));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
@@ -58,5 +76,5 @@ app.post('/v1/chat/completions', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`@ekai/openrouter listening on port ${PORT}`);
+  console.log(`@ekai/openrouter listening on port ${PORT} (memory embedded, db at ${MEMORY_DB_PATH})`);
 });

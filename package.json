@@ -14,8 +14,7 @@
     "dev:ui": "npm run dev --workspace=ui/dashboard",
     "dev:openrouter": "npm run dev --workspace=@ekai/openrouter",
     "start:gateway": "npm run start --workspace=gateway",
-    "start:ui": "npx --workspace=ui/dashboard next start -p 3000 -H 0.0.0.0",
-    "start:memory": "npm run start --workspace=memory"
+    "start:ui": "npx --workspace=ui/dashboard next start -p 3000 -H 0.0.0.0"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
