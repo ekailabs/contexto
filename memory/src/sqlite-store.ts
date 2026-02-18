@@ -286,7 +286,6 @@ export class SqliteMemoryStore {
       episodic: [],
       semantic: [],
       procedural: [],
-      reflective: [], // kept for type compatibility; not queried
     };
 
     for (const sector of SECTORS) {
@@ -800,7 +799,6 @@ export class SqliteMemoryStore {
     const table =
       sector === 'procedural' ? 'procedural_memory'
         : sector === 'semantic' ? 'semantic_memory'
-        : sector === 'reflective' ? 'reflective_memory'
         : 'memory';
     const timeCol = sector === 'semantic' ? 'updated_at' : 'last_accessed';
 
