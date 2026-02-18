@@ -45,28 +45,6 @@ export interface ConfigStatusResponse {
   };
 }
 
-export interface ModelCatalogEntry {
-  id: string;
-  provider: string;
-  endpoint: 'chat_completions' | 'messages' | 'responses';
-  pricing: {
-    input: number;
-    output: number;
-    cache_write?: number;
-    cache_read?: number;
-    currency: string;
-    unit: string;
-  } | null;
-  source: string;
-}
-
-export interface ModelsResponse {
-  total: number;
-  limit: number;
-  offset: number;
-  items: ModelCatalogEntry[];
-}
-
 export interface BudgetResponse {
   amountUsd: number | null;
   alertOnly: boolean;
@@ -166,22 +144,6 @@ export const apiService = {
     const response = await fetch(`${API_BASE_URL}/config/status`);
     if (!response.ok) {
       throw new Error(`Failed to fetch config status: ${response.statusText}`);
-    }
-    return response.json();
-  },
-
-  async getModels(params?: { provider?: string; endpoint?: 'chat_completions' | 'messages' | 'responses'; search?: string; limit?: number; offset?: number }): Promise<ModelsResponse> {
-    const searchParams = new URLSearchParams();
-    if (params?.provider) searchParams.append('provider', params.provider);
-    if (params?.endpoint) searchParams.append('endpoint', params.endpoint);
-    if (params?.search) searchParams.append('search', params.search);
-    if (params?.limit) searchParams.append('limit', String(params.limit));
-    if (params?.offset) searchParams.append('offset', String(params.offset));
-
-    const url = `${API_BASE_URL}/v1/models${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models: ${response.statusText}`);
     }
     return response.json();
   },
