@@ -94,32 +94,6 @@ WORKDIR /app/integrations/openrouter
 EXPOSE 4010
 CMD ["node", "dist/server.js"]
 
-# ---------- openrouter + dashboard Cloud Run runtime (single container) ----------
-FROM node:20-alpine AS ekai-cloudrun
-WORKDIR /app
-ENV NODE_ENV=production
-
-# Memory package (workspace dependency of openrouter)
-COPY memory/package.json ./memory/
-RUN cd memory && npm install --omit=dev
-COPY --from=memory-build /app/memory/dist ./memory/dist
-
-# OpenRouter — rewrite workspace ref to local file path before install
-COPY integrations/openrouter/package.json ./integrations/openrouter/
-RUN cd integrations/openrouter && \
-    sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
-    npm install --omit=dev
-COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
-
-# Dashboard static export
-COPY --from=dashboard-embedded-build /app/ui/dashboard/out ./dashboard-static
-
-RUN mkdir -p /app/memory/data
-WORKDIR /app/integrations/openrouter
-ENV DASHBOARD_STATIC_DIR=/app/dashboard-static
-EXPOSE 4010
-CMD ["node", "dist/server.js"]
-
 # ---------- fullstack runtime ----------
 FROM node:20-alpine AS ekai-gateway-runtime
 WORKDIR /app
@@ -162,3 +136,29 @@ ENV NODE_ENV=production
 EXPOSE 3001 3000 4010
 VOLUME ["/app/gateway/data", "/app/gateway/logs", "/app/memory/data"]
 CMD ["/app/start-docker-fullstack.sh"]
+
+# ---------- openrouter + dashboard Cloud Run runtime (single container) ----------
+FROM node:20-alpine AS ekai-cloudrun
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Memory package (workspace dependency of openrouter)
+COPY memory/package.json ./memory/
+RUN cd memory && npm install --omit=dev
+COPY --from=memory-build /app/memory/dist ./memory/dist
+
+# OpenRouter — rewrite workspace ref to local file path before install
+COPY integrations/openrouter/package.json ./integrations/openrouter/
+RUN cd integrations/openrouter && \
+    sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
+    npm install --omit=dev
+COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
+
+# Dashboard static export
+COPY --from=dashboard-embedded-build /app/ui/dashboard/out ./dashboard-static
+
+RUN mkdir -p /app/memory/data
+WORKDIR /app/integrations/openrouter
+ENV DASHBOARD_STATIC_DIR=/app/dashboard-static
+EXPOSE 4010
+CMD ["node", "dist/server.js"]
