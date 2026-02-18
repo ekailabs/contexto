@@ -4,11 +4,14 @@ Neuroscience-inspired, agent-centric memory kernel. Sectorized storage with PBWM
 
 ## Quickstart
 
+By default, memory is embedded inside the OpenRouter integration and served on port `4010`. No separate service needed.
+
 ```bash
-npm install -w memory
-npm run build -w memory
-npm start -w memory          # :4005
+npm install -w @ekai/memory
+npm run build -w @ekai/memory
 ```
+
+See [Usage Modes](#usage-modes) below for direct import, mountable router, and standalone options.
 
 Env (root `.env` or `memory/.env`):
 
@@ -17,9 +20,39 @@ Env (root `.env` or `memory/.env`):
 | `GOOGLE_API_KEY` | — | Yes |
 | `GEMINI_EXTRACT_MODEL` | `gemini-2.5-flash` | No |
 | `GEMINI_EMBED_MODEL` | `gemini-embedding-001` | No |
-| `MEMORY_PORT` | `4005` | No |
 | `MEMORY_DB_PATH` | `./memory.db` | No |
-| `MEMORY_CORS_ORIGIN` | `*` | No |
+| `MEMORY_CORS_ORIGIN` | `*` | No (standalone mode only) |
+
+## Usage Modes
+
+### 1. Direct import
+
+Use the memory store and embedding functions directly in your code:
+
+```ts
+import { SqliteMemoryStore, embed } from '@ekai/memory';
+```
+
+### 2. Mountable router
+
+Mount memory endpoints into an existing Express app:
+
+```ts
+import { createMemoryRouter } from '@ekai/memory';
+
+const memoryRouter = createMemoryRouter();
+app.use(memoryRouter);
+```
+
+This is how the OpenRouter integration embeds memory on port `4010`.
+
+### 3. Standalone server
+
+Run memory as its own HTTP server (useful for development or isolated deployments):
+
+```bash
+npm run start -w @ekai/memory
+```
 
 ## How It Works
 
@@ -204,7 +237,7 @@ Get all memories scoped to a specific user.
 | DELETE | `/v1/graph/triple/:id` | Delete a triple |
 | GET | `/health` | Health check |
 
-All endpoints support `profile` query/body param.
+All endpoints support `profile` query/body param. In the default deployment, these are served on the OpenRouter port (`4010`).
 
 ## Retrieval Pipeline
 

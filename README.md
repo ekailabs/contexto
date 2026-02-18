@@ -56,17 +56,15 @@ Important: The dashboard is initially empty. After setup, send a query using you
 **Access Points (default ports, configurable in `.env`):**
 - Gateway API: port `3001` (`PORT`) - OpenAI/Anthropic compatible endpoints
 - Dashboard UI: port `3000` (`UI_PORT`) - Usage analytics and cost tracking
-- Memory Service: port `4005` (`MEMORY_PORT`) - Agent memory and context storage
-- OpenRouter Integration: port `4010` (`OPENROUTER_PORT`) - OpenRouter proxy service
+- OpenRouter Integration: port `4010` (`OPENROUTER_PORT`) - OpenRouter proxy with embedded memory APIs
 
-The dashboard auto-detects the host and connects to the gateway and memory service on the same host using their configured ports. No extra URL configuration needed.
+The dashboard auto-detects the host and connects to the gateway on the same host using its configured port. No extra URL configuration needed.
 
 **Docker Service Configuration:**
 All services run in a single Docker container. Control which services start via `.env`:
 ```bash
 ENABLE_GATEWAY=true       # API server (default: true)
 ENABLE_DASHBOARD=true     # Web dashboard (default: true)
-ENABLE_MEMORY=true        # Memory service (default: true)
 ENABLE_OPENROUTER=true    # OpenRouter integration (default: true)
 ```
 
@@ -135,7 +133,7 @@ codex
 ekai-gateway/
 ├── gateway/              # Backend API and routing
 ├── ui/dashboard/         # Dashboard frontend (Next.js)
-├── memory/               # Agent memory service
+├── memory/               # Agent memory library (@ekai/memory)
 ├── integrations/
 │   └── openrouter/       # OpenRouter integration service
 ├── scripts/
@@ -206,7 +204,7 @@ The proxy uses **cost-based optimization** to automatically select the cheapest 
 
 ### With npm (local development)
 
-A unified launcher starts all 4 services by default (gateway, dashboard, memory, openrouter):
+A unified launcher starts all 3 services by default (gateway, dashboard, openrouter):
 
 ```bash
 npm run dev    # Development mode — all services with hot-reload
@@ -218,7 +216,6 @@ npm start      # Production mode — all services from built output
 ```bash
 ENABLE_DASHBOARD=false npm run dev           # Skip the dashboard
 ENABLE_OPENROUTER=false npm start            # Production without openrouter
-ENABLE_MEMORY=false ENABLE_DASHBOARD=false npm run dev  # Gateway + openrouter only
 ```
 
 **Individual service scripts** (escape hatches):
@@ -229,7 +226,6 @@ npm run dev:ui          # Dashboard only (port 3000)
 npm run dev:openrouter  # OpenRouter integration only (port 4010)
 npm run start:gateway   # Production gateway
 npm run start:ui        # Production dashboard
-npm run start:memory    # Memory service (port 4005)
 ```
 
 ### With Docker
