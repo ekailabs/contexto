@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "npm ci && tsc && npm run copy:assets",
+    "build": "tsc && npm run copy:assets",
     "type-check": "tsc --noEmit",
     "copy:assets": "copyfiles -u 1 ../model_catalog/*.json dist/ && copyfiles -u 3 src/infrastructure/db/schema.sql dist/gateway/src/infrastructure/db/ && copyfiles -u 2 src/costs/*.yaml dist/gateway/src/costs/",
     "start": "node dist/gateway/src/index.js",
