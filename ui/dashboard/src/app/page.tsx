@@ -15,8 +15,19 @@ import BudgetCard from '@/components/BudgetCard';
 import { useBudget } from '@/hooks/useBudget';
 import { apiService } from '@/lib/api';
 import Link from 'next/link';
+import { MEMORY_PORT } from '@/lib/constants';
 
 export default function Dashboard() {
+  // Embedded mode: redirect root to Memory Vault
+  useEffect(() => {
+    if (
+      process.env.NEXT_PUBLIC_EMBEDDED_MODE === 'true' ||
+      window.location.port === MEMORY_PORT
+    ) {
+      window.location.replace('/memory');
+    }
+  }, []);
+
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [mounted, setMounted] = useState(false);
   const usageData = useUsageData(dateRange?.from, dateRange?.to);

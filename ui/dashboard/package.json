@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "npm install && next build --turbopack",
+    "build:embedded": "NEXT_BUILD_MODE=embedded NEXT_PUBLIC_EMBEDDED_MODE=true next build",
     "type-check": "tsc --noEmit",
     "start": "next start",
     "lint": "eslint"

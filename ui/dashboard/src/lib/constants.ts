@@ -36,7 +36,12 @@ const baseHost = getBaseHost();
 export const GATEWAY_PORT = process.env.NEXT_PUBLIC_GATEWAY_PORT || '3001';
 export const MEMORY_PORT = process.env.NEXT_PUBLIC_MEMORY_PORT || '4010';
 
+// Embedded mode: UI is served from the same Express server as the API
+const isEmbedded =
+  process.env.NEXT_PUBLIC_EMBEDDED_MODE === 'true' ||
+  (typeof window !== 'undefined' && window.location.port === MEMORY_PORT);
+
 export const API_CONFIG = {
   BASE_URL: buildUrl(baseHost, GATEWAY_PORT),
-  MEMORY_URL: buildUrl(baseHost, MEMORY_PORT),
+  MEMORY_URL: isEmbedded ? '' : buildUrl(baseHost, MEMORY_PORT),
 } as const;

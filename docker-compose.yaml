@@ -28,6 +28,23 @@ services:
       - memory_db:/app/memory/data
     restart: unless-stopped
 
+  openrouter-standalone:
+    build:
+      context: .
+      target: openrouter-cloudrun
+    image: ghcr.io/ekailabs/ekai-openrouter:latest
+    profiles: [cloudrun]
+    environment:
+      PORT: ${OPENROUTER_PORT:-4010}
+      MEMORY_DB_PATH: /app/memory/data/memory.db
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DASHBOARD_STATIC_DIR: /app/dashboard-static
+    ports:
+      - "4010:4010"
+    volumes:
+      - memory_db:/app/memory/data
+    restart: unless-stopped
+
 volumes:
   gateway_logs:
   gateway_db:

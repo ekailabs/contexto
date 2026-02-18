@@ -17,6 +17,7 @@ import ProfileSelector from '@/components/memory/ProfileSelector';
 import ProfileManagement from '@/components/memory/ProfileManagement';
 import ProfileStats from '@/components/memory/ProfileStats';
 import ProfileBadge from '@/components/memory/ProfileBadge';
+import { MEMORY_PORT } from '@/lib/constants';
 
 
 export default function MemoryVaultPage() {
@@ -36,6 +37,14 @@ export default function MemoryVaultPage() {
   const [currentProfile, setCurrentProfile] = useState('default');
   const [showProfileManagement, setShowProfileManagement] = useState(false);
   const [profileSwitching, setProfileSwitching] = useState(false);
+  const [embedded, setEmbedded] = useState(false);
+
+  useEffect(() => {
+    setEmbedded(
+      process.env.NEXT_PUBLIC_EMBEDDED_MODE === 'true' ||
+      window.location.port === MEMORY_PORT
+    );
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
@@ -190,14 +199,16 @@ export default function MemoryVaultPage() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="text-stone-500 hover:text-stone-900 transition-colors p-2 rounded-full hover:bg-stone-100"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
+              {!embedded && (
+                <Link
+                  href="/"
+                  className="text-stone-500 hover:text-stone-900 transition-colors p-2 rounded-full hover:bg-stone-100"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                </Link>
+              )}
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Memory Vault</h1>
                 <p className="text-sm text-stone-500 mt-0.5">

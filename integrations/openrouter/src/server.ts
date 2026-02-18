@@ -1,10 +1,15 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { SqliteMemoryStore, embed, createMemoryRouter } from '@ekai/memory';
 import { PORT, MEMORY_DB_PATH } from './config.js';
 import { initMemoryStore, fetchMemoryContext, ingestMessages } from './memory-client.js';
 import { formatMemoryBlock, injectMemory } from './memory.js';
 import { proxyToOpenRouter } from './proxy.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
@@ -74,6 +79,34 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
   }
 });
+
+// ---------- Embedded dashboard (static export) ----------
+const DASHBOARD_DIR = process.env.DASHBOARD_STATIC_DIR
+  ? path.resolve(process.env.DASHBOARD_STATIC_DIR)
+  : path.resolve(__dirname, '../../dashboard-static');
+
+if (fs.existsSync(DASHBOARD_DIR)) {
+  // Serve static assets (JS, CSS, images, etc.)
+  app.use(express.static(DASHBOARD_DIR));
+
+  // SPA catch-all: serve pre-rendered .html for page routes, fallback to index.html
+  app.get('*', (req, res) => {
+    // Try <route>.html first (e.g. /memory → /memory.html)
+    const htmlFile = path.join(DASHBOARD_DIR, `${req.path}.html`);
+    if (fs.existsSync(htmlFile)) {
+      return res.sendFile(htmlFile);
+    }
+    // Try <route>/index.html (e.g. /memory/ → /memory/index.html)
+    const indexFile = path.join(DASHBOARD_DIR, req.path, 'index.html');
+    if (fs.existsSync(indexFile)) {
+      return res.sendFile(indexFile);
+    }
+    // Fallback to root index.html
+    res.sendFile(path.join(DASHBOARD_DIR, 'index.html'));
+  });
+
+  console.log(`[dashboard] serving static files from ${DASHBOARD_DIR}`);
+}
 
 app.listen(PORT, () => {
   console.log(`@ekai/openrouter listening on port ${PORT} (memory embedded, db at ${MEMORY_DB_PATH})`);

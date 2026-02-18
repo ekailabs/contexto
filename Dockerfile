@@ -41,6 +41,13 @@ RUN npm run build
 WORKDIR /app/integrations/openrouter
 RUN npm run build
 
+# ---------- dashboard embedded build (static export for single-container) ----------
+FROM build-base AS dashboard-embedded-build
+WORKDIR /app/ui/dashboard
+ENV NEXT_BUILD_MODE=embedded
+ENV NEXT_PUBLIC_EMBEDDED_MODE=true
+RUN npm run build:embedded
+
 # ---------- gateway runtime ----------
 FROM node:20-alpine AS gateway-runtime
 WORKDIR /app/gateway
@@ -82,6 +89,30 @@ COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/op
 
 RUN mkdir -p /app/memory/data
 WORKDIR /app/integrations/openrouter
+EXPOSE 4010
+CMD ["node", "dist/server.js"]
+
+# ---------- openrouter + dashboard Cloud Run runtime (single container) ----------
+FROM node:20-alpine AS openrouter-cloudrun
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Memory package (workspace dependency of openrouter)
+COPY memory/package.json ./memory/
+RUN cd memory && npm install --omit=dev
+COPY --from=memory-build /app/memory/dist ./memory/dist
+
+# OpenRouter
+COPY integrations/openrouter/package.json ./integrations/openrouter/
+RUN cd integrations/openrouter && npm install --omit=dev
+COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
+
+# Dashboard static export
+COPY --from=dashboard-embedded-build /app/ui/dashboard/out ./dashboard-static
+
+RUN mkdir -p /app/memory/data
+WORKDIR /app/integrations/openrouter
+ENV DASHBOARD_STATIC_DIR=/app/dashboard-static
 EXPOSE 4010
 CMD ["node", "dist/server.js"]
 
