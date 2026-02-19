@@ -18,18 +18,10 @@ try {
 } catch {}
 
 // Resolve ports from env (each service owns its own port var)
-const gatewayPort = process.env.PORT || "3001";
 const dashboardPort = process.env.DASHBOARD_PORT || "3000";
 const openrouterPort = process.env.OPENROUTER_PORT || "4010";
 
 const SERVICES = {
-  gateway: {
-    dev: `PORT=${gatewayPort} npm run dev -w gateway`,
-    start: `PORT=${gatewayPort} npm run start -w gateway`,
-    label: "gateway",
-    color: "blue",
-    port: gatewayPort,
-  },
   dashboard: {
     dev: `npx -w ui/dashboard next dev -p ${dashboardPort}`,
     start: `npx -w ui/dashboard next start -p ${dashboardPort} -H 0.0.0.0`,

@@ -3,28 +3,18 @@ services:
     build: .
     image: ghcr.io/ekailabs/ekai-gateway:latest
     environment:
-      PORT: ${PORT:-3001}
       UI_PORT: ${UI_PORT:-3000}
       OPENROUTER_PORT: ${OPENROUTER_PORT:-4010}
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3001}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4010}
       NEXT_PUBLIC_MEMORY_PORT: ${OPENROUTER_PORT:-4010}
-      DATABASE_PATH: /app/gateway/data/proxy.db
       MEMORY_DB_PATH: /app/memory/data/memory.db
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      XAI_API_KEY: ${XAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      ENABLE_GATEWAY: ${ENABLE_GATEWAY:-true}
       ENABLE_DASHBOARD: ${ENABLE_DASHBOARD:-true}
       ENABLE_OPENROUTER: ${ENABLE_OPENROUTER:-true}
     ports:
-      - "3001:3001"
       - "3000:3000"
       - "4010:4010"
     volumes:
-      - gateway_logs:/app/gateway/logs
-      - gateway_db:/app/gateway/data
       - memory_db:/app/memory/data
     restart: unless-stopped
 
@@ -46,6 +36,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  gateway_logs:
-  gateway_db:
   memory_db:

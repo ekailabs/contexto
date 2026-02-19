@@ -1,19 +1,17 @@
 {
   "name": "ekai-gateway",
   "version": "0.1.0-beta.1",
-  "description": "Ekai Gateway - Multi-provider AI request routing with dashboard",
+  "description": "Ekai Gateway - AI proxy with memory and dashboard",
   "private": true,
-  "workspaces": ["gateway", "ui/dashboard", "memory", "integrations/openrouter"],
+  "workspaces": ["ui/dashboard", "memory", "integrations/openrouter"],
   "scripts": {
     "dev": "node scripts/launcher.js --mode dev",
     "start": "node scripts/launcher.js --mode start",
     "build": "npm install --workspaces && npm run build --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
-    "test": "npm run test --workspace=gateway",
-    "dev:gateway": "npm run dev --workspace=gateway",
+    "test": "npm run test --workspace=@ekai/openrouter",
     "dev:ui": "npm run dev --workspace=ui/dashboard",
     "dev:openrouter": "npm run dev --workspace=@ekai/openrouter",
-    "start:gateway": "npm run start --workspace=gateway",
     "start:ui": "npx --workspace=ui/dashboard next start -p 3000 -H 0.0.0.0"
   },
   "devDependencies": {
@@ -25,7 +23,6 @@
     "gateway",
     "dashboard",
     "openai",
-    "anthropic",
     "openrouter"
   ],
   "author": "Ekai Labs"

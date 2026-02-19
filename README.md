@@ -4,241 +4,137 @@
 [![GitHub stars](https://img.shields.io/github/stars/ekailabs/ekai-gateway.svg?style=social)](https://github.com/ekailabs/ekai-gateway)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.com/invite/5VsUUEfbJk)
 
-Multi-provider AI proxy with usage dashboard supporting Anthropic, OpenAI, Google Gemini, xAI, and OpenRouter models through OpenAI-compatible and Anthropic-compatible APIs.
+OpenRouter proxy with embedded agent memory and a management dashboard. Drop it in front of any OpenAI-compatible client and your AI tools gain persistent memory across conversations.
 
-**Designed for self-hosted personal use** - run your own instance to securely proxy AI requests using your API keys.
+**Designed for self-hosted personal use** — run your own instance using your OpenRouter API key.
 
 ## Features
 
-- 🤖 **Multi-provider**: Anthropic + OpenAI + Google (Gemini) + xAI + OpenRouter models
-- 🔄 **Dual APIs**: OpenAI-compatible + Anthropic-compatible endpoints
-- 🔀 **Cost-optimized routing**: Automatic selection of cheapest provider for each model
-- 💰 **Usage tracking**: Track token usage and costs with visual dashboard
-- 🗄️ **Database storage**: SQLite database for persistent usage tracking
-- 📊 **Analytics dashboard**: Real-time cost analysis and usage breakdowns
+- 🔀 **OpenRouter proxy**: Full OpenAI-compatible `/v1/chat/completions` endpoint
+- 🧠 **Embedded memory**: Automatically stores and injects relevant context from past conversations
+- 📊 **Memory dashboard**: Browse, search, and manage stored memories
+- 🔑 **BYOK**: Bring your own OpenRouter API key — or pass a key per-request
 
-## 🎥 Demo Video
+## Quick Start
 
-{% embed url="https://www.youtube.com/watch?v=sLg9YmYtg64" %}
-
-## Quick Start (Beta)
-
-**Option 1: Using npm**
+**Option 1: npm**
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Setup environment variables
 cp .env.example .env
-# Edit .env and add at least one API key (see .env.example for details)
-
-# 3. Build and start the application
+# Add OPENROUTER_API_KEY to .env
 npm run build
 npm start
 ```
 
-**Option 2: Using Docker (published image)**
+**Option 2: Docker (published image)**
 ```bash
-# 1. Setup environment variables
 cp .env.example .env
-# Edit .env and add at least one API key (see .env.example for details)
-
-# 2. Pull + start the latest GHCR image
+# Add OPENROUTER_API_KEY to .env
 docker compose up -d
-
-# Optional: run without Compose
-docker pull ghcr.io/ekailabs/ekai-gateway:latest
-docker run --env-file .env -p 3001:3001 -p 3000:3000 ghcr.io/ekailabs/ekai-gateway:latest
 ```
 
-Important: The dashboard is initially empty. After setup, send a query using your own client/tool (IDE, app, or API) through the gateway; usage appears once at least one request is processed.
+**Access points (default ports):**
+- OpenRouter proxy + memory APIs: port `4010` (`OPENROUTER_PORT`)
+- Memory dashboard: port `3000` (`UI_PORT`)
 
-**Access Points (default ports, configurable in `.env`):**
-- Gateway API: port `3001` (`PORT`) - OpenAI/Anthropic compatible endpoints
-- Dashboard UI: port `3000` (`UI_PORT`) - Usage analytics and cost tracking
-- OpenRouter Integration: port `4010` (`OPENROUTER_PORT`) - OpenRouter proxy with embedded memory APIs
-
-The dashboard auto-detects the host and connects to the gateway on the same host using its configured port. No extra URL configuration needed.
-
-**Docker Service Configuration:**
-All services run in a single Docker container. Control which services start via `.env`:
-```bash
-ENABLE_GATEWAY=true       # API server (default: true)
-ENABLE_DASHBOARD=true     # Web dashboard (default: true)
-ENABLE_OPENROUTER=true    # OpenRouter integration (default: true)
-```
-
-Detailed setup steps live in `docs/getting-started.md`; check `docs/` for additional guides.
-
-### Build the Image Yourself (optional)
-
-If you’re contributing changes or need a custom build:
+### Build the image yourself (optional)
 
 ```bash
-docker build --target ekai-gateway-runtime -t ekai-gateway .
-docker run --env-file .env -p 3001:3001 -p 3000:3000 ekai-gateway
+docker build --target ekai-cloudrun -t ekai-gateway .
+docker run --env-file .env -p 4010:4010 ekai-gateway
 ```
 
-## Populate the Dashboard
+## Usage
 
-- Point your client/tool to the gateway (`http://localhost:3001` or `http://localhost:3001/v1`), see integration guides below.
-- Send a query using your usual workflow; both OpenAI-compatible and Anthropic-compatible endpoints are tracked.
-- Open `http://localhost:3000` to view usage and costs after your first request.
+Point any OpenAI-compatible client at `http://localhost:4010`:
 
-**Required:** At least one API key from Anthropic, OpenAI, Google Gemini, xAI, or OpenRouter (see `.env.example` for configuration details).
+```bash
+# Chat completions — memory is injected automatically
+curl -X POST http://localhost:4010/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "anthropic/claude-sonnet-4-5", "messages": [{"role": "user", "content": "Hello"}]}'
+
+# Pass your own OpenRouter key per-request
+curl -X POST http://localhost:4010/v1/chat/completions \
+  -H "Authorization: Bearer sk-or-..." \
+  -H "Content-Type: application/json" \
+  -d '{"model": "openai/gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
+
+# Health check
+curl http://localhost:4010/health
+```
 
 ## Integration Guides
 
-### 🤖 **Claude Code Integration**
-Use the gateway with Claude Code for multi-provider AI assistance:
+### 🤖 Claude Code
 
 ```bash
-# Point Claude Code to the gateway
-export ANTHROPIC_BASE_URL="http://localhost:3001"
-export ANTHROPIC_MODEL="grok-code-fast-1"  # or "gpt-4o","claude-sonnet-4-20250514"
-
-# Start Claude Code as usual
+export ANTHROPIC_BASE_URL="http://localhost:4010"
+export ANTHROPIC_MODEL="anthropic/claude-sonnet-4-5"
 claude
 ```
 
 📖 **[Complete Claude Code Guide →](./docs/USAGE_WITH_CLAUDE_CODE.md)**
 
-### 💻 **Codex Integration** 
-Use the gateway with Codex for OpenAI-compatible development tools:
+### 💻 Codex
 
 ```bash
-# Point Codex to the gateway
-export OPENAI_BASE_URL="http://localhost:3001/v1"
-
-# Start Codex as usual  
+export OPENAI_BASE_URL="http://localhost:4010/v1"
 codex
 ```
 
 📖 **[Complete Codex Guide →](./docs/USAGE_WITH_CODEX.md)**
-## Beta Testing Notes
 
-🚧 **This is a beta release** - please report any issues or feedback!
+## Running Services
 
-**Known Limitations:**
-- Some edge cases in model routing may exist
+### npm (local development)
 
-**Getting Help:**
-- Check the logs in `gateway/logs/gateway.log` for debugging
-- Ensure your API keys have sufficient credits
-- Test with simple requests first before complex workflows
+```bash
+npm run dev    # dashboard + openrouter with hot-reload
+npm start      # production mode
+```
+
+Disable individual services via env:
+```bash
+ENABLE_DASHBOARD=false npm run dev      # openrouter only
+ENABLE_OPENROUTER=false npm run dev     # dashboard only
+```
+
+### Docker
+
+```bash
+docker compose up -d    # start all services
+docker compose logs -f  # view logs
+docker compose down     # stop
+```
+
+**Docker service toggles (`.env`):**
+```bash
+ENABLE_DASHBOARD=true    # memory dashboard (default: true)
+ENABLE_OPENROUTER=true   # proxy + memory APIs (default: true)
+```
 
 ## Project Structure
 
 ```
 ekai-gateway/
-├── gateway/              # Backend API and routing
-├── ui/dashboard/         # Dashboard frontend (Next.js)
-├── memory/               # Agent memory library (@ekai/memory)
 ├── integrations/
-│   └── openrouter/       # OpenRouter integration service
+│   └── openrouter/       # Proxy server with embedded memory (@ekai/openrouter)
+├── memory/               # Agent memory library (@ekai/memory)
+├── ui/dashboard/         # Memory management dashboard (Next.js)
 ├── scripts/
 │   └── launcher.js       # Unified service launcher
 └── package.json          # Root workspace configuration
 ```
 
-## API Endpoints
+## Beta Testing Notes
 
-```bash
-POST /v1/chat/completions  # OpenAI-compatible chat endpoint
-POST /v1/messages          # Anthropic-compatible messages endpoint
-POST /v1/responses         # OpenAI Responses endpoint
-GET  /usage               # View token usage and costs
-GET  /health              # Health check endpoint
-```
+🚧 **This is a beta release** — please report issues and feedback!
 
-```bash
-# OpenAI-compatible endpoint (works with all providers)
-curl -X POST http://localhost:3001/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
-
-# Use Claude models via OpenAI-compatible endpoint
-curl -X POST http://localhost:3001/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "claude-3-5-sonnet-20241022", "messages": [{"role": "user", "content": "Hello"}]}'
-
-# Use xAI Grok models
-curl -X POST http://localhost:3001/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "grok-code-fast", "messages": [{"role": "user", "content": "Hello"}]}'
-
-# Anthropic-compatible endpoint
-curl -X POST http://localhost:3001/v1/messages \
-  -H "Content-Type: application/json" \
-  -d '{"model": "claude-3-5-sonnet-20241022", "max_tokens": 100, "messages": [{"role": "user", "content": "Hello"}]}'
-
-# OpenAI Responses endpoint
-curl -X POST http://localhost:3001/v1/responses \
-  -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o-mini", "input": "Say hi in one short sentence.", "temperature": 0.7, "max_output_tokens": 128}'
-
-# Both endpoints support all models and share conversation context
-# Client A uses OpenAI format, Client B uses Anthropic format - same conversation!
-
-# Check usage and costs
-curl http://localhost:3001/usage
-```
-
-## Model Routing (Cost-Optimized)
-
-The proxy uses **cost-based optimization** to automatically select the cheapest available provider:
-
-1. **Special routing**: Grok models (`grok-code-fast`, `grok-beta`) → xAI (if available)
-2. **Cost optimization**: All other models are routed to the cheapest provider that supports them
-3. **Provider fallback**: Graceful fallback if preferred provider is unavailable
-
-**Supported providers**:
-- **Anthropic**: Claude models (direct API access)
-- **OpenAI**: GPT models (direct API access)
-- **xAI**: Grok models (direct API access)
-- **OpenRouter**: Multi-provider access with `provider/model` format
-
-**Multi-client proxy**: Web apps, mobile apps, and scripts share conversations across providers with automatic cost tracking and optimization.
-
-## Running Services
-
-### With npm (local development)
-
-A unified launcher starts all 3 services by default (gateway, dashboard, openrouter):
-
-```bash
-npm run dev    # Development mode — all services with hot-reload
-npm start      # Production mode — all services from built output
-```
-
-**Disable individual services** by setting `ENABLE_<NAME>=false`:
-
-```bash
-ENABLE_DASHBOARD=false npm run dev           # Skip the dashboard
-ENABLE_OPENROUTER=false npm start            # Production without openrouter
-```
-
-**Individual service scripts** (escape hatches):
-
-```bash
-npm run dev:gateway     # Gateway only (port 3001)
-npm run dev:ui          # Dashboard only (port 3000)
-npm run dev:openrouter  # OpenRouter integration only (port 4010)
-npm run start:gateway   # Production gateway
-npm run start:ui        # Production dashboard
-```
-
-### With Docker
-
-All services run together in a single container. The entrypoint script manages service lifecycle and ensures all enabled services stay running:
-
-```bash
-docker compose up -d    # Start all services
-docker compose logs -f  # View logs from all services
-docker compose down     # Stop all services
-```
-
-Services are controlled via `.env` file `ENABLE_*` variables. The Docker container will restart automatically on failure (see `docker-compose.yaml` for `restart: unless-stopped`).
+**Getting help:**
+- Join the [Discord](https://discord.com/invite/5VsUUEfbJk)
+- Check logs with `docker compose logs -f`
+- Ensure your OpenRouter API key has sufficient credits
 
 ## Contributing
 

@@ -1,12 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-PORT="${PORT:-3001}"
 UI_PORT="${UI_PORT:-3000}"
 OPENROUTER_PORT="${OPENROUTER_PORT:-4010}"
 
 # Service toggles (all enabled by default)
-ENABLE_GATEWAY="${ENABLE_GATEWAY:-true}"
 ENABLE_DASHBOARD="${ENABLE_DASHBOARD:-true}"
 ENABLE_OPENROUTER="${ENABLE_OPENROUTER:-true}"
 
@@ -21,7 +19,7 @@ trap cleanup INT TERM
 
 # Runtime API URL replacement for Next.js
 if [ "$ENABLE_DASHBOARD" != "false" ] && [ "$ENABLE_DASHBOARD" != "0" ]; then
-  API_URL="${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${PORT}}"
+  API_URL="${NEXT_PUBLIC_API_BASE_URL:-http://localhost:${OPENROUTER_PORT}}"
   echo "Configuring API URL: $API_URL"
   cd /app/ui/dashboard
   if [ "$API_URL" != "__API_URL_PLACEHOLDER__" ]; then
@@ -33,13 +31,6 @@ fi
 echo ""
 echo "  ekai-gateway (docker)"
 echo ""
-
-if [ "$ENABLE_GATEWAY" != "false" ] && [ "$ENABLE_GATEWAY" != "0" ]; then
-  echo "  Starting gateway on :${PORT}"
-  cd /app/gateway
-  PORT="$PORT" node dist/gateway/src/index.js &
-  PIDS+=($!)
-fi
 
 if [ "$ENABLE_DASHBOARD" != "false" ] && [ "$ENABLE_DASHBOARD" != "0" ]; then
   echo "  Starting dashboard on :${UI_PORT}"

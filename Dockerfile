@@ -6,7 +6,6 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Copy per-workspace manifests (lock files may not exist for all)
-COPY gateway/package.json gateway/package-lock.json* ./gateway/
 COPY ui/dashboard/package.json ui/dashboard/package-lock.json* ./ui/dashboard/
 COPY memory/package.json ./memory/
 COPY integrations/openrouter/package.json ./integrations/openrouter/
@@ -16,11 +15,6 @@ RUN npm install --workspaces --include-workspace-root
 
 # Copy the rest of the source
 COPY . .
-
-# ---------- gateway build ----------
-FROM build-base AS gateway-build
-WORKDIR /app/gateway
-RUN npm run build
 
 # ---------- dashboard build ----------
 FROM build-base AS dashboard-build
@@ -47,18 +41,6 @@ WORKDIR /app/ui/dashboard
 ENV NEXT_BUILD_MODE=embedded
 ENV NEXT_PUBLIC_EMBEDDED_MODE=true
 RUN npm run build:embedded
-
-# ---------- gateway runtime ----------
-FROM node:20-alpine AS gateway-runtime
-WORKDIR /app/gateway
-ENV NODE_ENV=production
-COPY gateway/package.json ./
-RUN npm install --omit=dev
-COPY --from=gateway-build /app/gateway/dist ./dist
-COPY --from=gateway-build /app/model_catalog ./dist/model_catalog
-RUN mkdir -p /app/gateway/data /app/gateway/logs
-EXPOSE 3001
-CMD ["node", "dist/gateway/src/index.js"]
 
 # ---------- dashboard runtime ----------
 FROM node:20-alpine AS dashboard-runtime
@@ -94,18 +76,11 @@ WORKDIR /app/integrations/openrouter
 EXPOSE 4010
 CMD ["node", "dist/server.js"]
 
-# ---------- fullstack runtime ----------
+# ---------- fullstack runtime (dashboard + openrouter + memory) ----------
 FROM node:20-alpine AS ekai-gateway-runtime
 WORKDIR /app
 
 RUN apk add --no-cache bash
-
-# Gateway
-COPY gateway/package.json ./gateway/
-RUN cd gateway && npm install --omit=dev
-COPY --from=gateway-build /app/gateway/dist ./gateway/dist
-COPY --from=gateway-build /app/model_catalog ./model_catalog
-RUN mkdir -p /app/gateway/data /app/gateway/logs
 
 # Dashboard
 COPY ui/dashboard/package.json ./ui/dashboard/
@@ -133,8 +108,8 @@ RUN chmod +x /app/start-docker-fullstack.sh
 
 ENV NODE_ENV=production
 
-EXPOSE 3001 3000 4010
-VOLUME ["/app/gateway/data", "/app/gateway/logs", "/app/memory/data"]
+EXPOSE 3000 4010
+VOLUME ["/app/memory/data"]
 CMD ["/app/start-docker-fullstack.sh"]
 
 # ---------- openrouter + dashboard Cloud Run runtime (single container) ----------
