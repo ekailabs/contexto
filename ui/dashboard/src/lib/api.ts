@@ -1,57 +1,6 @@
 import { API_CONFIG } from './constants';
 
-const API_BASE_URL = API_CONFIG.BASE_URL;
 export const MEMORY_BASE_URL = API_CONFIG.MEMORY_URL;
-
-// Types based on your backend response
-export interface UsageRecord {
-  id: number;
-  request_id: string;
-  provider: string;
-  model: string;
-  timestamp: string;
-  input_tokens: number;
-  cache_write_input_tokens: number;
-  cache_read_input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-  input_cost: number;
-  cache_write_cost: number;
-  cache_read_cost: number;
-  output_cost: number;
-  total_cost: number;
-  currency: string;
-  payment_method?: string;
-  created_at: string;
-}
-
-export interface UsageResponse {
-  totalRequests: number;
-  totalCost: number;
-  totalTokens: number;
-  costByProvider: Record<string, number>;
-  costByModel: Record<string, number>;
-  records: UsageRecord[];
-}
-
-export interface ConfigStatusResponse {
-  providers: Record<string, boolean>;
-  mode: 'byok' | 'hybrid' | 'x402-only';
-  hasApiKeys: boolean;
-  x402Enabled: boolean;
-  server: {
-    environment: string;
-    port: number;
-  };
-}
-
-export interface BudgetResponse {
-  amountUsd: number | null;
-  alertOnly: boolean;
-  window: 'monthly';
-  spentMonthToDate: number;
-  remaining: number | null;
-}
 
 export interface MemorySectorSummary {
   sector: 'episodic' | 'semantic' | 'procedural' | 'reflective';
@@ -82,99 +31,11 @@ export interface MemorySummaryResponse {
 
 // API service functions
 export const apiService = {
-  // Fetch usage data
-  async getUsage(fromDate?: Date, toDate?: Date): Promise<UsageResponse> {
-    let url = `${API_BASE_URL}/usage`;
-    
-    if (fromDate || toDate) {
-      const params = new URLSearchParams();
-      if (fromDate) {
-        params.append('startTime', fromDate.toISOString());
-      }
-      if (toDate) {
-        params.append('endTime', toDate.toISOString());
-      }
-      url += `?${params.toString()}`;
-    }
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch usage data: ${response.statusText}`);
-    }
-    return response.json();
-  },
-
-  // Check health
-  async getHealth() {
-    const response = await fetch(`${API_BASE_URL}/health`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch health: ${response.statusText}`);
-    }
-    return response.json();
-  },
-
-  async downloadUsageCsv(fromDate?: Date, toDate?: Date) {
-    const params = new URLSearchParams();
-    if (fromDate) params.append('startTime', fromDate.toISOString());
-    if (toDate) params.append('endTime', toDate.toISOString());
-    params.append('format', 'csv');
-
-    const url = `${API_BASE_URL}/usage?${params.toString()}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to export CSV: ${response.statusText}`);
-    }
-
-    const blob = await response.blob();
-    const link = document.createElement('a');
-    const downloadUrl = window.URL.createObjectURL(blob);
-    link.href = downloadUrl;
-
-    const startLabel = fromDate ? fromDate.toISOString().slice(0, 10) : 'start';
-    const endLabel = toDate ? toDate.toISOString().slice(0, 10) : 'end';
-    link.download = `usage-${startLabel}-${endLabel}.csv`;
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(downloadUrl);
-  },
-
-  async getConfigStatus(): Promise<ConfigStatusResponse> {
-    const response = await fetch(`${API_BASE_URL}/config/status`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch config status: ${response.statusText}`);
-    }
-    return response.json();
-  },
-
-  async getBudget(): Promise<BudgetResponse> {
-    const response = await fetch(`${API_BASE_URL}/budget`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch budget: ${response.statusText}`);
-    }
-    return response.json();
-  },
-
-  async updateBudget(payload: { amountUsd: number | null; alertOnly?: boolean }): Promise<BudgetResponse> {
-    const response = await fetch(`${API_BASE_URL}/budget`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to update budget: ${response.statusText}`);
-    }
-
-    return response.json();
-  },
-
   async getMemorySummary(limit = 50, profile?: string): Promise<MemorySummaryResponse> {
     const params = new URLSearchParams();
     params.append('limit', String(limit));
     if (profile) params.append('profile', profile);
-    
+
     const response = await fetch(`${MEMORY_BASE_URL}/v1/summary?${params.toString()}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch memory summary: ${response.statusText}`);

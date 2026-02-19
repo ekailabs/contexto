@@ -64,27 +64,6 @@ curl -X POST http://localhost:4010/v1/chat/completions \
 curl http://localhost:4010/health
 ```
 
-## Integration Guides
-
-### 🤖 Claude Code
-
-```bash
-export ANTHROPIC_BASE_URL="http://localhost:4010"
-export ANTHROPIC_MODEL="anthropic/claude-sonnet-4-5"
-claude
-```
-
-📖 **[Complete Claude Code Guide →](./docs/USAGE_WITH_CLAUDE_CODE.md)**
-
-### 💻 Codex
-
-```bash
-export OPENAI_BASE_URL="http://localhost:4010/v1"
-codex
-```
-
-📖 **[Complete Codex Guide →](./docs/USAGE_WITH_CODEX.md)**
-
 ## Running Services
 
 ### npm (local development)

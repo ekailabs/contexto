@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ekai Gateway Dashboard",
-  description: "AI Spend Analytics & Usage Tracking Dashboard",
+  title: "Ekai Memory Vault",
+  description: "Memory management and knowledge graph explorer",
   icons: {
     icon: '/favicon.ico',
   },

@@ -1,45 +1,19 @@
-# Ekai Gateway Dashboard
+# Ekai Memory Vault Dashboard
 
-A comprehensive spend dashboard for tracking AI model usage and pricing across multiple providers.
+A dashboard for managing agent memory and exploring the knowledge graph.
 
 ## Features
 
-- 📊 **Real-time Analytics**: Monitor spending and usage patterns with live data
-- 📈 **Trend Visualization**: Track spend and token usage over time with interactive charts
-- 🥧 **Provider Breakdown**: See cost distribution across different AI providers (OpenAI, Anthropic, etc.)
-- 🎯 **Model Comparison**: Compare costs and usage across different AI models
-- 📋 **Usage Table**: Detailed tabular view of all API requests with sorting and filtering
-- 💰 **Cost Optimization**: Identify the most cost-effective models for your use cases
-- 📅 **Date Range Filtering**: Filter analytics by custom date ranges or quick presets (Today, Yesterday, Last 7/30 Days, etc.)
-
-## Dashboard Components
-
-### TrendChart
-- **Spend Over Time**: Bar/line charts showing daily or hourly cost trends
-- **Tokens Over Time**: Bar/line charts showing token usage patterns
-- **Burn Rate**: Daily average spending calculation
-
-### ProviderChart
-- **Pie Chart**: Visual breakdown of costs by provider
-- **Cost Distribution**: See which providers you're spending the most on
-- **Percentage Analysis**: Understand your provider usage patterns
-
-### ModelChart
-- **Pie Chart**: Visual breakdown of costs by AI model
-- **Model Comparison**: Compare costs across GPT-4, Claude, and other models
-- **Usage Insights**: Identify your most-used models
-
-### UsageTable
-- **Detailed Records**: Sortable table showing all API requests
-- **Request Details**: Timestamp, provider, model, tokens, and costs
-- **Interactive Sorting**: Click column headers to sort data
-- **Summary Statistics**: Total requests, tokens, and costs
+- **Memory Management**: View, edit, and delete memories across episodic, semantic, procedural, and reflective sectors
+- **Knowledge Graph**: Interactive visualization of entity relationships and triples
+- **Profile Support**: Switch between memory profiles
+- **Semantic Graph Explorer**: Traverse paths, neighbors, and connections between entities
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
-- Backend gateway running on port 3001
+- Node.js 18+
+- Memory service running (embedded in OpenRouter on port 4010)
 
 ### Installation
 
@@ -58,73 +32,65 @@ A comprehensive spend dashboard for tracking AI model usage and pricing across m
 
 ### Optional: Environment Configuration
 
-The dashboard automatically detects the host from the browser URL and connects to the gateway (port 3001) and memory service (port 4005) on the same host. No configuration is needed for standard deployments.
+The dashboard automatically detects the host from the browser URL and connects to the memory API (port 4010) on the same host. No configuration is needed for standard deployments.
 
-To override ports, set these in `.env`:
+To override, set these in `.env`:
 
 ```bash
-PORT=3001          # Gateway port
-MEMORY_PORT=4005   # Memory service port
+NEXT_PUBLIC_MEMORY_PORT=4010   # Memory API port
+NEXT_PUBLIC_EMBEDDED_MODE=true # When UI is served from the same Express server
 ```
 
 ## API Integration
 
-The dashboard connects to the Ekai Gateway backend through these endpoints:
+The dashboard connects to the memory API through these endpoints:
 
-- `GET /usage` - Fetch usage statistics and cost data
-  - Optional query parameters:
-    - `startTime` - ISO 8601 datetime string for filtering from this date/time
-    - `endTime` - ISO 8601 datetime string for filtering to this date/time  
-    - `timezone` - Timezone identifier (defaults to UTC)
-    - Example: `/usage?startTime=2025-01-01T00:00:00.000Z&endTime=2025-01-31T23:59:59.999Z`
-- `GET /health` - Check backend health status
+- `GET /v1/summary` — Fetch memory sector summaries and recent items
+- `PUT /v1/memory/:id` — Update a memory
+- `DELETE /v1/memory/:id` — Delete a memory
+- `DELETE /v1/memory` — Delete all memories
+- `GET /v1/graph/visualization` — Graph visualization data
+- `GET /v1/graph/triples` — Query triples for an entity
+- `GET /v1/graph/neighbors` — Get entity neighbors
+- `GET /v1/graph/paths` — Find paths between entities
+- `GET /v1/profiles` — List memory profiles
+- `DELETE /v1/profiles/:name` — Delete a profile
+- `DELETE /v1/graph/triple/:id` — Delete a graph triple
 
-## Architecture
-
-### Component Structure
-- **Shared Hook**: `useUsageData` - Centralized API data fetching
-- **UI Components**: Reusable loading, error, and empty state components  
-- **Chart Components**: Interactive visualizations with shared tooltips
-- **Table Component**: Sortable data table with detailed request information
-
-### Code Organization
+## Code Organization
 ```
 src/
+├── app/
+│   ├── layout.tsx
+│   ├── page.tsx            # Redirects to /memory
+│   ├── globals.css
+│   └── memory/
+│       └── page.tsx        # Memory vault page
 ├── components/
-│   ├── TrendChart.tsx      # Time-based analytics
-│   ├── ProviderChart.tsx   # Provider cost breakdown  
-│   ├── ModelChart.tsx      # Model cost comparison
-│   ├── UsageTable.tsx      # Detailed request table
-│   ├── DateRangePicker.tsx # Date range filtering component
-│   └── ui/                 # Shared UI components
+│   ├── memory/             # Memory-specific components
+│   └── ui/
 │       ├── LoadingSkeleton.tsx
-│       ├── ErrorState.tsx
-│       ├── EmptyState.tsx
-│       └── ChartTooltip.tsx
-├── hooks/
-│   └── useUsageData.ts     # Shared data fetching logic with date filtering
+│       └── ErrorState.tsx
 └── lib/
-    ├── api.ts              # API service functions with date parameters
-    ├── constants.ts        # Shared constants
-    └── utils.ts            # Utility functions
+    ├── api.ts              # API service functions
+    └── constants.ts        # Port and URL config
 ```
 
 ## Technology Stack
 
-- **Next.js** - React framework with App Router
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first CSS framework
-- **Recharts** - Beautiful, composable charts for data visualization
-- **Custom Hooks** - Shared logic and state management
+- **Next.js** — React framework with App Router
+- **TypeScript** — Type-safe development
+- **Tailwind CSS** — Utility-first CSS framework
 
 ## Development
 
 ### Available Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint
+- `npm run dev` — Start development server
+- `npm run build` — Build for production
+- `npm run start` — Start production server
+- `npm run lint` — Run ESLint
+- `npm run type-check` — Run TypeScript type checking
 
 ## License
 
