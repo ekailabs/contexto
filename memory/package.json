@@ -2,14 +2,23 @@
   "name": "@ekai/memory",
   "version": "0.1.0",
   "description": "Neuroscience-inspired cognitive memory kernel",
-  "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "prepublishOnly": "npm run build",
     "prestart": "npm run build",
     "start": "node dist/server.js"
   },
