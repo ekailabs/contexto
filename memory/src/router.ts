@@ -24,6 +24,22 @@ export function createMemoryRouter(store: SqliteMemoryStore, extractFn?: Extract
     }
   });
 
+  router.post('/v1/agents', (req: Request, res: Response) => {
+    try {
+      const { id, name, soul } = req.body as { id?: string; name?: string; soul?: string };
+      if (!id || !id.trim()) {
+        return res.status(400).json({ error: 'id is required' });
+      }
+      const agent = store.addAgent(id.trim(), { name: name?.trim(), soulMd: soul });
+      res.json({ agent });
+    } catch (err: any) {
+      if (err?.message === 'invalid_agent') {
+        return res.status(400).json({ error: 'invalid_agent' });
+      }
+      res.status(500).json({ error: err.message ?? 'failed to add agent' });
+    }
+  });
+
   const handleDeleteAgent = (req: Request, res: Response) => {
     try {
       const { slug } = req.params;
@@ -111,6 +127,7 @@ export function createMemoryRouter(store: SqliteMemoryStore, extractFn?: Extract
         retrievalCount: (r as any).retrievalCount ?? 0,
         details: (r as any).details,
         userScope: (r as any).userScope ?? null,
+        source: (r as any).source ?? null,
       }));
       res.json({ summary, recent, agent: normalizedAgent });
     } catch (err: any) {
@@ -124,7 +141,7 @@ export function createMemoryRouter(store: SqliteMemoryStore, extractFn?: Extract
   router.put('/v1/memory/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { content, sector, agent } = req.body as { content?: string; sector?: string; agent?: string };
+      const { content, sector, agent, userScope } = req.body as { content?: string; sector?: string; agent?: string; userScope?: string | null };
 
       if (!id) return res.status(400).json({ error: 'id_required' });
       if (!content || !content.trim()) {
@@ -141,7 +158,7 @@ export function createMemoryRouter(store: SqliteMemoryStore, extractFn?: Extract
         return res.status(500).json({ error: 'agent_normalization_failed' });
       }
 
-      const updated = await store.updateById(id, content.trim(), sector as any, normalizedAgent);
+      const updated = await store.updateById(id, content.trim(), sector as any, normalizedAgent, userScope);
       if (!updated) {
         return res.status(404).json({ error: 'not_found', id });
       }

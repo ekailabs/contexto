@@ -27,13 +27,13 @@ export default function MemoryVaultPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'graph'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'graph'>('logs');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSector, setFilterSector] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ type: 'single'; id: string; preview?: string } | { type: 'bulk' } | null>(null);
   const [bulkScope, setBulkScope] = useState<'current' | 'all'>('current');
-  const [editModal, setEditModal] = useState<{ id: string; content: string; sector: string } | null>(null);
+  const [editModal, setEditModal] = useState<{ id: string; content: string; sector: string; userScope: string | null } | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [currentProfile, setCurrentProfile] = useState('default');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -49,11 +49,11 @@ export default function MemoryVaultPage() {
     );
   }, []);
 
-  // On mount, pick the first non-default agent profile (or fall back to 'default')
+  // On mount, pick the first non-default agent (or fall back to 'default')
   useEffect(() => {
-    apiService.getProfiles().then(({ profiles }) => {
-      const agent = profiles.find(p => p !== 'default');
-      if (agent) setCurrentProfile(agent);
+    apiService.getAgents().then(({ agents }) => {
+      const agent = agents.find(a => a.id !== 'default');
+      if (agent) setCurrentProfile(agent.id);
       setProfileResolved(true);
     }).catch(() => {
       setProfileResolved(true);
@@ -99,8 +99,8 @@ export default function MemoryVaultPage() {
     }
   };
 
-  const handleEditClick = (id: string, content: string, sector: string) => {
-    setEditModal({ id, content, sector });
+  const handleEditClick = (id: string, content: string, sector: string, userScope?: string | null) => {
+    setEditModal({ id, content, sector, userScope: userScope ?? null });
   };
 
   const handleDeleteClick = (id: string, preview?: string) => {
@@ -118,7 +118,7 @@ export default function MemoryVaultPage() {
     try {
       setEditBusy(true);
       setError(null);
-      await apiService.updateMemory(editModal.id, editModal.content, editModal.sector, currentProfile);
+      await apiService.updateMemory(editModal.id, editModal.content, editModal.sector, currentProfile, editModal.userScope);
       setEditModal(null);
       await fetchData();
     } catch (err) {
@@ -142,11 +142,11 @@ export default function MemoryVaultPage() {
         if (bulkScope === 'current') {
           await apiService.deleteAllMemories(currentProfile);
         } else {
-          const { profiles } = await apiService.getProfiles();
-          // Delete sequentially to surface the first failing profile clearly
-          const targets = profiles.length ? profiles : ['default'];
-          for (const profile of targets) {
-            await apiService.deleteAllMemories(profile);
+          const { agents } = await apiService.getAgents();
+          // Delete sequentially to surface the first failing agent clearly
+          const targets = agents.length ? agents.map(a => a.id) : ['default'];
+          for (const agentId of targets) {
+            await apiService.deleteAllMemories(agentId);
           }
         }
       }
@@ -384,7 +384,7 @@ export default function MemoryVaultPage() {
           </div>
         ) : activeTab === 'graph' ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <SemanticGraph maxDepth={2} maxNodes={50} height={600} profile={currentProfile} userId={selectedUserId} />
+            <SemanticGraph maxDepth={2} maxNodes={50} height={600} agent={currentProfile} userId={selectedUserId} />
           </div>
         ) : (
           <div className="bg-gradient-to-br from-white via-stone-50/20 to-white rounded-2xl border border-stone-200 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden">
@@ -487,12 +487,11 @@ export default function MemoryVaultPage() {
                           }`}
                           onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                         >
-                          {/* Left border indicator for active memories */}
-                          {isActive && (
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-500 to-teal-600"></div>
-                          )}
-                          
-                          <td className="px-6 py-5 whitespace-nowrap align-top">
+                          <td className="px-6 py-5 whitespace-nowrap align-top relative">
+                            {/* Left border indicator for active memories */}
+                            {isActive && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-500 to-teal-600"></div>
+                            )}
                             <div className="flex flex-col gap-1.5">
                               <SectorTooltip sector={item.sector}>
                                 <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-bold border shadow-sm transition-all group-hover:scale-105 cursor-help ${
@@ -533,6 +532,14 @@ export default function MemoryVaultPage() {
                                     </svg>
                                     Last accessed: {new Date(item.lastAccessed).toLocaleString()}
                                   </span>
+                                  {item.source && (
+                                    <span className="flex items-center gap-1.5 text-stone-500">
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                      </svg>
+                                      Source: {item.source}
+                                    </span>
+                                  )}
                                   {isRecent && (
                                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold">
                                       New
@@ -567,7 +574,7 @@ export default function MemoryVaultPage() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleEditClick(item.id, item.preview, item.sector);
+                                  handleEditClick(item.id, item.preview, item.sector, item.userScope);
                                 }}
                                 className="text-stone-400 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 p-2 rounded-lg hover:bg-blue-50 transform hover:scale-110"
                                 title="Edit memory"
@@ -623,7 +630,7 @@ export default function MemoryVaultPage() {
           editBusy={editBusy}
           onClose={() => setEditModal(null)}
           onConfirm={handleEditConfirm}
-          onUpdate={(updates) => setEditModal(editModal ? { ...editModal, ...updates } : null)}
+          onUpdate={(updates) => setEditModal(editModal ? { ...editModal, ...updates } as typeof editModal : null)}
         />
         <ProfileManagement
           isOpen={showProfileManagement}

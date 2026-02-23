@@ -227,6 +227,47 @@ GET /v1/summary?agent=my-bot&limit=20
 }
 ```
 
+### `GET /v1/agents`
+
+List all registered agents.
+
+```json
+{
+  "agents": [{ "id": "my-bot", "name": "My Bot", "soulMd": "You are helpful", "createdAt": 1700000000 }]
+}
+```
+
+### `POST /v1/agents`
+
+Register a new agent. `name` and `soul` are optional.
+
+```json
+{ "id": "my-bot", "name": "My Bot", "soul": "You are helpful and concise" }
+```
+```json
+{ "agent": { "id": "my-bot", "name": "My Bot", "soulMd": "You are helpful and concise", "createdAt": 1700000000 } }
+```
+
+### `DELETE /v1/agents/:slug`
+
+Delete an agent and all its memories. Cannot delete the `default` agent.
+
+```json
+{ "deleted": 5, "agent": "my-bot" }
+```
+
+### `PUT /v1/memory/:id`
+
+Update a memory's content and/or user scope. Body: `{ "content": "...", "sector?": "episodic", "agent?": "my-bot", "userScope?": "sha" }`. Set `userScope` to `null` to make a memory shared/global.
+
+### `DELETE /v1/memory/:id`
+
+Delete a single memory. Query: `?agent=my-bot`.
+
+### `DELETE /v1/memory`
+
+Delete all memories for an agent. Query: `?agent=my-bot`.
+
 ### `GET /v1/users`
 
 List all users the agent has interacted with.
@@ -236,28 +277,42 @@ GET /v1/users?agent=my-bot
 ```
 ```json
 {
-  "users": [{ "userId": "sha", "firstSeen": 1700000000, "lastSeen": 1700100000, "interactionCount": 5 }]
+  "users": [{ "userId": "sha", "firstSeen": 1700000000, "lastSeen": 1700100000, "interactionCount": 5 }],
+  "agent": "my-bot"
 }
 ```
 
 ### `GET /v1/users/:id/memories`
 
-Get all memories scoped to a specific user.
+Get memories scoped to a specific user. Query: `?agent=my-bot&limit=20`.
+
+### `GET /v1/graph/triples`
+
+Query semantic triples by entity. Query: `?entity=Sha&direction=outgoing&agent=my-bot&predicate=...&maxResults=100&userId=...`.
+
+### `DELETE /v1/graph/triple/:id`
+
+Delete a single semantic triple. Query: `?agent=my-bot`.
+
+### `GET /v1/graph/visualization`
+
+Graph visualization data (nodes + edges). Query: `?entity=Sha&maxDepth=2&maxNodes=50&agent=my-bot&includeHistory=true&userId=...`.
 
 ### All Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/v1/agents` | List agents |
+| POST | `/v1/agents` | Create agent |
+| DELETE | `/v1/agents/:slug` | Delete agent + memories |
 | POST | `/v1/ingest` | Ingest conversation |
 | POST | `/v1/search` | Search with PBWM gating |
 | GET | `/v1/summary` | Sector counts + recent |
-| GET | `/v1/users` | List agent's users |
-| GET | `/v1/users/:id/memories` | User-scoped memories |
-| GET | `/v1/agents` | List agents |
 | PUT | `/v1/memory/:id` | Update a memory |
 | DELETE | `/v1/memory/:id` | Delete one memory |
 | DELETE | `/v1/memory` | Delete all for agent |
-| DELETE | `/v1/agents/:slug` | Delete agent + memories |
+| GET | `/v1/users` | List agent's users |
+| GET | `/v1/users/:id/memories` | User-scoped memories |
 | GET | `/v1/graph/triples` | Query semantic triples by entity |
 | GET | `/v1/graph/visualization` | Graph visualization data (dashboard) |
 | DELETE | `/v1/graph/triple/:id` | Delete a triple |

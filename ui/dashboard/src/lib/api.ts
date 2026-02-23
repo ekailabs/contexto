@@ -16,6 +16,7 @@ export interface MemoryRecentItem {
   preview: string;
   retrievalCount?: number;
   userScope?: string | null;
+  source?: string | null;
   details?: {
     trigger?: string;
     goal?: string;
@@ -33,10 +34,10 @@ export interface MemorySummaryResponse {
 
 // API service functions
 export const apiService = {
-  async getMemorySummary(limit = 50, profile?: string): Promise<MemorySummaryResponse> {
+  async getMemorySummary(limit = 50, agent?: string): Promise<MemorySummaryResponse> {
     const params = new URLSearchParams();
     params.append('limit', String(limit));
-    if (profile) params.append('profile', profile);
+    if (agent) params.append('agent', agent);
 
     const response = await fetch(`${MEMORY_BASE_URL}/v1/summary?${params.toString()}`);
     if (!response.ok) {
@@ -45,11 +46,15 @@ export const apiService = {
     return response.json();
   },
 
-  async updateMemory(id: string, content: string, sector?: string, profile?: string): Promise<{ updated: boolean; id: string; profile?: string }> {
+  async updateMemory(id: string, content: string, sector?: string, agent?: string, userScope?: string | null): Promise<{ updated: boolean; id: string; agent?: string }> {
+    const body: Record<string, string | null | undefined> = { content, sector, agent };
+    if (userScope !== undefined) {
+      body.userScope = userScope;
+    }
     const response = await fetch(`${MEMORY_BASE_URL}/v1/memory/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, sector, profile }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       let errorMessage = `Failed to update memory: ${response.statusText}`;
@@ -66,9 +71,9 @@ export const apiService = {
     return response.json();
   },
 
-  async deleteMemory(id: string, profile?: string): Promise<void> {
+  async deleteMemory(id: string, agent?: string): Promise<void> {
     const params = new URLSearchParams();
-    if (profile) params.append('profile', profile);
+    if (agent) params.append('agent', agent);
     const url = `${MEMORY_BASE_URL}/v1/memory/${encodeURIComponent(id)}${params.toString() ? `?${params.toString()}` : ''}`;
 
     const response = await fetch(url, { method: 'DELETE' });
@@ -86,9 +91,9 @@ export const apiService = {
     }
   },
 
-  async deleteAllMemories(profile?: string): Promise<{ deleted: number; profile?: string }> {
+  async deleteAllMemories(agent?: string): Promise<{ deleted: number; agent?: string }> {
     const params = new URLSearchParams();
-    if (profile) params.append('profile', profile);
+    if (agent) params.append('agent', agent);
     const url = `${MEMORY_BASE_URL}/v1/memory${params.toString() ? `?${params.toString()}` : ''}`;
 
     const response = await fetch(url, { method: 'DELETE' });
@@ -99,7 +104,7 @@ export const apiService = {
   },
 
   // Graph traversal APIs
-  async getGraphVisualization(params?: { entity?: string; maxDepth?: number; maxNodes?: number; profile?: string; includeHistory?: boolean; userId?: string }): Promise<{
+  async getGraphVisualization(params?: { entity?: string; maxDepth?: number; maxNodes?: number; agent?: string; includeHistory?: boolean; userId?: string }): Promise<{
     center?: string;
     nodes: Array<{ id: string; label: string }>;
     edges: Array<{ source: string; target: string; predicate: string; isHistorical?: boolean }>;
@@ -109,7 +114,7 @@ export const apiService = {
     if (params?.entity) searchParams.append('entity', params.entity);
     if (params?.maxDepth) searchParams.append('maxDepth', String(params.maxDepth));
     if (params?.maxNodes) searchParams.append('maxNodes', String(params.maxNodes));
-    if (params?.profile) searchParams.append('profile', params.profile);
+    if (params?.agent) searchParams.append('agent', params.agent);
     if (params?.includeHistory) searchParams.append('includeHistory', 'true');
     if (params?.userId) searchParams.append('userId', params.userId);
 
@@ -147,36 +152,36 @@ export const apiService = {
     return response.json();
   },
 
-  async getProfiles(): Promise<{ profiles: string[] }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/profiles`);
+  async getAgents(): Promise<{ agents: Array<{ id: string; name: string; createdAt: number }> }> {
+    const response = await fetch(`${MEMORY_BASE_URL}/v1/agents`);
     if (!response.ok) {
-      throw new Error(`Failed to fetch profiles: ${response.statusText}`);
+      throw new Error(`Failed to fetch agents: ${response.statusText}`);
     }
     return response.json();
   },
 
-  async getUsers(profile: string): Promise<{ users: Array<{ userId: string; firstSeen: number; lastSeen: number; interactionCount: number }>; profile: string }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/users?profile=${encodeURIComponent(profile)}`);
+  async getUsers(agent: string): Promise<{ users: Array<{ userId: string; firstSeen: number; lastSeen: number; interactionCount: number }>; agent: string }> {
+    const response = await fetch(`${MEMORY_BASE_URL}/v1/users?agent=${encodeURIComponent(agent)}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch users: ${response.statusText}`);
     }
     return response.json();
   },
 
-  async deleteProfile(profile: string): Promise<{ deleted: number; profile: string }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/profiles/${encodeURIComponent(profile)}`, {
+  async deleteAgent(agent: string): Promise<{ deleted: number; agent: string }> {
+    const response = await fetch(`${MEMORY_BASE_URL}/v1/agents/${encodeURIComponent(agent)}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       // Treat "not_found" as a no-op to keep the flow idempotent
       if (response.status === 404 && body?.error === 'not_found') {
-        return { deleted: 0, profile };
+        return { deleted: 0, agent };
       }
-      const reason = body?.error === 'default_profile_protected'
-        ? 'Default profile cannot be deleted'
+      const reason = body?.error === 'default_agent_protected'
+        ? 'Default agent cannot be deleted'
         : body?.error ?? response.statusText;
-      throw new Error(`Failed to delete profile: ${reason}`);
+      throw new Error(`Failed to delete agent: ${reason}`);
     }
     return response.json();
   },

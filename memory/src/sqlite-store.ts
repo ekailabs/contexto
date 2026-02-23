@@ -358,19 +358,19 @@ export class SqliteMemoryStore {
     this.ensureAgentExists(agentId);
     const rows = this.db
       .prepare(
-        `select id, sector, content, embedding, created_at as createdAt, last_accessed as lastAccessed, '{}' as details, event_start as eventStart, event_end as eventEnd, retrieval_count as retrievalCount, user_scope as userScope
+        `select id, sector, content, embedding, created_at as createdAt, last_accessed as lastAccessed, '{}' as details, event_start as eventStart, event_end as eventEnd, retrieval_count as retrievalCount, user_scope as userScope, source
          from memory
          where agent_id = @agentId
          union all
          select id, 'procedural' as sector, trigger as content, embedding, created_at as createdAt, last_accessed as lastAccessed,
                 json_object('trigger', trigger, 'goal', goal, 'context', context, 'result', result, 'steps', json(steps)) as details,
-                null as eventStart, null as eventEnd, 0 as retrievalCount, user_scope as userScope
+                null as eventStart, null as eventEnd, 0 as retrievalCount, user_scope as userScope, source
          from procedural_memory
          where agent_id = @agentId
          union all
          select id, 'semantic' as sector, object as content, json('[]') as embedding, created_at as createdAt, updated_at as lastAccessed,
                 json_object('subject', subject, 'predicate', predicate, 'object', object, 'validFrom', valid_from, 'validTo', valid_to, 'strength', strength, 'metadata', metadata, 'domain', domain) as details,
-                null as eventStart, null as eventEnd, 0 as retrievalCount, user_scope as userScope
+                null as eventStart, null as eventEnd, 0 as retrievalCount, user_scope as userScope, source
          from semantic_memory
          where agent_id = @agentId
            and (valid_to is null or valid_to > @now)
@@ -1114,7 +1114,7 @@ export class SqliteMemoryStore {
       .run({ id, now: this.now() });
   }
 
-  async updateById(id: string, content: string, sector?: SectorName, agent?: string): Promise<boolean> {
+  async updateById(id: string, content: string, sector?: SectorName, agent?: string, userScope?: string | null): Promise<boolean> {
     const agentId = normalizeAgentId(agent);
     this.ensureAgentExists(agentId);
     // First, get the existing record to preserve sector if not changing
@@ -1131,18 +1131,20 @@ export class SqliteMemoryStore {
     // Regenerate embedding with new content
     const embedding = await this.embed(content, targetSector);
 
-    // Update the record
+    // Build update dynamically to support optional userScope
+    const setClauses = ['content = ?', 'sector = ?', 'embedding = json(?)', 'last_accessed = ?'];
+    const params: any[] = [content, targetSector, JSON.stringify(embedding), this.now()];
+
+    if (userScope !== undefined) {
+      setClauses.push('user_scope = ?');
+      params.push(userScope);
+    }
+
+    params.push(id, agentId);
     const stmt = this.db.prepare(
-      'update memory set content = ?, sector = ?, embedding = json(?), last_accessed = ? where id = ? and agent_id = ?'
+      `update memory set ${setClauses.join(', ')} where id = ? and agent_id = ?`
     );
-    const res = stmt.run(
-      content,
-      targetSector,
-      JSON.stringify(embedding),
-      this.now(),
-      id,
-      agentId,
-    );
+    const res = stmt.run(...params);
 
     return res.changes > 0;
   }

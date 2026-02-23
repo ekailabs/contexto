@@ -23,6 +23,7 @@ export function formatMemoryBlock(results: QueryResult[]): string {
   const facts: string[] = [];
   const events: string[] = [];
   const procedures: string[] = [];
+  const observations: string[] = [];
 
   for (const r of results) {
     if (r.sector === 'semantic' && r.details?.subject) {
@@ -30,6 +31,8 @@ export function formatMemoryBlock(results: QueryResult[]): string {
     } else if (r.sector === 'procedural' && r.details?.trigger) {
       const steps = r.details.steps?.join(' → ') || r.content;
       procedures.push(`- When ${r.details.trigger}: ${steps}`);
+    } else if (r.sector === 'reflective') {
+      observations.push(`- ${r.content}`);
     } else {
       events.push(`- ${r.content}`);
     }
@@ -39,6 +42,7 @@ export function formatMemoryBlock(results: QueryResult[]): string {
   if (facts.length) sections.push(`What I know:\n${facts.join('\n')}`);
   if (events.length) sections.push(`What I remember:\n${events.join('\n')}`);
   if (procedures.length) sections.push(`How I do things:\n${procedures.join('\n')}`);
+  if (observations.length) sections.push(`My observations:\n${observations.join('\n')}`);
 
   return `<memory>\n[Recalled context for this conversation. Use naturally if relevant, ignore if not.]\n\n${sections.join('\n\n')}\n</memory>`;
 }
