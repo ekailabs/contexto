@@ -227,14 +227,6 @@ GET /v1/summary?agent=my-bot&limit=20
 }
 ```
 
-### `POST /v1/ingest/documents`
-
-Ingest markdown files from a directory with deduplication.
-
-```json
-{ "path": "/path/to/docs", "agent": "my-bot" }
-```
-
 ### `GET /v1/users`
 
 List all users the agent has interacted with.
@@ -257,7 +249,6 @@ Get all memories scoped to a specific user.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/v1/ingest` | Ingest conversation |
-| POST | `/v1/ingest/documents` | Ingest markdown directory |
 | POST | `/v1/search` | Search with PBWM gating |
 | GET | `/v1/summary` | Sector counts + recent |
 | GET | `/v1/users` | List agent's users |

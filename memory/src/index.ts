@@ -8,7 +8,7 @@ export type { ProviderConfig } from './providers/registry.js';
 export * from './scoring.js';
 export * from './wm.js';
 export * from './utils.js';
-export * from './documents.js';
+
 export * from './router.js';
 export { Memory } from './memory.js';
 export type { MemoryConfig } from './memory.js';

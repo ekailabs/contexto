@@ -5,7 +5,7 @@ import type { ExtractFn } from './types.js';
 import { extract as defaultExtract } from './providers/extract.js';
 import { normalizeAgentId } from './utils.js';
 import type { IngestComponents } from './types.js';
-import { ingestDocuments } from './documents.js';
+
 
 /**
  * Creates an Express Router with all memory API routes.
@@ -92,42 +92,6 @@ export function createMemoryRouter(store: SqliteMemoryStore, extractFn?: Extract
       res.json({ stored: rows.length, ids: rows.map((r) => r.id), agent: normalizedAgent });
     } catch (err: any) {
       res.status(500).json({ error: err.message ?? 'ingest failed' });
-    }
-  });
-
-  router.post('/v1/ingest/documents', async (req: Request, res: Response) => {
-    const { path: docPath, agent } = req.body as {
-      path?: string;
-      agent?: string;
-    };
-
-    if (!docPath || !docPath.trim()) {
-      return res.status(400).json({ error: 'path_required' });
-    }
-
-    let normalizedAgent: string;
-    try {
-      normalizedAgent = normalizeAgentId(agent);
-    } catch (err: any) {
-      if (err?.message === 'invalid_agent') {
-        return res.status(400).json({ error: 'invalid_agent' });
-      }
-      return res.status(500).json({ error: 'agent_normalization_failed' });
-    }
-
-    // Validate path exists
-    try {
-      const fs = await import('node:fs/promises');
-      await fs.stat(docPath.trim());
-    } catch {
-      return res.status(400).json({ error: 'path_not_found' });
-    }
-
-    try {
-      const result = await ingestDocuments(docPath.trim(), store, normalizedAgent, doExtract);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message ?? 'document ingestion failed' });
     }
   });
 
