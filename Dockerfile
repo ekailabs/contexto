@@ -7,8 +7,8 @@ COPY package.json package-lock.json ./
 
 # Copy per-workspace manifests (lock files may not exist for all)
 COPY ui/dashboard/package.json ui/dashboard/package-lock.json* ./ui/dashboard/
-COPY memory/package.json ./memory/
-COPY integrations/openrouter/package.json ./integrations/openrouter/
+COPY memory/package.json memory/package-lock.json ./memory/
+COPY integrations/openrouter/package.json integrations/openrouter/package-lock.json ./integrations/openrouter/
 
 # Install all workspace deps from root
 RUN npm install --workspaces --include-workspace-root
@@ -60,15 +60,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Memory package (workspace dependency of openrouter)
-COPY memory/package.json ./memory/
-RUN cd memory && npm install --omit=dev
+COPY memory/package.json memory/package-lock.json ./memory/
+RUN cd memory && npm ci --omit=dev
 COPY --from=memory-build /app/memory/dist ./memory/dist
 
 # OpenRouter — rewrite workspace ref to local file path before install
-COPY integrations/openrouter/package.json ./integrations/openrouter/
+COPY integrations/openrouter/package.json integrations/openrouter/package-lock.json ./integrations/openrouter/
 RUN cd integrations/openrouter && \
     sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
-    npm install --omit=dev
+    npm ci --omit=dev
 COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
 
 RUN mkdir -p /app/memory/data
@@ -90,16 +90,16 @@ COPY --from=dashboard-build /app/ui/dashboard/public ./ui/dashboard/public
 COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./ui/dashboard/next.config.mjs
 
 # Memory (workspace dependency of openrouter)
-COPY memory/package.json ./memory/
-RUN cd memory && npm install --omit=dev
+COPY memory/package.json memory/package-lock.json ./memory/
+RUN cd memory && npm ci --omit=dev
 COPY --from=memory-build /app/memory/dist ./memory/dist
 RUN mkdir -p /app/memory/data
 
 # OpenRouter — rewrite workspace ref to local file path before install
-COPY integrations/openrouter/package.json ./integrations/openrouter/
+COPY integrations/openrouter/package.json integrations/openrouter/package-lock.json ./integrations/openrouter/
 RUN cd integrations/openrouter && \
     sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
-    npm install --omit=dev
+    npm ci --omit=dev
 COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
 
 # Entrypoint
@@ -118,15 +118,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Memory package (workspace dependency of openrouter)
-COPY memory/package.json ./memory/
-RUN cd memory && npm install --omit=dev
+COPY memory/package.json memory/package-lock.json ./memory/
+RUN cd memory && npm ci --omit=dev
 COPY --from=memory-build /app/memory/dist ./memory/dist
 
 # OpenRouter — rewrite workspace ref to local file path before install
-COPY integrations/openrouter/package.json ./integrations/openrouter/
+COPY integrations/openrouter/package.json integrations/openrouter/package-lock.json ./integrations/openrouter/
 RUN cd integrations/openrouter && \
     sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
-    npm install --omit=dev
+    npm ci --omit=dev
 COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
 
 # Dashboard static export
