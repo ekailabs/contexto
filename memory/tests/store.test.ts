@@ -112,11 +112,11 @@ describe('SqliteMemoryStore (single-user mode)', () => {
     // Structure
     expect(result).toHaveProperty('workingMemory');
     expect(result).toHaveProperty('perSector');
-    expect(result).toHaveProperty('profileId');
+    expect(result).toHaveProperty('agentId');
     expect(Array.isArray(result.workingMemory)).toBe(true);
 
-    // perSector has all 4 sector keys
-    for (const sector of ['episodic', 'semantic', 'procedural', 'reflective'] as SectorName[]) {
+    // perSector has all 3 active sector keys (reflective is disabled)
+    for (const sector of ['episodic', 'semantic', 'procedural'] as SectorName[]) {
       expect(result.perSector).toHaveProperty(sector);
       expect(Array.isArray(result.perSector[sector])).toBe(true);
     }
@@ -350,9 +350,13 @@ describe('SqliteMemoryStore (single-user mode)', () => {
     }
   });
 
-  // ─── 10. Profile isolation (dashboard profile selector) ───────────
-  it('isolates memories by profile and getAvailableProfiles returns both', async () => {
-    // Ingest for profile "agent-a"
+  // ─── 10. Agent isolation (agent selector) ───────────
+  it('isolates memories by agent and getAgents returns both', async () => {
+    // Create agents explicitly
+    store.addAgent('agent-a', { name: 'Agent A' });
+    store.addAgent('agent-b', { name: 'Agent B' });
+
+    // Ingest for agent "agent-a"
     await store.ingest(
       {
         episodic: 'deployed v2 to staging',
@@ -361,7 +365,7 @@ describe('SqliteMemoryStore (single-user mode)', () => {
       'agent-a',
     );
 
-    // Ingest for profile "agent-b"
+    // Ingest for agent "agent-b"
     await store.ingest(
       {
         episodic: 'TypeScript',
@@ -372,27 +376,82 @@ describe('SqliteMemoryStore (single-user mode)', () => {
 
     // Query agent-a should return only its memories
     const resultA = await store.query('dark mode', 'agent-a');
-    expect(resultA.profileId).toBe('agent-a');
+    expect(resultA.agentId).toBe('agent-a');
     // Episodic and semantic should only come from agent-a
     for (const sector of ['episodic', 'semantic'] as SectorName[]) {
       for (const row of resultA.perSector[sector]) {
-        expect(row.profileId).toBe('agent-a');
+        expect(row.agentId).toBe('agent-a');
       }
     }
 
     // Query agent-b should return only its memories
     const resultB = await store.query('TypeScript', 'agent-b');
-    expect(resultB.profileId).toBe('agent-b');
+    expect(resultB.agentId).toBe('agent-b');
     for (const sector of ['episodic', 'semantic'] as SectorName[]) {
       for (const row of resultB.perSector[sector]) {
-        expect(row.profileId).toBe('agent-b');
+        expect(row.agentId).toBe('agent-b');
       }
     }
 
-    // getAvailableProfiles returns both (plus 'default')
-    const profiles = store.getAvailableProfiles();
-    expect(profiles).toContain('agent-a');
-    expect(profiles).toContain('agent-b');
-    expect(profiles).toContain('default');
+    // getAgents returns both (plus 'default')
+    const agents = store.getAgents();
+    const agentIds = agents.map((a) => a.id);
+    expect(agentIds).toContain('agent-a');
+    expect(agentIds).toContain('agent-b');
+    expect(agentIds).toContain('default');
+  });
+
+  // ─── 11. addAgent and getAgent ───────────────────────────────────
+  it('addAgent creates agent and getAgent retrieves it', () => {
+    const agent = store.addAgent('test-bot', { name: 'Test Bot', soulMd: 'You are helpful' });
+    expect(agent.id).toBe('test-bot');
+    expect(agent.name).toBe('Test Bot');
+    expect(agent.soulMd).toBe('You are helpful');
+    expect(agent.createdAt).toBe(NOW);
+
+    const retrieved = store.getAgent('test-bot');
+    expect(retrieved).toBeDefined();
+    expect(retrieved!.id).toBe('test-bot');
+    expect(retrieved!.name).toBe('Test Bot');
+    expect(retrieved!.soulMd).toBe('You are helpful');
+  });
+
+  // ─── 12. addAgent upserts on conflict ─────────────────────────────
+  it('addAgent upserts name and soulMd on conflict', () => {
+    store.addAgent('my-bot', { name: 'V1' });
+    store.addAgent('my-bot', { name: 'V2', soulMd: 'Updated soul' });
+
+    const agent = store.getAgent('my-bot');
+    expect(agent!.name).toBe('V2');
+    expect(agent!.soulMd).toBe('Updated soul');
+  });
+
+  // ─── 13. getAgent returns undefined for non-existent ─────────────
+  it('getAgent returns undefined for non-existent agent', () => {
+    const agent = store.getAgent('does-not-exist');
+    expect(agent).toBeUndefined();
+  });
+
+  // ─── 14. deleteAgent removes agent and all its data ──────────────
+  it('deleteAgent removes agent and its memories', async () => {
+    store.addAgent('temp-agent');
+    await store.ingest(
+      { episodic: 'deployed v2 to staging' },
+      'temp-agent',
+    );
+
+    const summary = store.getSectorSummary('temp-agent');
+    expect(summary.find((s) => s.sector === 'episodic')!.count).toBe(1);
+
+    store.deleteAgent('temp-agent');
+
+    // Agent should be gone
+    const agent = store.getAgent('temp-agent');
+    expect(agent).toBeUndefined();
+  });
+
+  // ─── 15. Cannot delete default agent ──────────────────────────────
+  it('throws when trying to delete default agent', () => {
+    expect(() => store.deleteAgent('default')).toThrow('cannot_delete_default_agent');
   });
 });

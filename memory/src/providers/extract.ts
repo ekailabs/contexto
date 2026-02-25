@@ -1,6 +1,6 @@
-import type { IngestComponents, SemanticTripleInput } from '../types.js';
+import type { ExtractFn, IngestComponents, ProviderName, SemanticTripleInput } from '../types.js';
 import { EXTRACT_PROMPT } from './prompt.js';
-import { buildUrl, getApiKey, getModel, resolveProvider } from './registry.js';
+import { PROVIDERS, buildUrl, getApiKey, getModel, resolveProvider, type ProviderConfig } from './registry.js';
 
 /**
  * Normalize semantic output: single object → array, filter invalid triples.
@@ -33,10 +33,7 @@ function parseResponse(parsed: any): IngestComponents {
   };
 }
 
-export async function extract(text: string): Promise<IngestComponents> {
-  const cfg = resolveProvider('extract');
-  const apiKey = getApiKey(cfg);
-  const model = getModel(cfg, 'extract');
+async function callExtract(cfg: ProviderConfig, model: string, apiKey: string, text: string): Promise<IngestComponents> {
   const { url, headers } = buildUrl(cfg, 'extract', model, apiKey);
 
   if (cfg.name === 'gemini') {
@@ -77,4 +74,20 @@ export async function extract(text: string): Promise<IngestComponents> {
   const json = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
   const content = json.choices[0]?.message?.content ?? '{}';
   return parseResponse(JSON.parse(content));
+}
+
+/** Env-based extract (legacy). Resolves provider from MEMORY_EXTRACT_PROVIDER env var. */
+export async function extract(text: string): Promise<IngestComponents> {
+  const cfg = resolveProvider('extract');
+  const apiKey = getApiKey(cfg);
+  const model = getModel(cfg, 'extract');
+  return callExtract(cfg, model, apiKey, text);
+}
+
+/** Factory: create an ExtractFn from explicit provider config. */
+export function createExtractFn(opts: { provider: ProviderName; apiKey: string; extractModel?: string }): ExtractFn {
+  const cfg = PROVIDERS[opts.provider];
+  const model = opts.extractModel ?? cfg.defaultExtractModel;
+  const apiKey = opts.apiKey;
+  return (text: string) => callExtract(cfg, model, apiKey, text);
 }

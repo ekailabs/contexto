@@ -51,16 +51,16 @@ export default function ProfileManagement({ isOpen, onClose, currentProfile, onP
     try {
       setLoading(true);
       setError('');
-      const response = await apiService.getProfiles();
-      const profileList: Profile[] = response.profiles.map((slug, index) => ({
-        slug,
-        displayName: formatProfileName(slug),
-        color: getProfileColor(slug, index),
+      const response = await apiService.getAgents();
+      const profileList: Profile[] = response.agents.map((agent, index) => ({
+        slug: agent.id,
+        displayName: agent.name ? formatProfileName(agent.name) : formatProfileName(agent.id),
+        color: getProfileColor(agent.id, index),
       }));
       setProfiles(profileList);
     } catch (err) {
       setError('Failed to load profiles');
-      console.error('Failed to fetch profiles', err);
+      console.error('Failed to fetch agents', err);
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ export default function ProfileManagement({ isOpen, onClose, currentProfile, onP
     try {
       setDeleting(slug);
       setDeleteError('');
-      await apiService.deleteProfile(slug);
+      await apiService.deleteAgent(slug);
       if (onProfileDeleted) onProfileDeleted(slug);
       await loadProfiles();
     } catch (err: unknown) {

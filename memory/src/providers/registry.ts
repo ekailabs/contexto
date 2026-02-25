@@ -1,8 +1,8 @@
-type ProviderName = 'gemini' | 'openai' | 'openrouter';
+import type { ProviderName } from '../types.js';
 
 type AuthMode = 'queryKey' | 'bearer';
 
-interface ProviderConfig {
+export interface ProviderConfig {
   name: ProviderName;
   apiKeyEnv: string;
   baseUrl: string;
@@ -15,7 +15,7 @@ interface ProviderConfig {
   auth: AuthMode;
 }
 
-const PROVIDERS: Record<ProviderName, ProviderConfig> = {
+export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   gemini: {
     name: 'gemini',
     apiKeyEnv: 'GOOGLE_API_KEY',
@@ -28,7 +28,6 @@ const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     extractModelEnv: 'GEMINI_EXTRACT_MODEL',
     auth: 'queryKey',
   },
-  // TODO: add OpenAI provider wiring (bearer auth, /v1/embeddings and /v1/chat/completions)
   openai: {
     name: 'openai',
     apiKeyEnv: 'OPENAI_API_KEY',
@@ -90,4 +89,3 @@ export function buildUrl(cfg: ProviderConfig, kind: 'embed' | 'extract', model: 
     },
   };
 }
-

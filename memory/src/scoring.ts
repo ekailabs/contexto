@@ -41,7 +41,7 @@ export function scoreRowPBWM(
   return {
     sector: row.sector,
     id: row.id,
-    profileId: row.profileId,
+    agentId: row.agentId,
     content: row.content,
     score,
     similarity: relevance,

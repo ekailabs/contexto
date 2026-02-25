@@ -122,11 +122,11 @@ export function DeleteModal({
 }
 
 interface EditModalProps {
-  editModal: { id: string; content: string; sector: string } | null;
+  editModal: { id: string; content: string; sector: string; userScope?: string | null } | null;
   editBusy: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  onUpdate: (updates: { content?: string; sector?: string }) => void;
+  onUpdate: (updates: { content?: string; sector?: string; userScope?: string | null }) => void;
 }
 
 export function EditModal({ editModal, editBusy, onClose, onConfirm, onUpdate }: EditModalProps) {
@@ -182,6 +182,21 @@ export function EditModal({ editModal, editBusy, onClose, onConfirm, onUpdate }:
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   The embedding will be regenerated automatically when you save.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  User Scope
+                </label>
+                <input
+                  type="text"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  value={editModal.userScope ?? ''}
+                  onChange={(e) => onUpdate({ userScope: e.target.value || null })}
+                  placeholder="Leave empty for shared/global"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Assign this memory to a specific user ID, or leave empty for shared access.
                 </p>
               </div>
             </div>

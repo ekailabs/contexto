@@ -37,15 +37,15 @@ export function SectorTooltip({ sector, children }: SectorTooltipProps) {
     >
       {children}
       {showTooltip && (
-        <div className="absolute z-50 w-72 p-4 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg shadow-xl bottom-full left-1/2 transform -translate-x-1/2 mb-3 pointer-events-none">
-          <div className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+        <div className="absolute z-50 w-56 p-3 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg shadow-xl top-full left-0 mt-2 pointer-events-none">
+          <div className="font-semibold text-gray-900 mb-1 flex items-center gap-1.5">
             <span className={`inline-block w-2 h-2 rounded-full ${sectorColors[sector].split(' ')[0]}`}></span>
             {capitalizeSector(sector)}
           </div>
-          <div className="text-gray-600 leading-relaxed">{sectorDescriptions[sector]}</div>
+          <div className="text-gray-500 leading-relaxed">{sectorDescriptions[sector]}</div>
           {/* Arrow */}
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-            <div className="w-3 h-3 bg-white border-r border-b border-gray-200 transform rotate-45"></div>
+          <div className="absolute bottom-full left-4 -mb-1">
+            <div className="w-2.5 h-2.5 bg-white border-l border-t border-gray-200 transform rotate-45"></div>
           </div>
         </div>
       )}

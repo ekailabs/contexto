@@ -23,19 +23,19 @@ export function gaussianNoise(mean: number, std: number): number {
   return mean + std * z0;
 }
 
-export const DEFAULT_PROFILE = 'default';
+export const DEFAULT_AGENT = 'default';
 
 /**
- * Normalize a human-friendly profile string to a slug we can safely index on.
+ * Normalize a human-friendly agent string to a slug we can safely index on.
  * Falls back to "default" when empty. Throws on invalid input.
  */
-export function normalizeProfileSlug(profile?: string | null): string {
-  const trimmed = profile?.trim();
-  if (!trimmed) return DEFAULT_PROFILE;
+export function normalizeAgentId(agent?: string | null): string {
+  const trimmed = agent?.trim();
+  if (!trimmed) return DEFAULT_AGENT;
 
   const slug = trimmed.toLowerCase();
   if (!/^[a-z0-9_-]{1,40}$/.test(slug)) {
-    throw new Error('invalid_profile');
+    throw new Error('invalid_agent');
   }
   return slug;
 }

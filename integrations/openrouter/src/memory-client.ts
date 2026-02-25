@@ -1,5 +1,4 @@
-import type { SqliteMemoryStore } from '@ekai/memory';
-import { extract } from '@ekai/memory';
+import type { Memory } from '@ekai/memory';
 
 interface QueryResult {
   sector: 'episodic' | 'semantic' | 'procedural' | 'reflective';
@@ -16,13 +15,13 @@ interface QueryResult {
   };
 }
 
-let store: SqliteMemoryStore | null = null;
+let memory: Memory | null = null;
 
 /**
- * Initialize the memory store reference. Called once at startup.
+ * Initialize the Memory instance. Called once at startup.
  */
-export function initMemoryStore(s: SqliteMemoryStore): void {
-  store = s;
+export function initMemory(m: Memory): void {
+  memory = m;
 }
 
 /**
@@ -31,15 +30,15 @@ export function initMemoryStore(s: SqliteMemoryStore): void {
  */
 export async function fetchMemoryContext(
   query: string,
-  profile: string,
+  userId?: string,
 ): Promise<QueryResult[] | null> {
-  if (!store) {
-    console.warn('[memory] store not initialized');
+  if (!memory) {
+    console.warn('[memory] not initialized');
     return null;
   }
   try {
-    const data = await store.query(query, profile);
-    return data.workingMemory?.length ? data.workingMemory : null;
+    const results = await memory.search(query, { userId });
+    return results.length ? results : null;
   } catch (err: any) {
     console.warn(`[memory] search failed: ${err.message}`);
     return null;
@@ -52,29 +51,14 @@ export async function fetchMemoryContext(
  */
 export function ingestMessages(
   messages: Array<{ role: string; content: string }>,
-  profile: string,
+  userId?: string,
 ): void {
-  if (!store) {
-    console.warn('[memory] store not initialized, skipping ingest');
+  if (!memory) {
+    console.warn('[memory] not initialized, skipping ingest');
     return;
   }
 
-  const allMessages = messages.filter((m) => m.content?.trim());
-  const sourceText = allMessages
-    .map((m) => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content.trim()}`)
-    .join('\n\n');
-
-  if (!sourceText) return;
-
-  // Fire-and-forget: extract then ingest
-  extract(sourceText)
-    .then((components) => {
-      if (!components || !store) return;
-      return store.ingest(components, profile, {
-        origin: { originType: 'conversation' },
-      });
-    })
-    .catch((err) => {
-      console.warn(`[memory] ingest failed: ${err.message}`);
-    });
+  memory.add(messages, { userId }).catch((err) => {
+    console.warn(`[memory] ingest failed: ${err.message}`);
+  });
 }

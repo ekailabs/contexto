@@ -358,8 +358,6 @@ The provider layer abstracts LLM and embedding API calls behind a two-provider r
 **`semantic-graph.ts`** — Class `SemanticGraphTraversal`:
 - `findTriplesBySubject(subject, options)` / `findTriplesByObject(object, options)`
 - `findConnectedTriples(entity, options)` — Union of subject + object queries
-- `findNeighbors(entity, options)` — Set of connected entities
-- `findPaths(from, to, options)` — BFS path-finding (default maxDepth=3)
 - `findReachableEntities(entity, options)` — BFS reachability (default maxDepth=2)
 
 **`utils.ts`** — Math primitives and profile normalization:
@@ -861,5 +859,5 @@ The ekai-gateway has **two independent memory systems**:
 
 The dashboard (`ui/dashboard/src/lib/api.ts`) connects to the memory service at `NEXT_PUBLIC_MEMORY_BASE_URL` (default `http://localhost:4005`). It exposes methods for:
 - `getMemorySummary`, `deleteMemory`, `deleteAllMemories`, `updateMemory`
-- `getGraphVisualization`, `getGraphTriples`, `getGraphNeighbors`, `getGraphPaths`
+- `getGraphVisualization`, `getGraphTriples`
 - `getProfiles`, `deleteProfile`, `deleteGraphTriple`

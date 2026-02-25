@@ -8,12 +8,21 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import express from 'express';
 import cors from 'cors';
-import { SqliteMemoryStore } from './sqlite-store.js';
-import { embed } from './providers/embed.js';
+import type { ProviderName } from './types.js';
+import { Memory } from './memory.js';
 import { createMemoryRouter } from './router.js';
 
 const PORT = Number(process.env.MEMORY_PORT ?? 4005);
 const DB_PATH = process.env.MEMORY_DB_PATH ?? './memory.db';
+
+// Resolve provider config from env
+const provider = (process.env.MEMORY_EMBED_PROVIDER ?? process.env.MEMORY_EXTRACT_PROVIDER ?? 'gemini') as ProviderName;
+const apiKeyEnvMap: Record<ProviderName, string> = {
+  gemini: 'GOOGLE_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+};
+const apiKey = process.env[apiKeyEnvMap[provider]] ?? '';
 
 async function main() {
   const app = express();
@@ -27,16 +36,17 @@ async function main() {
   app.options('*', cors({ origin: corsOrigins }));
   app.use(express.json({ limit: '2mb' }));
 
-  const store = new SqliteMemoryStore({
+  const memory = new Memory({
+    provider,
+    apiKey,
     dbPath: DB_PATH,
-    embed,
   });
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
 
-  app.use(createMemoryRouter(store));
+  app.use(createMemoryRouter(memory._store, memory._extractFn));
 
   // Fallback 404 with CORS headers
   app.use((req, res) => {

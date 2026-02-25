@@ -3,9 +3,9 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { SqliteMemoryStore, embed, createMemoryRouter } from '@ekai/memory';
-import { PORT, MEMORY_DB_PATH } from './config.js';
-import { initMemoryStore, fetchMemoryContext, ingestMessages } from './memory-client.js';
+import { Memory, createMemoryRouter } from '@ekai/memory';
+import { PORT, MEMORY_DB_PATH, OPENROUTER_API_KEY } from './config.js';
+import { initMemory, fetchMemoryContext, ingestMessages } from './memory-client.js';
 import { formatMemoryBlock, injectMemory } from './memory.js';
 import { proxyToOpenRouter } from './proxy.js';
 
@@ -19,15 +19,18 @@ app.use(cors({ origin: corsOrigins }));
 app.options('*', cors({ origin: corsOrigins }));
 app.use(express.json({ limit: '10mb' }));
 
-// Initialize embedded memory store
-const store = new SqliteMemoryStore({
+// Initialize embedded memory with explicit provider config
+const agentId = process.env.MEMORY_AGENT ?? 'default';
+const mem = new Memory({
+  provider: 'openrouter',
+  apiKey: OPENROUTER_API_KEY,
   dbPath: MEMORY_DB_PATH,
-  embed,
 });
-initMemoryStore(store);
+const memory = mem.agent(agentId);
+initMemory(memory);
 
 // Mount memory admin routes (dashboard, graph, etc.)
-app.use(createMemoryRouter(store));
+app.use(createMemoryRouter(mem._store, mem._extractFn));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
@@ -36,8 +39,8 @@ app.get('/health', (_req, res) => {
 app.post('/v1/chat/completions', async (req, res) => {
   try {
     const body = req.body;
-    // Profile from body.user (PydanticAI openai_user), header, or default
-    const profile = body.user || (req.headers['x-memory-profile'] as string) || 'default';
+    // userId from body.user (PydanticAI openai_user), header, or undefined
+    const userId = body.user || (req.headers['x-memory-user'] as string) || undefined;
     // Pass through client's API key if provided, otherwise proxy.ts falls back to env
     const authHeader = req.headers['authorization'] as string | undefined;
     const clientKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
@@ -61,7 +64,7 @@ app.post('/v1/chat/completions', async (req, res) => {
 
     // Fetch memory context (non-blocking on failure)
     if (query) {
-      const results = await fetchMemoryContext(query, profile);
+      const results = await fetchMemoryContext(query, userId);
       if (results) {
         const block = formatMemoryBlock(results);
         body.messages = injectMemory(body.messages, block);
@@ -110,5 +113,5 @@ if (fs.existsSync(DASHBOARD_DIR)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`@ekai/openrouter listening on port ${PORT} (memory embedded, db at ${MEMORY_DB_PATH})`);
+  console.log(`@ekai/openrouter listening on port ${PORT} (memory embedded, agent=${agentId}, db at ${MEMORY_DB_PATH})`);
 });
