@@ -987,13 +987,22 @@ export class SqliteMemoryStore {
     }
 
     // Ensure the default agent always exists
-    this.ensureAgentExists(DEFAULT_AGENT);
+    this.upsertDefaultAgent();
+  }
+
+  private upsertDefaultAgent() {
+    this.db
+      .prepare('insert or ignore into agents (id, name, created_at) values (@id, @name, @createdAt)')
+      .run({ id: DEFAULT_AGENT, name: DEFAULT_AGENT, createdAt: this.now() });
   }
 
   ensureAgentExists(agentId: string) {
-    this.db
-      .prepare('insert or ignore into agents (id, name, created_at) values (@id, @name, @createdAt)')
-      .run({ id: agentId, name: agentId, createdAt: this.now() });
+    const exists = this.db
+      .prepare('select 1 from agents where id = @id')
+      .get({ id: agentId });
+    if (!exists) {
+      throw new Error('agent_not_found');
+    }
   }
 
   /**
