@@ -233,7 +233,7 @@ export default function MemoryVaultPage() {
   return (
     <div className="min-h-screen font-sans text-slate-800" style={{ backgroundColor: '#FFFCEC' }}>
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-stone-200 sticky top-0 z-20">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-stone-200 sticky top-11 z-20">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

@@ -153,10 +153,36 @@ export const apiService = {
     return response.json();
   },
 
-  async getAgents(): Promise<{ agents: Array<{ id: string; name: string; createdAt: number }> }> {
+  async getAgents(): Promise<{ agents: Array<{ id: string; name: string; createdAt: number; soulMd?: string; relevancePrompt?: string }> }> {
     const response = await fetch(`${MEMORY_BASE_URL}/v1/agents`);
     if (!response.ok) {
       throw new Error(`Failed to fetch agents: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  async createAgent(id: string, opts?: { name?: string; soulMd?: string; relevancePrompt?: string }): Promise<{ id: string; name: string; createdAt: number }> {
+    const response = await fetch(`${MEMORY_BASE_URL}/v1/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...opts }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(`Failed to create agent: ${body?.error ?? response.statusText}`);
+    }
+    return response.json();
+  },
+
+  async updateAgent(id: string, opts: { name?: string; soulMd?: string; relevancePrompt?: string }): Promise<{ id: string; name: string }> {
+    const response = await fetch(`${MEMORY_BASE_URL}/v1/agents/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(opts),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(`Failed to update agent: ${body?.error ?? response.statusText}`);
     }
     return response.json();
   },
