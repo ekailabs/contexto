@@ -358,11 +358,12 @@ graph LR
 
   Q["Query + userId"]:::i
   EMB["3 embeddings<br>(per sector)"]:::p
-  F["cosine >= 0.2<br>+ user_scope"]:::e
+  ANN["sqlite-vec KNN<br>(cosine distance)"]:::p
+  F["similarity >= 0.2<br>+ user_scope"]:::e
   G["PBWM gate<br>sigmoid(1.0r + 0.4e + 0.05c - 0.02n)"]:::e
   W["Working Memory<br>top-4/sector, cap 8"]:::o
 
-  Q --> EMB --> F --> G --> W
+  Q --> EMB --> ANN --> F --> G --> W
 ```
 
 ## Data Model
@@ -374,16 +375,24 @@ erDiagram
     agents ||--o{ procedural_memory : has
     agents ||--o{ reflective_memory : has
     agents ||--o{ agent_users : has
+    memory ||--|| memory_vec : "vec index"
+    procedural_memory ||--|| procedural_vec : "vec index"
+    semantic_memory ||--|| semantic_vec : "vec index"
+    reflective_memory ||--|| reflective_vec : "vec index"
 
     memory { text id PK; text sector; text content; text user_scope; text origin_type }
-    semantic_memory { text id PK; text subject; text predicate; text object; text domain; text user_scope; real strength }
+    semantic_memory { text id PK; text subject; text predicate; text object; text domain; text user_scope }
     procedural_memory { text id PK; text trigger; json steps; text user_scope; text origin_type }
     reflective_memory { text id PK; text observation; text origin_type; text origin_actor }
+    memory_vec { text memory_id; float embedding }
+    procedural_vec { text memory_id; float embedding }
+    semantic_vec { text memory_id; float embedding }
+    reflective_vec { text memory_id; float embedding }
     agent_users { text agent_id PK; text user_id PK; int interaction_count }
     agents { text id PK; text name; text soul_md; text relevance_prompt; int created_at }
 ```
 
-All tables share: `embedding`, `created_at`, `last_accessed`, `agent_id`, `source`, `origin_type`, `origin_actor`, `origin_ref`. Clean schema — no migrations, old DBs re-create.
+All main tables share: `embedding` (JSON), `created_at`, `last_accessed`, `agent_id`, `source`, `origin_type`, `origin_actor`, `origin_ref`. Vec tables (`vec0` virtual tables via sqlite-vec) store cosine-distance-indexed copies of embeddings for ANN search. Clean schema — no migrations, old DBs re-create.
 
 ## Integration
 
@@ -411,4 +420,4 @@ My observations:
 - Provider config via constructor: `new Memory({ provider: 'openai', apiKey: '...' })`
 - Agents are first-class: `addAgent()` required before data ops (auto-created for `default`)
 - `user_scope` is opt-in — no `userId` = all memories returned
-- Reflective weight `0.8` is a tuning knob
+- Vector search via sqlite-vec (cosine distance, vec0 virtual tables) — single-file embedded architecture
