@@ -1,6 +1,8 @@
 # @ekai/contexto
 
-OpenClaw plugin that captures all 13 lifecycle events to a JSONL log. Built for context, memory, and analytics.
+OpenClaw plugin that captures all 13 lifecycle events to structured JSONL storage. Built for context, memory, and analytics.
+
+Uses [`@ekai/store`](../../store/) for event normalization, safe serialization, and per-session file organization.
 
 ## Install
 
@@ -19,14 +21,14 @@ In your OpenClaw config:
     entries: {
       "ekai-contexto": {
         enabled: true,
-        config: { "logPath": "~/.openclaw/ekai/events.jsonl" }
+        config: { "dataDir": "~/.openclaw/ekai/data" }
       }
     }
   }
 }
 ```
 
-`logPath` defaults to `~/.openclaw/ekai/events.jsonl` if not set.
+`dataDir` defaults to `~/.openclaw/ekai/data` if not set.
 
 ## Verify
 
@@ -35,13 +37,27 @@ openclaw plugins list       # should show ekai-contexto
 openclaw hooks list          # should show plugin:ekai-contexto:contexto:* hooks
 ```
 
-## What It Captures
+## Storage Layout
 
-All 13 OpenClaw lifecycle hooks, written as one JSON line per event:
+Events are organized as one JSONL file per session, grouped by agent:
+
+```
+{dataDir}/
+  {agent_id}/
+    {session_id}.jsonl
+```
+
+IDs are sanitized for safe file paths (`[a-zA-Z0-9_-]` + 8-char SHA-256 hash suffix). Missing IDs fall back to `_unknown-agent` / `_unknown-session`.
+
+Each line is a JSON object with a versioned schema:
 
 ```json
-{"ts":1709500000000,"hook":"llm_input","sessionId":"abc","agentId":"default","event":{...},"ctx":{...}}
+{"id":"...","v":1,"eventTs":1709500000000,"ingestTs":1709500000050,"hook":"llm_output","sessionId":"abc-3f2a1b9c","agentId":"default-8e4c7d1a","event":{...},"ctx":{...}}
 ```
+
+## What It Captures
+
+All 13 OpenClaw lifecycle hooks:
 
 | Hook | Description |
 |------|-------------|
@@ -59,19 +75,28 @@ All 13 OpenClaw lifecycle hooks, written as one JSON line per event:
 | `before_compaction` | Pre-compaction state |
 | `after_compaction` | Post-compaction state |
 
+Additional fields extracted per event: `sessionId`, `agentId`, `userId`, `conversationId`.
+
 ## Design
 
-- **Zero runtime dependencies** — Node built-ins only
-- **Safe serialization** — handles circular refs, BigInt, Error objects
+- **Structured storage** — one JSONL file per session via `@ekai/store` EventWriter
+- **Safe serialization** — handles circular refs, BigInt, Error objects (never throws)
 - **Never crashes OpenClaw** — every handler wrapped in try/catch
 - **Sync writes** — `appendFileSync` for `tool_result_persist` compatibility
-- **sessionId/agentId extraction** — normalized from event or context
+- **ID sanitization** — safe file paths with collision-resistant hashing
+- **Schema versioned** — every event carries `v: 1` for future migration
 
 ## Development
 
 ```bash
 # Type-check (no build needed — OpenClaw loads .ts via jiti)
 npm run type-check --workspace=@ekai/contexto
+
+# Build the store dependency
+npm run build --workspace=store
+
+# Run store tests
+npm run test --workspace=store
 
 # Local dev install (symlink)
 openclaw plugins install -l ./integrations/openclaw

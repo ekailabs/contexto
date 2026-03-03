@@ -1,4 +1,4 @@
-import { EventLog } from './store.js';
+import { EventWriter } from '@ekai/store';
 
 const HOOKS = [
   { name: 'session_start', description: 'Log session start' },
@@ -23,25 +23,37 @@ export default {
   configSchema: {},
 
   register(api: any) {
-    const logPath = api.resolvePath(api.pluginConfig?.logPath ?? '~/.openclaw/ekai/events.jsonl');
-    const log = new EventLog(logPath);
+    const dataDir = api.resolvePath(api.pluginConfig?.dataDir ?? '~/.openclaw/ekai/data');
+    const store = new EventWriter(dataDir);
 
     for (const hook of HOOKS) {
       api.registerHook({
         name: `contexto:${hook.name}`,
         description: hook.description,
         hook: hook.name,
-        handler: (event: unknown, ctx: unknown) => {
+        handler: (event: any, ctx: any) => {
           try {
-            log.append(hook.name, event, ctx);
+            const sessionId = event?.sessionId ?? ctx?.sessionId ?? ctx?.sessionKey;
+            const agentId = event?.agentId ?? ctx?.agentId;
+            const userId = event?.userId ?? ctx?.userId ?? ctx?.user;
+            const conversationId = event?.conversationId ?? ctx?.conversationId;
+
+            store.append({
+              hook: hook.name,
+              sessionId,
+              agentId,
+              userId,
+              conversationId,
+              event: event ?? {},
+              ctx,
+            });
           } catch (err) {
-            // Never crash OpenClaw — log the failure and move on
-            api.logger.warn(`ekai-contexto: failed to log ${hook.name}: ${String(err)}`);
+            api.logger.warn(`ekai-contexto: store.append failed: ${String(err)}`);
           }
         },
       });
     }
 
-    api.logger.info(`ekai-contexto: logging to ${logPath}`);
+    api.logger.info(`ekai-contexto: storing events to ${dataDir}`);
   },
 };

@@ -4,13 +4,13 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "logPath": { "type": "string" }
+      "dataDir": { "type": "string" }
     }
   },
   "uiHints": {
-    "logPath": {
-      "label": "Event log path",
-      "description": "Path to the JSONL event log file"
+    "dataDir": {
+      "label": "Event data directory",
+      "description": "Directory for structured JSONL event storage (one file per session)"
     }
   }
 }

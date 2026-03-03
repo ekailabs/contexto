@@ -27,6 +27,9 @@
   "scripts": {
     "type-check": "tsc --noEmit"
   },
+  "dependencies": {
+    "@ekai/store": "*"
+  },
   "devDependencies": {
     "typescript": "^5.3.2"
   },

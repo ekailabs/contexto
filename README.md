@@ -97,6 +97,7 @@ ENABLE_OPENROUTER=true   # proxy + memory APIs (default: true)
 
 ```
 ekai-gateway/
+├── store/                # JSONL event storage library (@ekai/store)
 ├── integrations/
 │   ├── openrouter/       # Proxy server with embedded memory (@ekai/openrouter)
 │   └── openclaw/         # OpenClaw lifecycle plugin (@ekai/contexto)
@@ -109,7 +110,7 @@ ekai-gateway/
 
 ## OpenClaw Plugin
 
-[`@ekai/contexto`](https://www.npmjs.com/package/@ekai/contexto) is an OpenClaw plugin that captures all 13 lifecycle events to a JSONL log. Install it in any OpenClaw instance:
+[`@ekai/contexto`](https://www.npmjs.com/package/@ekai/contexto) is an OpenClaw plugin that captures all 13 lifecycle events to structured JSONL storage (powered by [`@ekai/store`](./store/)). Install it in any OpenClaw instance:
 
 ```bash
 openclaw plugins install @ekai/contexto
@@ -123,7 +124,7 @@ Configure in your OpenClaw config:
     entries: {
       "ekai-contexto": {
         enabled: true,
-        config: { "logPath": "~/.openclaw/ekai/events.jsonl" }
+        config: { "dataDir": "~/.openclaw/ekai/data" }
       }
     }
   }
