@@ -21,6 +21,33 @@ const NOOP_HOOKS = [
   { name: 'after_compaction', description: 'Monitor compaction end' },
 ] as const;
 
+function makeHandler(store: EventWriter, hookName: string, api: any) {
+  return async (event: any, ctx: any) => {
+    const sessionId = event?.sessionId ?? ctx?.sessionId ?? ctx?.sessionKey;
+    const agentId = event?.agentId ?? ctx?.agentId;
+    const userId = event?.userId ?? ctx?.userId ?? ctx?.user;
+    const conversationId = event?.conversationId ?? ctx?.conversationId;
+
+    try {
+      await store.append({
+        hook: hookName,
+        sessionId,
+        agentId,
+        userId,
+        conversationId,
+        event: event ?? {},
+        ctx,
+      });
+
+      if (hookName === 'agent_end') {
+        await store.flush();
+      }
+    } catch (err) {
+      api.logger.warn(`claw-contexto: ${hookName} failed: ${String(err)}`);
+    }
+  };
+}
+
 export default {
   id: 'claw-contexto',
   name: 'Ekai Contexto',
@@ -37,72 +64,22 @@ export default {
     const dataDir = api.resolvePath(api.pluginConfig?.dataDir ?? '~/.openclaw/ekai/data');
     const store = new EventWriter(dataDir);
 
-    // Store hooks — fire-and-forget with .catch() logging
     for (const hook of STORE_HOOKS) {
-      if (hook.name === 'agent_end') {
-        // agent_end: store event then flush for clean shutdown
-        api.registerHook({
-          name: `contexto:${hook.name}`,
-          description: hook.description,
-          hook: hook.name,
-          handler: (event: any, ctx: any) => {
-            const sessionId = event?.sessionId ?? ctx?.sessionId ?? ctx?.sessionKey;
-            const agentId = event?.agentId ?? ctx?.agentId;
-            const userId = event?.userId ?? ctx?.userId ?? ctx?.user;
-            const conversationId = event?.conversationId ?? ctx?.conversationId;
-
-            store.append({
-              hook: hook.name,
-              sessionId,
-              agentId,
-              userId,
-              conversationId,
-              event: event ?? {},
-              ctx,
-            })
-              .catch(err => api.logger.warn(`ekai-contexto: append failed: ${String(err)}`))
-              .finally(() => store.flush()
-                .catch(err => api.logger.warn(`ekai-contexto: flush failed: ${String(err)}`)));
-          },
-        });
-        continue;
-      }
-
-      api.registerHook({
-        name: `contexto:${hook.name}`,
-        description: hook.description,
-        hook: hook.name,
-        handler: (event: any, ctx: any) => {
-          const sessionId = event?.sessionId ?? ctx?.sessionId ?? ctx?.sessionKey;
-          const agentId = event?.agentId ?? ctx?.agentId;
-          const userId = event?.userId ?? ctx?.userId ?? ctx?.user;
-          const conversationId = event?.conversationId ?? ctx?.conversationId;
-
-          store.append({
-            hook: hook.name,
-            sessionId,
-            agentId,
-            userId,
-            conversationId,
-            event: event ?? {},
-            ctx,
-          }).catch(err => {
-            api.logger.warn(`ekai-contexto: store.append failed: ${String(err)}`);
-          });
-        },
-      });
+      api.registerHook(
+        hook.name,
+        makeHandler(store, hook.name, api),
+        { name: `claw-contexto.${hook.name}`, description: hook.description },
+      );
     }
 
-    // No-op hooks — registered so OpenClaw knows we're listening
     for (const hook of NOOP_HOOKS) {
-      api.registerHook({
-        name: `contexto:${hook.name}`,
-        description: hook.description,
-        hook: hook.name,
-        handler: () => {},
-      });
+      api.registerHook(
+        hook.name,
+        async () => {},
+        { name: `claw-contexto.${hook.name}`, description: hook.description },
+      );
     }
 
-    api.logger.info(`ekai-contexto: storing events to ${dataDir}`);
+    api.logger.info(`claw-contexto: storing events to ${dataDir}`);
   },
 };
