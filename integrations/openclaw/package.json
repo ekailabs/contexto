@@ -1,0 +1,36 @@
+{
+  "name": "@ekai/contexto",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin — captures all lifecycle events to JSONL for context, memory, and analytics",
+  "type": "module",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "files": [
+    "src/",
+    "openclaw.plugin.json"
+  ],
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "ai",
+    "context",
+    "memory",
+    "lifecycle",
+    "events"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ekai-labs/ekai-gateway",
+    "directory": "integrations/openclaw"
+  },
+  "author": "Ekai Labs",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.2"
+  },
+  "openclaw": {
+    "extensions": ["./src/index.ts"]
+  }
+}

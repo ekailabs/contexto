@@ -1,0 +1,16 @@
+{
+  "id": "ekai-contexto",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "logPath": { "type": "string" }
+    }
+  },
+  "uiHints": {
+    "logPath": {
+      "label": "Event log path",
+      "description": "Path to the JSONL event log file"
+    }
+  }
+}
