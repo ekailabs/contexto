@@ -105,7 +105,7 @@ describe('EventWriter', () => {
     expect(ev.rawSessionId).toBe('sess/special');
   });
 
-  it('does not store raw IDs when sanitization is a no-op', () => {
+  it('always stores raw IDs since hash suffix changes the value', () => {
     writer.append({
       hook: 'session_start',
       sessionId: 'clean-session',
@@ -113,8 +113,7 @@ describe('EventWriter', () => {
       event: {},
     });
 
-    // sanitizeId always appends hash, so raw IDs will differ from sanitized
-    // The raw IDs are stored because sanitized adds the hash suffix
+    // sanitizeId always appends a hash suffix, so sanitized !== raw even for clean IDs
     const agentDir = readdirSync(dataDir)[0];
     const sessionFile = readdirSync(join(dataDir, agentDir))[0];
     const content = readFileSync(join(dataDir, agentDir, sessionFile), 'utf-8');

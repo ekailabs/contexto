@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node scripts/launcher.js --mode dev",
     "start": "node scripts/launcher.js --mode start",
-    "build": "npm run build --workspace=store && npm install --workspaces && npm run build --workspaces --if-present",
+    "build": "npm install --workspaces && npm run build --workspace=store && npm run build --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "test": "npm run test --workspace=@ekai/openrouter",
     "dev:ui": "npm run dev --workspace=ui/dashboard",

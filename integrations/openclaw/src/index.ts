@@ -20,7 +20,13 @@ export default {
   id: 'ekai-contexto',
   name: 'Ekai Contexto',
   description: 'Context engine for OpenClaw — captures lifecycle events, extensible to memory injection',
-  configSchema: {},
+  configSchema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      dataDir: { type: 'string' },
+    },
+  },
 
   register(api: any) {
     const dataDir = api.resolvePath(api.pluginConfig?.dataDir ?? '~/.openclaw/ekai/data');

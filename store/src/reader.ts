@@ -103,9 +103,10 @@ export class EventReader {
 
   /** Reconstruct a session from events into ordered turns with tool call pairing. */
   reconstructSession(agentId: string, sessionId: string): ReconstructedSession {
-    const events = this.readSession(agentId, sessionId);
     const resolvedAgent = this.resolveAgent(agentId);
     const resolvedSession = this.resolveSession(resolvedAgent, sessionId);
+    // Pass resolved IDs — readSession will short-circuit resolve via existsSync
+    const events = this.readSession(resolvedAgent, resolvedSession);
 
     // Sort by eventTs for chronological reconstruction
     events.sort((a, b) => a.eventTs - b.eventTs);
@@ -281,8 +282,9 @@ export class EventReader {
           matched.call.result = result;
           matched.call.error = typeof error === 'string' ? error : error?.message;
           matched.call.status = error ? 'error' : 'success';
-          if (durationMs != null) matched.call.durationMs = durationMs;
-          if (!durationMs && matched.ts) {
+          if (durationMs != null) {
+            matched.call.durationMs = durationMs;
+          } else if (matched.ts) {
             matched.call.durationMs = ev.eventTs - matched.ts;
           }
         }

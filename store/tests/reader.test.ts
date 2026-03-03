@@ -207,6 +207,23 @@ describe('EventReader', () => {
       expect(toolTurn!.toolCalls![0].result).toBe(42);
     });
 
+    it('preserves explicit durationMs: 0 without overwriting', () => {
+      writer.append({
+        hook: 'before_tool_call', agentId: 'a1', sessionId: 's1',
+        ts: 1000,
+        event: { toolCallId: 'tc-zero', toolName: 'fast', arguments: {} },
+      });
+      writer.append({
+        hook: 'after_tool_call', agentId: 'a1', sessionId: 's1',
+        ts: 2000,
+        event: { toolCallId: 'tc-zero', toolName: 'fast', result: 'ok', durationMs: 0 },
+      });
+
+      const session = reader.reconstructSession('a1', 's1');
+      const toolTurn = session.turns.find(t => t.role === 'tool');
+      expect(toolTurn!.toolCalls![0].durationMs).toBe(0);
+    });
+
     it('marks tool errors correctly', () => {
       writer.append({
         hook: 'before_tool_call', agentId: 'a1', sessionId: 's1',
