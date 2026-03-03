@@ -4,16 +4,17 @@
 [![GitHub stars](https://img.shields.io/github/stars/ekailabs/ekai-gateway.svg?style=social)](https://github.com/ekailabs/ekai-gateway)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.com/invite/5VsUUEfbJk)
 
-OpenRouter proxy with embedded agent memory and a management dashboard. Drop it in front of any OpenAI-compatible client and your AI tools gain persistent memory across conversations.
+Context engine for AI agents — event capture, persistent memory, and attribution. Use it as an OpenClaw plugin, drop it in front of any OpenAI-compatible client as a proxy, or integrate the store directly into your own agent.
 
-**Designed for self-hosted personal use** — run your own instance using your OpenRouter API key.
+**Designed for self-hosted personal use** — run your own instance, bring your own keys.
 
 ## Features
 
-- 🔀 **OpenRouter proxy**: Full OpenAI-compatible `/v1/chat/completions` endpoint
-- 🧠 **Embedded memory**: Automatically stores and injects relevant context from past conversations
+- 📦 **Event store**: Structured JSONL capture of agent lifecycle events ([`@ekai/store`](./store/))
+- 🔌 **OpenClaw plugin**: Drop-in context engine for any OpenClaw agent ([`@ekai/contexto`](./integrations/openclaw/))
+- 🔀 **OpenRouter proxy**: OpenAI-compatible `/v1/chat/completions` with embedded memory
 - 📊 **Memory dashboard**: Browse, search, and manage stored memories
-- 🔑 **BYOK**: Bring your own OpenRouter API key — or pass a key per-request
+- 🔑 **BYOK**: Bring your own API keys — per-instance or per-request
 
 ## Quick Start
 

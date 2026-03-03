@@ -1,10 +1,20 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { sanitizeId } from './types.js';
 import type { StoreEvent, ReconstructedSession, ReconstructedTurn, ReconstructedToolCall } from './types.js';
 
 export class EventReader {
   constructor(private dataDir: string) {}
+
+  /** Check if a path exists. */
+  private async pathExists(p: string): Promise<boolean> {
+    try {
+      await access(p);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   /** Check that a resolved path stays within dataDir (prevents traversal). */
   private isInsideDataDir(candidate: string): boolean {
@@ -17,9 +27,9 @@ export class EventReader {
    * Resolve an agentId to its directory name.
    * Accepts both raw IDs (sanitizes them) and already-sanitized IDs (from listAgents output).
    */
-  private resolveAgent(agentId: string): string {
+  private async resolveAgent(agentId: string): Promise<string> {
     const candidatePath = join(this.dataDir, agentId);
-    if (this.isInsideDataDir(candidatePath) && existsSync(candidatePath)) return agentId;
+    if (this.isInsideDataDir(candidatePath) && await this.pathExists(candidatePath)) return agentId;
     return sanitizeId(agentId, 'agent');
   }
 
@@ -27,16 +37,16 @@ export class EventReader {
    * Resolve a sessionId to its file stem.
    * Accepts both raw IDs and already-sanitized IDs (from listSessions output).
    */
-  private resolveSession(agentDir: string, sessionId: string): string {
+  private async resolveSession(agentDir: string, sessionId: string): Promise<string> {
     const candidatePath = join(this.dataDir, agentDir, `${sessionId}.jsonl`);
-    if (this.isInsideDataDir(candidatePath) && existsSync(candidatePath)) return sessionId;
+    if (this.isInsideDataDir(candidatePath) && await this.pathExists(candidatePath)) return sessionId;
     return sanitizeId(sessionId, 'session');
   }
 
   /** List all agent directories, sorted lexically. */
-  listAgents(): string[] {
+  async listAgents(): Promise<string[]> {
     try {
-      const entries = readdirSync(this.dataDir, { withFileTypes: true });
+      const entries = await readdir(this.dataDir, { withFileTypes: true });
       return entries
         .filter(e => e.isDirectory())
         .map(e => e.name)
@@ -47,18 +57,20 @@ export class EventReader {
   }
 
   /** List sessions for an agent, sorted by mtime (newest first). Accepts raw or sanitized agentId. */
-  listSessions(agentId: string): string[] {
-    const resolved = this.resolveAgent(agentId);
+  async listSessions(agentId: string): Promise<string[]> {
+    const resolved = await this.resolveAgent(agentId);
     const dir = join(this.dataDir, resolved);
     try {
-      const entries = readdirSync(dir, { withFileTypes: true });
-      const sessions = entries
-        .filter(e => e.isFile() && e.name.endsWith('.jsonl'))
-        .map(e => {
-          const name = e.name.replace(/\.jsonl$/, '');
-          const mtime = statSync(join(dir, e.name)).mtimeMs;
-          return { name, mtime };
-        });
+      const entries = await readdir(dir, { withFileTypes: true });
+      const sessions = await Promise.all(
+        entries
+          .filter(e => e.isFile() && e.name.endsWith('.jsonl'))
+          .map(async e => {
+            const name = e.name.replace(/\.jsonl$/, '');
+            const s = await stat(join(dir, e.name));
+            return { name, mtime: s.mtimeMs };
+          })
+      );
       sessions.sort((a, b) => b.mtime - a.mtime);
       return sessions.map(s => s.name);
     } catch {
@@ -66,15 +78,11 @@ export class EventReader {
     }
   }
 
-  /** Read all events from a session JSONL file. Accepts raw or sanitized IDs. Skips malformed lines. */
-  readSession(agentId: string, sessionId: string, opts?: { dedupe?: boolean }): StoreEvent[] {
-    const resolvedAgent = this.resolveAgent(agentId);
-    const resolvedSession = this.resolveSession(resolvedAgent, sessionId);
-    const filePath = join(this.dataDir, resolvedAgent, `${resolvedSession}.jsonl`);
-
+  /** Parse a JSONL file into events. Skips malformed lines. */
+  private async readEventsFromFile(filePath: string, opts?: { dedupe?: boolean }): Promise<StoreEvent[]> {
     let content: string;
     try {
-      content = readFileSync(filePath, 'utf-8');
+      content = await readFile(filePath, 'utf-8');
     } catch {
       return [];
     }
@@ -101,12 +109,18 @@ export class EventReader {
     return events;
   }
 
+  /** Read all events from a session JSONL file. Accepts raw or sanitized IDs. Skips malformed lines. */
+  async readSession(agentId: string, sessionId: string, opts?: { dedupe?: boolean }): Promise<StoreEvent[]> {
+    const resolvedAgent = await this.resolveAgent(agentId);
+    const resolvedSession = await this.resolveSession(resolvedAgent, sessionId);
+    return this.readEventsFromFile(join(this.dataDir, resolvedAgent, `${resolvedSession}.jsonl`), opts);
+  }
+
   /** Reconstruct a session from events into ordered turns with tool call pairing. */
-  reconstructSession(agentId: string, sessionId: string): ReconstructedSession {
-    const resolvedAgent = this.resolveAgent(agentId);
-    const resolvedSession = this.resolveSession(resolvedAgent, sessionId);
-    // Pass resolved IDs — readSession will short-circuit resolve via existsSync
-    const events = this.readSession(resolvedAgent, resolvedSession);
+  async reconstructSession(agentId: string, sessionId: string): Promise<ReconstructedSession> {
+    const resolvedAgent = await this.resolveAgent(agentId);
+    const resolvedSession = await this.resolveSession(resolvedAgent, sessionId);
+    const events = await this.readEventsFromFile(join(this.dataDir, resolvedAgent, `${resolvedSession}.jsonl`));
 
     // Sort by eventTs for chronological reconstruction
     events.sort((a, b) => a.eventTs - b.eventTs);
