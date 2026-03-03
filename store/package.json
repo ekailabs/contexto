@@ -1,0 +1,27 @@
+{
+  "name": "@ekai/store",
+  "version": "0.1.0",
+  "description": "JSONL event storage — structured lifecycle event capture and session reconstruction",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.2",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,8 +1,8 @@
-type ProviderName = 'gemini' | 'openai';
+import type { ProviderName } from '../types.js';
 
 type AuthMode = 'queryKey' | 'bearer';
 
-interface ProviderConfig {
+export interface ProviderConfig {
   name: ProviderName;
   apiKeyEnv: string;
   baseUrl: string;
@@ -15,20 +15,19 @@ interface ProviderConfig {
   auth: AuthMode;
 }
 
-const PROVIDERS: Record<ProviderName, ProviderConfig> = {
+export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   gemini: {
     name: 'gemini',
     apiKeyEnv: 'GOOGLE_API_KEY',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     embedPath: 'models/:model:embedContent',
     extractPath: 'models/:model:generateContent',
-    defaultEmbedModel: 'text-embedding-004',
+    defaultEmbedModel: 'gemini-embedding-001',
     defaultExtractModel: 'gemini-2.5-flash',
     embedModelEnv: 'GEMINI_EMBED_MODEL',
     extractModelEnv: 'GEMINI_EXTRACT_MODEL',
     auth: 'queryKey',
   },
-  // TODO: add OpenAI provider wiring (bearer auth, /v1/embeddings and /v1/chat/completions)
   openai: {
     name: 'openai',
     apiKeyEnv: 'OPENAI_API_KEY',
@@ -41,11 +40,23 @@ const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     extractModelEnv: 'OPENAI_EXTRACT_MODEL',
     auth: 'bearer',
   },
+  openrouter: {
+    name: 'openrouter',
+    apiKeyEnv: 'OPENROUTER_API_KEY',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    embedPath: 'embeddings',
+    extractPath: 'chat/completions',
+    defaultEmbedModel: 'openai/text-embedding-3-small',
+    defaultExtractModel: 'openai/gpt-4o-mini',
+    embedModelEnv: 'OPENROUTER_EMBED_MODEL',
+    extractModelEnv: 'OPENROUTER_EXTRACT_MODEL',
+    auth: 'bearer',
+  },
 };
 
 export function resolveProvider(kind: 'embed' | 'extract'): ProviderConfig {
   const env = (kind === 'embed' ? process.env.MEMORY_EMBED_PROVIDER : process.env.MEMORY_EXTRACT_PROVIDER)?.toLowerCase() as ProviderName | undefined;
-  const selected = env === 'openai' ? 'openai' : 'gemini';
+  const selected: ProviderName = env === 'openai' ? 'openai' : env === 'openrouter' ? 'openrouter' : 'gemini';
   return PROVIDERS[selected];
 }
 
@@ -78,4 +89,3 @@ export function buildUrl(cfg: ProviderConfig, kind: 'embed' | 'extract', model: 
     },
   };
 }
-

@@ -49,6 +49,7 @@ This is a quick-start for running Ekai Gateway locally. For detailed client setu
 After startup:
 - Gateway API → `http://localhost:3001`
 - Dashboard → `http://localhost:3000`
+- Memory Service → `http://localhost:4005`
 
 You can now send requests through the Gateway.
 
@@ -74,6 +75,25 @@ docker compose --profile split up --build -d
 
 The `split` profile starts the `gateway` and `dashboard` services defined in `docker-compose.yaml`.
 
+### Data persistence
+
+Docker Compose uses named volumes to persist data across container restarts and recreates:
+
+| Volume | Container path | Contents |
+|---|---|---|
+| `gateway_db` | `/app/gateway/data/` | SQLite database (`proxy.db`) and WAL files |
+| `gateway_logs` | `/app/gateway/logs/` | Application logs (`gateway.log`) |
+
+To back up the database:
+```bash
+docker cp $(docker compose ps -q fullstack):/app/gateway/data/proxy.db ./backup.db
+```
+
+To remove all data and start fresh:
+```bash
+docker compose down -v
+```
+
 ---
 
 ## Environment Variables
@@ -85,9 +105,11 @@ The `split` profile starts the `gateway` and `dashboard` services defined in `do
 | `XAI_API_KEY` | Key for xAI Grok models |
 | `OPENROUTER_API_KEY` | Key for OpenRouter models |
 | `GOOGLE_API_KEY` | Key for Google Gemini models |
-| `PORT_GATEWAY` | Port for Gateway API (default 3001) |
-| `PORT_DASHBOARD` | Port for Dashboard UI (default 3000) |
-| `DATABASE_PATH` | SQLite file path (default `data/usage.db`) |
+| `PORT` | Gateway API port (default 3001) |
+| `MEMORY_PORT` | Memory service port (default 4005) |
+| `DATABASE_PATH` | SQLite file path (default `data/proxy.db`) |
+
+The dashboard auto-detects the host from the browser and connects to the gateway and memory service on the same host using their default ports. No URL configuration needed for standard deployments.
 
 ---
 
@@ -95,8 +117,9 @@ The `split` profile starts the `gateway` and `dashboard` services defined in `do
 
 When you start the services:
 
-- The Gateway listens for OpenAI and Anthropic API calls on `http://localhost:3001`.  
-- The Dashboard runs at `http://localhost:3000` and automatically reads usage data.  
+- The Gateway listens for OpenAI and Anthropic API calls on `http://localhost:3001`.
+- The Dashboard runs at `http://localhost:3000` and automatically reads usage data.
+- The Memory service runs at `http://localhost:4005` for agent memory management.
 - A new SQLite database file is created the first time you send a request.
 
 ---

@@ -1,14 +1,24 @@
 {
-  "name": "memory",
+  "name": "@ekai/memory",
   "version": "0.1.0",
   "description": "Neuroscience-inspired cognitive memory kernel",
-  "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build",
     "prestart": "npm run build",
     "start": "node dist/server.js"
   },
@@ -16,12 +26,14 @@
     "better-sqlite3": "^12.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "sqlite-vec": "^0.1.7-alpha.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "typescript": "^5.3.2"
+    "typescript": "^5.3.2",
+    "vitest": "^3.0.0"
   }
 }

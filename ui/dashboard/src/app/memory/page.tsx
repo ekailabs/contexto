@@ -5,7 +5,6 @@ import {
   apiService,
   type MemorySummaryResponse,
 } from '@/lib/api';
-import Link from 'next/link';
 import { SectorTooltip, sectorColors, capitalizeSector } from '@/components/memory/SectorTooltip';
 import { ProceduralCard } from '@/components/memory/ProceduralCard';
 import { DeleteModal, EditModal } from '@/components/memory/MemoryModals';
@@ -14,6 +13,7 @@ import { ActivityDistribution } from '@/components/memory/ActivityDistribution';
 import { MemoryStrength } from '@/components/memory/MemoryStrength';
 import { SemanticGraph } from '@/components/memory/SemanticGraph';
 import ProfileSelector from '@/components/memory/ProfileSelector';
+import UserFilter from '@/components/memory/UserFilter';
 import ProfileManagement from '@/components/memory/ProfileManagement';
 import ProfileStats from '@/components/memory/ProfileStats';
 import ProfileBadge from '@/components/memory/ProfileBadge';
@@ -25,31 +25,44 @@ export default function MemoryVaultPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'graph'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'graph'>('logs');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSector, setFilterSector] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ type: 'single'; id: string; preview?: string } | { type: 'bulk' } | null>(null);
   const [bulkScope, setBulkScope] = useState<'current' | 'all'>('current');
-  const [editModal, setEditModal] = useState<{ id: string; content: string; sector: string } | null>(null);
+  const [editModal, setEditModal] = useState<{ id: string; content: string; sector: string; userScope: string | null } | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [currentProfile, setCurrentProfile] = useState('default');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [profileResolved, setProfileResolved] = useState(false);
   const [showProfileManagement, setShowProfileManagement] = useState(false);
   const [profileSwitching, setProfileSwitching] = useState(false);
+  // On mount, pick the first non-default agent (or fall back to 'default')
+  useEffect(() => {
+    apiService.getAgents().then(({ agents }) => {
+      const agent = agents.find(a => a.id !== 'default');
+      if (agent) setCurrentProfile(agent.id);
+      setProfileResolved(true);
+    }).catch(() => {
+      setProfileResolved(true);
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
+    if (!profileResolved) return;
     try {
       setLoading(true);
       setError(null);
       // Fetch more items for better visualization (limit=100)
-      const res = await apiService.getMemorySummary(100, currentProfile);
+      const res = await apiService.getMemorySummary(100, currentProfile, selectedUserId || undefined);
       setData(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load memory summary');
     } finally {
       setLoading(false);
     }
-  }, [currentProfile]);
+  }, [currentProfile, profileResolved, selectedUserId]);
 
   useEffect(() => {
     fetchData();
@@ -58,6 +71,7 @@ export default function MemoryVaultPage() {
   const handleProfileChange = (profileSlug: string) => {
     setProfileSwitching(true);
     setCurrentProfile(profileSlug);
+    setSelectedUserId(null);
     setSearchTerm('');
     setFilterSector('all');
     setExpandedId(null);
@@ -74,8 +88,8 @@ export default function MemoryVaultPage() {
     }
   };
 
-  const handleEditClick = (id: string, content: string, sector: string) => {
-    setEditModal({ id, content, sector });
+  const handleEditClick = (id: string, content: string, sector: string, userScope?: string | null) => {
+    setEditModal({ id, content, sector, userScope: userScope ?? null });
   };
 
   const handleDeleteClick = (id: string, preview?: string) => {
@@ -93,7 +107,7 @@ export default function MemoryVaultPage() {
     try {
       setEditBusy(true);
       setError(null);
-      await apiService.updateMemory(editModal.id, editModal.content, editModal.sector, currentProfile);
+      await apiService.updateMemory(editModal.id, editModal.content, editModal.sector, currentProfile, editModal.userScope);
       setEditModal(null);
       await fetchData();
     } catch (err) {
@@ -117,11 +131,11 @@ export default function MemoryVaultPage() {
         if (bulkScope === 'current') {
           await apiService.deleteAllMemories(currentProfile);
         } else {
-          const { profiles } = await apiService.getProfiles();
-          // Delete sequentially to surface the first failing profile clearly
-          const targets = profiles.length ? profiles : ['default'];
-          for (const profile of targets) {
-            await apiService.deleteAllMemories(profile);
+          const { agents } = await apiService.getAgents();
+          // Delete sequentially to surface the first failing agent clearly
+          const targets = agents.length ? agents.map(a => a.id) : ['default'];
+          for (const agentId of targets) {
+            await apiService.deleteAllMemories(agentId);
           }
         }
       }
@@ -144,61 +158,89 @@ export default function MemoryVaultPage() {
   };
 
 
+  const sectorOrder: Record<string, number> = { episodic: 0, procedural: 1, semantic: 2 };
+
   const filteredMemories = useMemo(() => {
     if (!data?.recent) return [];
-    return data.recent.filter((item) => {
-      // Exclude semantic memories - they're better visualized in the Knowledge Graph tab
-      if (item.sector === 'semantic') return false;
-      const matchesSearch = !searchTerm || item.preview.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSector = filterSector === 'all' || item.sector === filterSector;
-      return matchesSearch && matchesSector;
+    return data.recent
+      .filter((item) => {
+        // Exclude reflective memories (disabled)
+        if (item.sector === 'reflective') return false;
+        const matchesSearch = !searchTerm || item.preview.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSector = filterSector === 'all' || item.sector === filterSector;
+        const matchesUser = !selectedUserId || item.userScope === selectedUserId;
+        return matchesSearch && matchesSector && matchesUser;
+      })
+      .sort((a, b) => (sectorOrder[a.sector] ?? 99) - (sectorOrder[b.sector] ?? 99));
+  }, [data, searchTerm, filterSector, selectedUserId]);
+
+  // Filter out reflective memories from display data, and apply user scope filter
+  const displayData = useMemo(() => {
+    if (!data) return null;
+    const filtered = data.recent?.filter(r => {
+      if (r.sector === 'reflective') return false;
+      if (selectedUserId && r.userScope !== selectedUserId) return false;
+      return true;
     });
-  }, [data, searchTerm, filterSector]);
+    // Recompute summary counts from filtered recent items when user filter is active
+    const summary = selectedUserId
+      ? data.summary
+          .filter(s => s.sector !== 'reflective')
+          .map(s => ({
+            ...s,
+            count: filtered?.filter(r => r.sector === s.sector).length ?? 0,
+          }))
+      : data.summary.filter(s => s.sector !== 'reflective');
+    return {
+      ...data,
+      summary,
+      recent: filtered,
+    };
+  }, [data, selectedUserId]);
 
   // Calculate quick stats
   const quickStats = useMemo(() => {
-    if (!data) return null;
-    const total = data.summary.reduce((sum, s) => sum + s.count, 0);
-    const totalRetrievals = data.recent?.reduce((sum, r) => sum + (r.retrievalCount ?? 0), 0) ?? 0;
-    const mostRecent = data.recent?.[0]?.createdAt;
-    const oldest = data.recent?.[data.recent.length - 1]?.createdAt;
+    if (!displayData) return null;
+    const total = displayData.summary.reduce((sum, s) => sum + s.count, 0);
+    const totalRetrievals = displayData.recent?.reduce((sum, r) => sum + (r.retrievalCount ?? 0), 0) ?? 0;
+    const mostRecent = displayData.recent?.[0]?.createdAt;
+    const oldest = displayData.recent?.[displayData.recent.length - 1]?.createdAt;
     
     return {
       total,
       totalRetrievals,
-      avgRetrievals: data.recent?.length ? Math.round(totalRetrievals / data.recent.length) : 0,
+      avgRetrievals: displayData.recent?.length ? Math.round(totalRetrievals / displayData.recent.length) : 0,
       mostRecent,
       oldest,
     };
-  }, [data]);
+  }, [displayData]);
 
   // Calculate sector counts for ProfileStats
   const sectorCounts = useMemo(() => {
-    if (!data) return { episodic: 0, procedural: 0, semantic: 0, affective: 0 };
+    if (!displayData) return { episodic: 0, procedural: 0, semantic: 0 };
     return {
-      episodic: data.summary.find(s => s.sector === 'episodic')?.count ?? 0,
-      procedural: data.summary.find(s => s.sector === 'procedural')?.count ?? 0,
-      semantic: data.summary.find(s => s.sector === 'semantic')?.count ?? 0,
-      affective: data.summary.find(s => s.sector === 'affective')?.count ?? 0,
+      episodic: displayData.summary.find(s => s.sector === 'episodic')?.count ?? 0,
+      procedural: displayData.summary.find(s => s.sector === 'procedural')?.count ?? 0,
+      semantic: displayData.summary.find(s => s.sector === 'semantic')?.count ?? 0,
     };
-  }, [data]);
+  }, [displayData]);
 
+  // Wait for profile resolution before rendering
+  if (!profileResolved) {
+    return (
+      <div className="min-h-screen font-sans text-slate-800 flex items-center justify-center" style={{ backgroundColor: '#FFFCEC' }}>
+        <div className="text-stone-400 text-sm">Loading profiles...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen font-sans text-slate-800" style={{ backgroundColor: '#FFFCEC' }}>
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-stone-200 sticky top-0 z-20">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-stone-200 sticky top-11 z-20">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="text-stone-500 hover:text-stone-900 transition-colors p-2 rounded-full hover:bg-stone-100"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Memory Vault</h1>
                 <p className="text-sm text-stone-500 mt-0.5">
@@ -211,6 +253,11 @@ export default function MemoryVaultPage() {
                 currentProfile={currentProfile}
                 onProfileChange={handleProfileChange}
                 onManageProfiles={() => setShowProfileManagement(true)}
+              />
+              <UserFilter
+                currentProfile={currentProfile}
+                selectedUserId={selectedUserId}
+                onUserChange={setSelectedUserId}
               />
               <button
                 onClick={fetchData}
@@ -309,19 +356,18 @@ export default function MemoryVaultPage() {
               episodicCount={sectorCounts.episodic}
               proceduralCount={sectorCounts.procedural}
               semanticCount={sectorCounts.semantic}
-              affectiveCount={sectorCounts.affective}
               totalRetrievals={quickStats?.totalRetrievals ?? 0}
             />
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <BrainComposition data={data} quickStats={quickStats} />
-              <ActivityDistribution data={data} quickStats={quickStats} />
+              <BrainComposition data={displayData} quickStats={quickStats} />
+              <ActivityDistribution data={displayData} quickStats={quickStats} />
             </div>
-            <MemoryStrength data={data} />
+            <MemoryStrength data={displayData} />
           </div>
         ) : activeTab === 'graph' ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <SemanticGraph maxDepth={2} maxNodes={50} height={600} profile={currentProfile} />
+            <SemanticGraph maxDepth={2} maxNodes={50} height={600} agent={currentProfile} userId={selectedUserId} />
           </div>
         ) : (
           <div className="bg-gradient-to-br from-white via-stone-50/20 to-white rounded-2xl border border-stone-200 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden">
@@ -363,7 +409,7 @@ export default function MemoryVaultPage() {
                   <option value="all">All Sectors</option>
                   <option value="episodic">Episodic</option>
                   <option value="procedural">Procedural</option>
-                  <option value="affective">Affective</option>
+                  <option value="semantic">Semantic</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                   <svg className="w-4 h-4 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -425,22 +471,32 @@ export default function MemoryVaultPage() {
                           }`}
                           onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                         >
-                          {/* Left border indicator for active memories */}
-                          {isActive && (
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-500 to-teal-600"></div>
-                          )}
-                          
-                          <td className="px-6 py-5 whitespace-nowrap align-top">
-                            <SectorTooltip sector={item.sector}>
-                              <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-bold border shadow-sm transition-all group-hover:scale-105 cursor-help ${
-                                isActive ? 'ring-2 ring-teal-200' : ''
-                              } ${sectorColors[item.sector]}`}>
-                                {capitalizeSector(item.sector)}
-                                {isRecent && (
-                                  <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                )}
-                              </span>
-                            </SectorTooltip>
+                          <td className="px-6 py-5 whitespace-nowrap align-top relative">
+                            {/* Left border indicator for active memories */}
+                            {isActive && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-500 to-teal-600"></div>
+                            )}
+                            <div className="flex flex-col gap-1.5">
+                              <SectorTooltip sector={item.sector}>
+                                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-bold border shadow-sm transition-all group-hover:scale-105 cursor-help ${
+                                  isActive ? 'ring-2 ring-teal-200' : ''
+                                } ${sectorColors[item.sector]}`}>
+                                  {capitalizeSector(item.sector)}
+                                  {isRecent && (
+                                    <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  )}
+                                </span>
+                              </SectorTooltip>
+                              {item.userScope ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 w-fit" title={`Scoped to user: ${item.userScope}`}>
+                                  @ {item.userScope.length > 12 ? item.userScope.slice(0, 12) + '...' : item.userScope}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-stone-50 text-stone-400 border border-stone-100 w-fit">
+                                  shared
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-6 py-5 align-top">
                             <div className={`text-sm text-slate-700 leading-relaxed transition-all ${expandedId === item.id ? '' : 'line-clamp-2 font-medium'}`}>
@@ -460,6 +516,14 @@ export default function MemoryVaultPage() {
                                     </svg>
                                     Last accessed: {new Date(item.lastAccessed).toLocaleString()}
                                   </span>
+                                  {item.source && (
+                                    <span className="flex items-center gap-1.5 text-stone-500">
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                      </svg>
+                                      Source: {item.source}
+                                    </span>
+                                  )}
                                   {isRecent && (
                                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold">
                                       New
@@ -494,7 +558,7 @@ export default function MemoryVaultPage() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleEditClick(item.id, item.preview, item.sector);
+                                  handleEditClick(item.id, item.preview, item.sector, item.userScope);
                                 }}
                                 className="text-stone-400 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 p-2 rounded-lg hover:bg-blue-50 transform hover:scale-110"
                                 title="Edit memory"
@@ -550,7 +614,7 @@ export default function MemoryVaultPage() {
           editBusy={editBusy}
           onClose={() => setEditModal(null)}
           onConfirm={handleEditConfirm}
-          onUpdate={(updates) => setEditModal(editModal ? { ...editModal, ...updates } : null)}
+          onUpdate={(updates) => setEditModal(editModal ? { ...editModal, ...updates } as typeof editModal : null)}
         />
         <ProfileManagement
           isOpen={showProfileManagement}

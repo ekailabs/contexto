@@ -57,20 +57,20 @@ export default function ProfileSelector({ currentProfile, onProfileChange, onMan
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load profiles from backend
+  // Load agents from backend
   useEffect(() => {
-    const fetchProfiles = async () => {
+    const fetchAgents = async () => {
       try {
         setLoading(true);
-        const response = await apiService.getProfiles();
-        const profileList: Profile[] = response.profiles.map((slug, index) => ({
-          slug,
-          displayName: formatProfileName(slug),
-          color: getProfileColor(slug, index),
+        const response = await apiService.getAgents();
+        const profileList: Profile[] = response.agents.map((agent, index) => ({
+          slug: agent.id,
+          displayName: agent.name ? formatProfileName(agent.name) : formatProfileName(agent.id),
+          color: getProfileColor(agent.id, index),
         }));
         setProfiles(profileList);
       } catch (err) {
-        console.error('Failed to fetch profiles', err);
+        console.error('Failed to fetch agents', err);
         // Fallback to default profile if fetch fails
         setProfiles([{ slug: 'default', displayName: 'Default', color: 'bg-emerald-500' }]);
       } finally {
@@ -78,7 +78,7 @@ export default function ProfileSelector({ currentProfile, onProfileChange, onMan
       }
     };
 
-    fetchProfiles();
+    fetchAgents();
   }, []);
 
   const currentProfileData = profiles.find(p => p.slug === currentProfile) || (profiles[0] || { slug: 'default', displayName: 'Default', color: 'bg-emerald-500' });

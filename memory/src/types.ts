@@ -1,12 +1,43 @@
-export type SectorName = 'episodic' | 'semantic' | 'procedural' | 'affective';
+export type SectorName = 'episodic' | 'semantic' | 'procedural';
+
+export type SemanticDomain = 'user' | 'world' | 'self';
+
+export type ProviderName = 'gemini' | 'openai' | 'openrouter';
+
+export interface AgentInfo {
+  id: string;
+  name: string;
+  soulMd?: string;
+  relevancePrompt?: string;
+  createdAt: number;
+}
+
+export interface MemoryFilterOptions {
+  userId?: string;
+  scope?: 'global';
+  limit?: number;
+}
+
+export interface SemanticTripleInput {
+  subject: string;
+  predicate: string;
+  object: string;
+  domain?: SemanticDomain;
+}
+
+export interface ReflectiveInput {
+  observation: string;
+}
+
+export interface MemoryOrigin {
+  originType: 'conversation' | 'document' | 'api' | 'reflection';
+  originActor?: string;   // userId or system identifier
+  originRef?: string;      // conversation id, document path, etc.
+}
 
 export interface IngestComponents {
   episodic?: string;
-  semantic?: string | {
-    subject: string;
-    predicate: string;
-    object: string;
-  };
+  semantic?: SemanticTripleInput | SemanticTripleInput[];
   procedural?: string | {
     trigger: string;
     goal?: string;
@@ -14,7 +45,7 @@ export interface IngestComponents {
     result?: string;
     context?: string;
   };
-  affective?: string;
+  reflective?: ReflectiveInput | ReflectiveInput[];
 }
 
 export interface MemoryRecord {
@@ -22,17 +53,22 @@ export interface MemoryRecord {
   sector: SectorName;
   content: string;
   embedding: number[];
-  profileId: string;
+  agentId: string;
   createdAt: number;
   lastAccessed: number;
   eventStart?: number | null;
   eventEnd?: number | null;
+  source?: string;
+  originType?: string;
+  originActor?: string;
+  originRef?: string;
+  userScope?: string | null;
 }
 
 export interface ProceduralMemoryRecord {
   id: string;
   trigger: string;
-  profileId: string;
+  agentId: string;
   goal?: string;
   context?: string;
   result?: string;
@@ -40,6 +76,11 @@ export interface ProceduralMemoryRecord {
   embedding: number[];
   createdAt: number;
   lastAccessed: number;
+  source?: string;
+  originType?: string;
+  originActor?: string;
+  originRef?: string;
+  userScope?: string | null;
 }
 
 export interface SemanticMemoryRecord {
@@ -47,29 +88,46 @@ export interface SemanticMemoryRecord {
   subject: string;
   predicate: string;
   object: string;
-  profileId: string;
+  agentId: string;
   embedding: number[];
   validFrom: number;
   validTo: number | null;
   createdAt: number;
   updatedAt: number;
-  strength: number;           // Evidence count from consolidation (starts at 1.0)
   source?: string;
   metadata?: Record<string, any>;
+  domain?: SemanticDomain;
+  originType?: string;
+  originActor?: string;
+  originRef?: string;
+  userScope?: string | null;
+}
+
+export interface ReflectiveMemoryRecord {
+  id: string;
+  observation: string;
+  agentId: string;
+  embedding: number[];
+  createdAt: number;
+  lastAccessed: number;
+  source?: string;
+  originType?: string;
+  originActor?: string;
+  originRef?: string;
 }
 
 /**
  * Consolidation action for semantic facts
  */
 export type ConsolidationAction =
-  | { type: 'merge'; targetId: string }     // Same object exists: strengthen it
+  | { type: 'merge'; targetId: string }     // Same object exists: skip (dedup)
   | { type: 'supersede'; targetId: string } // Different object: close old, insert new
   | { type: 'insert' };                     // No existing fact for this slot
 
 export interface QueryResult {
   sector: SectorName;
   id: string;
-  profileId: string;
+  agentId: string;
   content: string;
   score: number;
   similarity: number;
@@ -80,15 +138,19 @@ export interface QueryResult {
 
 export type EmbedFn = (input: string, sector: SectorName) => Promise<number[]>;
 
+export type ExtractFn = (text: string) => Promise<IngestComponents>;
+
 export interface GraphTraversalOptions {
   maxDepth?: number;
   maxResults?: number;
   includeInvalidated?: boolean;
   predicateFilter?: string;
-  profile?: string;
+  agent?: string;
+  userId?: string;
 }
 
-export interface GraphPath {
-  path: SemanticMemoryRecord[];
-  depth: number;
+export interface IngestOptions {
+  source?: string;
+  origin?: MemoryOrigin;
+  userId?: string;
 }
