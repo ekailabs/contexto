@@ -153,4 +153,5 @@ export interface IngestOptions {
   source?: string;
   origin?: MemoryOrigin;
   userId?: string;
+  deduplicate?: boolean;
 }

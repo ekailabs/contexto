@@ -52,6 +52,7 @@ export class SqliteMemoryStore {
     const source = options?.source;
     const origin = options?.origin;
     const userId = options?.userId;
+    const deduplicate = options?.deduplicate ?? true;
 
     // Upsert into agent_users when userId is provided
     if (userId) {
@@ -63,7 +64,9 @@ export class SqliteMemoryStore {
     if (episodic && typeof episodic === 'string' && episodic.trim()) {
       const embedding = await this.embed(episodic, 'episodic');
 
-      const existingDup = this.findDuplicateMemory(embedding, 'episodic', agentId, 0.9);
+      const existingDup = deduplicate
+        ? this.findDuplicateMemory(embedding, 'episodic', agentId, 0.9)
+        : null;
       if (existingDup) {
         if (source && !existingDup.source) {
           this.setMemorySource(existingDup.id, source);
@@ -215,7 +218,9 @@ export class SqliteMemoryStore {
         const embedding = await this.embed(textToEmbed, 'procedural');
         procRow.embedding = embedding;
 
-        const existingDup = this.findDuplicateProcedural(embedding, agentId, 0.9);
+        const existingDup = deduplicate
+          ? this.findDuplicateProcedural(embedding, agentId, 0.9)
+          : null;
         if (existingDup) {
           if (source && !existingDup.source) {
             this.setProceduralSource(existingDup.id, source);

@@ -4,10 +4,11 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Memory, createMemoryRouter } from '@ekai/memory';
-import { PORT, MEMORY_DB_PATH, OPENROUTER_API_KEY } from './config.js';
-import { initMemory, fetchMemoryContext, ingestMessages } from './memory-client.js';
+import { PORT, MEMORY_DB_PATH, OPENROUTER_API_KEY, CONVERSATION_LOG_PATH } from './config.js';
+import { initMemory, fetchMemoryContext } from './memory-client.js';
 import { formatMemoryBlock, injectMemory } from './memory.js';
 import { proxyToOpenRouter } from './proxy.js';
+import { appendConversationLog, normalizeMessages } from './conversation-log.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -60,7 +61,7 @@ app.post('/v1/chat/completions', async (req, res) => {
           : null;
 
     // Save original messages before memory injection mutates them
-    const originalMessages = body.messages.map((m: any) => ({ ...m }));
+    const originalMessages = normalizeMessages(body.messages);
 
     // Fetch memory context (non-blocking on failure)
     if (query) {
@@ -71,9 +72,12 @@ app.post('/v1/chat/completions', async (req, res) => {
       }
     }
 
-    // Ingestion disabled — re-ingesting full conversation on every call causes
-    // runaway memory growth (no dedup). Will re-enable with proper deduplication.
-    // ingestMessages(originalMessages, profile);
+    // Capture original conversation for scheduled deduplicated ingestion.
+    appendConversationLog(CONVERSATION_LOG_PATH, {
+      agentId,
+      userId,
+      messages: originalMessages,
+    });
 
     await proxyToOpenRouter(body, res, clientKey);
   } catch (err: any) {

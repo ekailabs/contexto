@@ -24,3 +24,4 @@ if (!OPENROUTER_API_KEY) {
 
 export const MEMORY_DB_PATH = process.env.MEMORY_DB_PATH ?? './memory.db';
 export const PORT = parseInt(process.env.OPENROUTER_PORT || process.env.PORT || '4010', 10);
+export const CONVERSATION_LOG_PATH = process.env.CONVERSATION_LOG_PATH ?? './data/conversation-log.jsonl';

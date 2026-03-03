@@ -94,10 +94,11 @@ export function createMemoryRouter(store: SqliteMemoryStore, extractFn?: Extract
   });
 
   router.post('/v1/ingest', async (req: Request, res: Response) => {
-    const { messages, agent, userId } = req.body as {
+    const { messages, agent, userId, deduplicate } = req.body as {
       messages?: Array<{ role: 'user' | 'assistant' | string; content: string }>;
       agent?: string;
       userId?: string;
+      deduplicate?: boolean;
     };
 
     let normalizedAgent: string;
@@ -152,6 +153,7 @@ export function createMemoryRouter(store: SqliteMemoryStore, extractFn?: Extract
       const rows = await store.ingest(finalComponents, normalizedAgent, {
         origin: { originType: 'conversation', originActor: userId },
         userId,
+        deduplicate,
       });
       res.json({ stored: rows.length, ids: rows.map((r) => r.id), agent: normalizedAgent });
     } catch (err: any) {
