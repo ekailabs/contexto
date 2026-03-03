@@ -33,7 +33,6 @@ export interface AppendInput {
   userId?: string;
   event: Record<string, any>;
   ctx?: Record<string, any>;
-  _error?: string;
 }
 
 // --- Reconstructed Types ---
