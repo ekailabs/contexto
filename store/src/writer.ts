@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { SCHEMA_VERSION, sanitizeId } from './types.js';
@@ -29,9 +29,20 @@ function safeStringify(obj: unknown): string {
 }
 
 export class EventWriter {
+  /** Per-file promise chains — serializes writes to the same session file. */
+  private chains = new Map<string, Promise<void>>();
+
   constructor(private dataDir: string) {}
 
-  append(input: AppendInput): void {
+  /**
+   * Append an event to the session JSONL file.
+   *
+   * Writes are serialized per session file (deterministic line order) but
+   * concurrent across different sessions. Fire-and-forget callers may lose
+   * events on hard crash — acceptable for an observability layer. Use flush()
+   * for clean shutdown paths.
+   */
+  async append(input: AppendInput): Promise<void> {
     const id = input.id ?? randomUUID();
     const eventTs = input.ts ?? Date.now();
     const ingestTs = Date.now();
@@ -80,8 +91,27 @@ export class EventWriter {
     }
 
     const dir = join(this.dataDir, sanitizedAgentId);
-    mkdirSync(dir, { recursive: true });
     const filePath = join(dir, `${sanitizedSessionId}.jsonl`);
-    appendFileSync(filePath, line + '\n');
+
+    // Chain writes to the same file — different files write concurrently
+    const prev = this.chains.get(filePath) ?? Promise.resolve();
+    const next = prev.catch(() => {}).then(() => this.writeLine(dir, filePath, line));
+    this.chains.set(filePath, next);
+
+    // Prune completed chain entry to avoid unbounded map growth
+    next.then(() => { if (this.chains.get(filePath) === next) this.chains.delete(filePath); })
+        .catch(() => { if (this.chains.get(filePath) === next) this.chains.delete(filePath); });
+
+    return next;
+  }
+
+  /** Await all pending writes — use for clean shutdown. */
+  async flush(): Promise<void> {
+    await Promise.all(this.chains.values());
+  }
+
+  private async writeLine(dir: string, filePath: string, line: string): Promise<void> {
+    await mkdir(dir, { recursive: true });
+    await appendFile(filePath, line + '\n');
   }
 }

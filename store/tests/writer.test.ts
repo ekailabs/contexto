@@ -25,8 +25,8 @@ describe('EventWriter', () => {
     return content.trim().split('\n').map(line => JSON.parse(line));
   }
 
-  it('normalizes input with id, version, timestamps', () => {
-    writer.append({
+  it('normalizes input with id, version, timestamps', async () => {
+    await writer.append({
       hook: 'session_start',
       sessionId: 'sess-1',
       agentId: 'agent-1',
@@ -45,8 +45,8 @@ describe('EventWriter', () => {
     expect(ev.event).toEqual({ foo: 'bar' });
   });
 
-  it('preserves caller-provided id for idempotent retries', () => {
-    writer.append({
+  it('preserves caller-provided id for idempotent retries', async () => {
+    await writer.append({
       id: 'my-custom-id',
       hook: 'message_received',
       sessionId: 'sess-1',
@@ -58,9 +58,9 @@ describe('EventWriter', () => {
     expect(lines[0].id).toBe('my-custom-id');
   });
 
-  it('uses caller ts as eventTs when provided', () => {
+  it('uses caller ts as eventTs when provided', async () => {
     const ts = 1700000000000;
-    writer.append({
+    await writer.append({
       ts,
       hook: 'llm_output',
       sessionId: 'sess-1',
@@ -73,8 +73,8 @@ describe('EventWriter', () => {
     expect(lines[0].ingestTs).toBeGreaterThanOrEqual(ts);
   });
 
-  it('sanitizes agentId and sessionId', () => {
-    writer.append({
+  it('sanitizes agentId and sessionId', async () => {
+    await writer.append({
       hook: 'session_start',
       sessionId: 'sess/with/slashes',
       agentId: 'agent?with?marks',
@@ -88,8 +88,8 @@ describe('EventWriter', () => {
     expect(sessionFile).toMatch(/^sess_with_slashes-[a-f0-9]{8}\.jsonl$/);
   });
 
-  it('stores rawAgentId/rawSessionId when sanitization changes value', () => {
-    writer.append({
+  it('stores rawAgentId/rawSessionId when sanitization changes value', async () => {
+    await writer.append({
       hook: 'session_start',
       sessionId: 'sess/special',
       agentId: 'agent/special',
@@ -105,8 +105,8 @@ describe('EventWriter', () => {
     expect(ev.rawSessionId).toBe('sess/special');
   });
 
-  it('always stores raw IDs since hash suffix changes the value', () => {
-    writer.append({
+  it('always stores raw IDs since hash suffix changes the value', async () => {
+    await writer.append({
       hook: 'session_start',
       sessionId: 'clean-session',
       agentId: 'clean-agent',
@@ -122,8 +122,8 @@ describe('EventWriter', () => {
     expect(ev.rawSessionId).toBe('clean-session');
   });
 
-  it('falls back to _unknown-agent and _unknown-session', () => {
-    writer.append({
+  it('falls back to _unknown-agent and _unknown-session', async () => {
+    await writer.append({
       hook: 'session_start',
       event: {},
     });
@@ -135,8 +135,8 @@ describe('EventWriter', () => {
     expect(sessionFile).toBe('_unknown-session.jsonl');
   });
 
-  it('handles empty string IDs as unknown', () => {
-    writer.append({
+  it('handles empty string IDs as unknown', async () => {
+    await writer.append({
       hook: 'session_start',
       sessionId: '',
       agentId: '   ',
@@ -147,11 +147,11 @@ describe('EventWriter', () => {
     expect(agentDir).toBe('_unknown-agent');
   });
 
-  it('safely serializes circular references', () => {
+  it('safely serializes circular references', async () => {
     const circular: any = { a: 1 };
     circular.self = circular;
 
-    writer.append({
+    await writer.append({
       hook: 'message_received',
       sessionId: 'sess-1',
       agentId: 'agent-1',
@@ -163,8 +163,8 @@ describe('EventWriter', () => {
     expect(lines[0].event.self).toBe('[Circular]');
   });
 
-  it('safely serializes BigInt values', () => {
-    writer.append({
+  it('safely serializes BigInt values', async () => {
+    await writer.append({
       hook: 'message_received',
       sessionId: 'sess-1',
       agentId: 'agent-1',
@@ -175,13 +175,13 @@ describe('EventWriter', () => {
     expect(lines[0].event.big).toBe('9007199254740991');
   });
 
-  it('fallback preserves core fields when safeStringify throws', () => {
+  it('fallback preserves core fields when safeStringify throws', async () => {
     // Create an object with a toJSON that throws — defeats the safe replacer
     const poison = {
       toJSON() { throw new Error('toJSON bomb'); },
     };
 
-    writer.append({
+    await writer.append({
       id: 'fallback-id',
       ts: 1700000000000,
       hook: 'llm_output',
@@ -200,8 +200,8 @@ describe('EventWriter', () => {
     expect(ev._error).toBe('serialization failed');
   });
 
-  it('safely serializes Error objects', () => {
-    writer.append({
+  it('safely serializes Error objects', async () => {
+    await writer.append({
       hook: 'after_tool_call',
       sessionId: 'sess-1',
       agentId: 'agent-1',
@@ -213,27 +213,27 @@ describe('EventWriter', () => {
     expect(lines[0].event.error.stack).toBeDefined();
   });
 
-  it('appends multiple events to the same session file', () => {
-    writer.append({ hook: 'session_start', sessionId: 's1', agentId: 'a1', event: {} });
-    writer.append({ hook: 'message_received', sessionId: 's1', agentId: 'a1', event: { text: 'hi' } });
-    writer.append({ hook: 'session_end', sessionId: 's1', agentId: 'a1', event: {} });
+  it('appends multiple events to the same session file', async () => {
+    await writer.append({ hook: 'session_start', sessionId: 's1', agentId: 'a1', event: {} });
+    await writer.append({ hook: 'message_received', sessionId: 's1', agentId: 'a1', event: { text: 'hi' } });
+    await writer.append({ hook: 'session_end', sessionId: 's1', agentId: 'a1', event: {} });
 
     const lines = readLines('a1', 's1');
     expect(lines).toHaveLength(3);
     expect(lines.map((l: any) => l.hook)).toEqual(['session_start', 'message_received', 'session_end']);
   });
 
-  it('creates separate files for different sessions', () => {
-    writer.append({ hook: 'session_start', sessionId: 's1', agentId: 'a1', event: {} });
-    writer.append({ hook: 'session_start', sessionId: 's2', agentId: 'a1', event: {} });
+  it('creates separate files for different sessions', async () => {
+    await writer.append({ hook: 'session_start', sessionId: 's1', agentId: 'a1', event: {} });
+    await writer.append({ hook: 'session_start', sessionId: 's2', agentId: 'a1', event: {} });
 
     const agentDir = sanitizeId('a1', 'agent');
     const files = readdirSync(join(dataDir, agentDir));
     expect(files).toHaveLength(2);
   });
 
-  it('stores optional fields: conversationId, userId, ctx', () => {
-    writer.append({
+  it('stores optional fields: conversationId, userId, ctx', async () => {
+    await writer.append({
       hook: 'message_received',
       sessionId: 'sess-1',
       agentId: 'agent-1',
@@ -247,6 +247,43 @@ describe('EventWriter', () => {
     expect(lines[0].conversationId).toBe('conv-123');
     expect(lines[0].userId).toBe('user-456');
     expect(lines[0].ctx).toEqual({ mode: 'chat' });
+  });
+
+  it('concurrent appends to same session produce deterministic line order', async () => {
+    // Fire all appends concurrently — promise chain should serialize them
+    const promises = [];
+    for (let i = 0; i < 10; i++) {
+      promises.push(writer.append({
+        hook: 'message_received',
+        sessionId: 's1',
+        agentId: 'a1',
+        event: { seq: i },
+      }));
+    }
+    await Promise.all(promises);
+
+    const lines = readLines('a1', 's1');
+    expect(lines).toHaveLength(10);
+    // Lines should appear in the order appends were called (sequential chaining)
+    for (let i = 0; i < 10; i++) {
+      expect(lines[i].event.seq).toBe(i);
+    }
+  });
+
+  it('flush() resolves after all pending writes complete', async () => {
+    // Fire appends without awaiting
+    writer.append({ hook: 'session_start', sessionId: 's1', agentId: 'a1', event: { n: 1 } });
+    writer.append({ hook: 'message_received', sessionId: 's1', agentId: 'a1', event: { n: 2 } });
+    writer.append({ hook: 'session_start', sessionId: 's2', agentId: 'a1', event: { n: 3 } });
+
+    await writer.flush();
+
+    // All writes should be on disk after flush
+    const lines1 = readLines('a1', 's1');
+    expect(lines1).toHaveLength(2);
+
+    const lines2 = readLines('a1', 's2');
+    expect(lines2).toHaveLength(1);
   });
 });
 

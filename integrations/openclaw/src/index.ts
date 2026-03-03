@@ -22,7 +22,7 @@ const NOOP_HOOKS = [
 ] as const;
 
 export default {
-  id: 'ekai-contexto',
+  id: 'claw-contexto',
   name: 'Ekai Contexto',
   description: 'Context engine for OpenClaw — captures lifecycle events, extensible to memory injection',
   configSchema: {
