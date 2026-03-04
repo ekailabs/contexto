@@ -11,7 +11,7 @@ Context engine for AI agents — event capture, persistent memory, and attributi
 ## Features
 
 - 📦 **Event store**: Structured JSONL capture of agent lifecycle events ([`@ekai/store`](./store/))
-- 🔌 **OpenClaw plugin**: Drop-in context engine for any OpenClaw agent ([`@ekai/contexto`](./integrations/openclaw/))
+- 🔌 **OpenClaw plugin**: Drop-in context engine for any OpenClaw agent ([`claw-contexto`](./integrations/openclaw/))
 - 🔀 **OpenRouter proxy**: OpenAI-compatible `/v1/chat/completions` with embedded memory
 - 📊 **Memory dashboard**: Browse, search, and manage stored memories
 - 🔑 **BYOK**: Bring your own API keys — per-instance or per-request
@@ -101,7 +101,7 @@ ekai-gateway/
 ├── store/                # JSONL event storage library (@ekai/store)
 ├── integrations/
 │   ├── openrouter/       # Proxy server with embedded memory (@ekai/openrouter)
-│   └── openclaw/         # OpenClaw lifecycle plugin (@ekai/contexto)
+│   └── openclaw/         # OpenClaw lifecycle plugin (claw-contexto)
 ├── memory/               # Agent memory library (@ekai/memory)
 ├── ui/dashboard/         # Memory management dashboard (Next.js)
 ├── scripts/
@@ -111,19 +111,19 @@ ekai-gateway/
 
 ## OpenClaw Plugin
 
-[`@ekai/contexto`](https://www.npmjs.com/package/@ekai/contexto) is an OpenClaw plugin that captures all 13 lifecycle events to structured JSONL storage (powered by [`@ekai/store`](./store/)). Install it in any OpenClaw instance:
+[`claw-contexto`](https://www.npmjs.com/package/claw-contexto) is an OpenClaw plugin that captures all 13 lifecycle events to structured JSONL storage (powered by [`@ekai/store`](./store/)). Install it in any OpenClaw instance:
 
 ```bash
-openclaw plugins install @ekai/contexto
+openclaw plugins install claw-contexto
 ```
 
 Configure in your OpenClaw config:
 ```json5
 {
   plugins: {
-    allow: ["ekai-contexto"],
+    allow: ["claw-contexto"],
     entries: {
-      "ekai-contexto": {
+      "claw-contexto": {
         enabled: true,
         config: { "dataDir": "~/.openclaw/ekai/data" }
       }

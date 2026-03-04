@@ -1,7 +1,7 @@
-import { EventWriter } from '@ekai/store';
+import { EventWriter } from './store.js';
 
 export default {
-  id: 'contexto',
+  id: 'claw-contexto',
   name: 'Ekai Contexto',
   description: 'Context engine for OpenClaw — captures lifecycle events for memory and analytics',
   configSchema: {
@@ -50,7 +50,7 @@ export default {
         conversationId: extracted.conversationId,
         event: event ?? {},
         ctx: ctx ? { ...ctx } : undefined,
-      }).catch((err) => api.logger.warn(`contexto: ${hookName}: ${String(err)}`));
+      }).catch((err) => api.logger.warn(`claw-contexto: ${hookName}: ${String(err)}`));
     }
 
     // --- Session hooks ---
@@ -107,7 +107,7 @@ export default {
         });
         await store.flush();
       } catch (err) {
-        api.logger.warn(`contexto: agent_end: ${String(err)}`);
+        api.logger.warn(`claw-contexto: agent_end: ${String(err)}`);
       }
     });
 
@@ -123,10 +123,10 @@ export default {
         });
         await store.flush();
       } catch (err) {
-        api.logger.warn(`contexto: gateway_stop: ${String(err)}`);
+        api.logger.warn(`claw-contexto: gateway_stop: ${String(err)}`);
       }
     });
 
-    api.logger.info(`contexto: storing events to ${dataDir}`);
+    api.logger.info(`claw-contexto: storing events to ${dataDir}`);
   },
 };

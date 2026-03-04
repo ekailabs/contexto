@@ -1,5 +1,5 @@
 {
-  "name": "@ekai/contexto",
+  "name": "claw-contexto",
   "version": "0.2.0",
   "description": "OpenClaw plugin — captures all lifecycle events to JSONL for context, memory, and analytics",
   "type": "module",
@@ -26,9 +26,6 @@
   "author": "Ekai Labs",
   "scripts": {
     "type-check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@ekai/store": "*"
   },
   "devDependencies": {
     "typescript": "^5.3.2"
