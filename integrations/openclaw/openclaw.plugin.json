@@ -10,7 +10,7 @@
   "uiHints": {
     "dataDir": {
       "label": "Event data directory",
-      "description": "Directory for structured JSONL event storage (one file per session)"
+      "description": "Directory for structured JSONL event storage (one file per conversation)"
     }
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "claw-contexto",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "OpenClaw plugin — captures all lifecycle events to JSONL for context, memory, and analytics",
   "type": "module",
   "license": "MIT",
