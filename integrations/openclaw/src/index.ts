@@ -1,4 +1,152 @@
-import { EventWriter } from './store';
+import { appendFile, mkdir } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { join } from 'node:path';
+
+// --- Inline EventWriter (same as @ekai/store) ---
+
+const SCHEMA_VERSION = 1;
+const UNKNOWN_AGENT = '_unknown-agent';
+const UNKNOWN_SESSION = '_unknown-session';
+
+const REDACTED_KEYS = new Set([
+  'apikey',
+  'api_key',
+  'token',
+  'authorization',
+  'cookie',
+  'password',
+  'secret',
+  'access_token',
+  'refresh_token',
+  'x-api-key',
+  'set-cookie',
+]);
+
+type AppendInput = {
+  id?: string;
+  ts?: number;
+  hook: string;
+  sessionId?: string;
+  agentId?: string;
+  conversationId?: string;
+  userId?: string;
+  event: unknown;
+  ctx?: Record<string, unknown>;
+};
+
+function shortHash(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex').slice(0, 8);
+}
+
+function sanitizeId(raw: string | undefined | null, fallback: 'agent' | 'session'): string {
+  if (!raw || raw.trim() === '') {
+    return fallback === 'agent' ? UNKNOWN_AGENT : UNKNOWN_SESSION;
+  }
+  const sanitized = raw.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  const hash = shortHash(raw);
+  return `${sanitized}-${hash}`;
+}
+
+function safeReplacer() {
+  const seen = new WeakSet<object>();
+  return (key: string, value: unknown): unknown => {
+    if (typeof key === 'string' && REDACTED_KEYS.has(key.toLowerCase())) {
+      return '[REDACTED]';
+    }
+    if (typeof value === 'bigint') return value.toString();
+    if (value instanceof Error) return { message: value.message, stack: value.stack };
+    if (value !== null && typeof value === 'object') {
+      if (seen.has(value)) return '[Circular]';
+      seen.add(value);
+    }
+    return value;
+  };
+}
+
+function safeStringify(obj: unknown): string {
+  return JSON.stringify(obj, safeReplacer());
+}
+
+class EventWriter {
+  private chains = new Map<string, Promise<void>>();
+
+  constructor(private dataDir: string) {}
+
+  async append(input: AppendInput): Promise<void> {
+    const id = input.id ?? randomUUID();
+    const eventTs = input.ts ?? Date.now();
+    const ingestTs = Date.now();
+
+    const sanitizedAgentId = sanitizeId(input.agentId, 'agent');
+    const sanitizedSessionId = sanitizeId(input.sessionId, 'session');
+
+    const storeEvent: Record<string, unknown> = {
+      id,
+      v: SCHEMA_VERSION,
+      eventTs,
+      ingestTs,
+      hook: input.hook,
+      sessionId: sanitizedSessionId,
+      agentId: sanitizedAgentId,
+      conversationId: input.conversationId,
+      userId: input.userId,
+      event: input.event,
+      ctx: input.ctx,
+    };
+
+    if (input.agentId) {
+      storeEvent.rawAgentId = input.agentId;
+    }
+    if (input.sessionId) {
+      storeEvent.rawSessionId = input.sessionId;
+    }
+
+    let line: string;
+    try {
+      line = safeStringify(storeEvent);
+    } catch {
+      line = JSON.stringify({
+        id,
+        v: SCHEMA_VERSION,
+        eventTs,
+        ingestTs,
+        hook: input.hook,
+        sessionId: sanitizedSessionId,
+        agentId: sanitizedAgentId,
+        event: {},
+        _error: 'serialization failed',
+      });
+    }
+
+    const dir = join(this.dataDir, sanitizedAgentId);
+    const filePath = join(dir, `${sanitizedSessionId}.jsonl`);
+
+    const prev = this.chains.get(filePath) ?? Promise.resolve();
+    const next = prev.catch(() => {}).then(() => this.writeLine(dir, filePath, line));
+    this.chains.set(filePath, next);
+
+    next
+      .then(() => {
+        if (this.chains.get(filePath) === next) this.chains.delete(filePath);
+      })
+      .catch(() => {
+        if (this.chains.get(filePath) === next) this.chains.delete(filePath);
+      });
+
+    return next;
+  }
+
+  async flush(): Promise<void> {
+    await Promise.all(this.chains.values());
+  }
+
+  private async writeLine(dir: string, filePath: string, line: string): Promise<void> {
+    await mkdir(dir, { recursive: true });
+    await appendFile(filePath, line + '\n');
+  }
+}
+
+// --- Plugin definition ---
 
 export default {
   id: 'claw-contexto',
