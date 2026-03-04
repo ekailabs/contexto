@@ -1,4 +1,4 @@
-import { EventWriter } from './store.js';
+import { EventWriter } from './store';
 
 export default {
   id: 'claw-contexto',
