@@ -25,10 +25,12 @@
   },
   "author": "Ekai Labs",
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^5.3.2"
+    "typescript": "^5.3.2",
+    "vitest": "^3.0.0"
   },
   "openclaw": {
     "extensions": ["./src/index.ts"]
