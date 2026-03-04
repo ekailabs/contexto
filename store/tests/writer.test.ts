@@ -239,14 +239,67 @@ describe('EventWriter', () => {
       agentId: 'agent-1',
       conversationId: 'conv-123',
       userId: 'user-456',
+      ctx: { sessionKey: 'sk-1', agentId: 'a1' },
       event: { text: 'hello' },
-      ctx: { mode: 'chat' },
     });
 
     const lines = readLines('agent-1', 'sess-1');
     expect(lines[0].conversationId).toBe('conv-123');
     expect(lines[0].userId).toBe('user-456');
-    expect(lines[0].ctx).toEqual({ mode: 'chat' });
+    expect(lines[0].ctx).toEqual({ sessionKey: 'sk-1', agentId: 'a1' });
+  });
+
+  it('redacts sensitive keys in event payloads', async () => {
+    await writer.append({
+      hook: 'llm_input',
+      sessionId: 'sess-1',
+      agentId: 'agent-1',
+      event: {
+        prompt: 'hello',
+        apiKey: 'sk-secret-123',
+        token: 'bearer-xyz',
+        authorization: 'Basic abc',
+        password: 'hunter2',
+        nested: {
+          api_key: 'nested-key',
+          access_token: 'nested-token',
+          refresh_token: 'nested-refresh',
+          secret: 'nested-secret',
+          cookie: 'session=abc',
+          'x-api-key': 'header-key',
+          'set-cookie': 'session=def',
+        },
+      },
+    });
+
+    const lines = readLines('agent-1', 'sess-1');
+    const ev = lines[0].event;
+    expect(ev.prompt).toBe('hello');
+    expect(ev.apiKey).toBe('[REDACTED]');
+    expect(ev.token).toBe('[REDACTED]');
+    expect(ev.authorization).toBe('[REDACTED]');
+    expect(ev.password).toBe('[REDACTED]');
+    expect(ev.nested.api_key).toBe('[REDACTED]');
+    expect(ev.nested.access_token).toBe('[REDACTED]');
+    expect(ev.nested.refresh_token).toBe('[REDACTED]');
+    expect(ev.nested.secret).toBe('[REDACTED]');
+    expect(ev.nested.cookie).toBe('[REDACTED]');
+    expect(ev.nested['x-api-key']).toBe('[REDACTED]');
+    expect(ev.nested['set-cookie']).toBe('[REDACTED]');
+  });
+
+  it('redaction is case-insensitive', async () => {
+    await writer.append({
+      hook: 'llm_input',
+      sessionId: 'sess-1',
+      agentId: 'agent-1',
+      event: { ApiKey: 'upper', TOKEN: 'upper2', Authorization: 'mixed' },
+    });
+
+    const lines = readLines('agent-1', 'sess-1');
+    expect(lines[0].event.ApiKey).toBe('[REDACTED]');
+    expect(lines[0].event.TOKEN).toBe('[REDACTED]');
+    expect(lines[0].event.Authorization).toBe('[REDACTED]');
   });
 
   it('concurrent appends to same session produce deterministic line order', async () => {

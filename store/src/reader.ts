@@ -1,7 +1,7 @@
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { sanitizeId } from './types.js';
-import type { StoreEvent, ReconstructedSession, ReconstructedTurn, ReconstructedToolCall } from './types.js';
+import type { StoreEvent, ReconstructedSession, ReconstructedTurn } from './types.js';
 
 export class EventReader {
   constructor(private dataDir: string) {}
@@ -116,7 +116,7 @@ export class EventReader {
     return this.readEventsFromFile(join(this.dataDir, resolvedAgent, `${resolvedSession}.jsonl`), opts);
   }
 
-  /** Reconstruct a session from events into ordered turns with tool call pairing. */
+  /** Reconstruct a session from events into ordered turns. */
   async reconstructSession(agentId: string, sessionId: string): Promise<ReconstructedSession> {
     const resolvedAgent = await this.resolveAgent(agentId);
     const resolvedSession = await this.resolveSession(resolvedAgent, sessionId);
@@ -132,33 +132,30 @@ export class EventReader {
       turns: [],
     };
 
-    // Track pending tool calls for pairing.
-    // Each entry tracks all its map keys so we can clean up all indexes on match.
-    interface PendingToolEntry {
-      turn: ReconstructedTurn;
-      call: ReconstructedToolCall;
-      ts: number;
-      mapKeys: string[];
-    }
-    const pendingToolCalls = new Map<string, PendingToolEntry>();
-    // Sequence-based fallback: track before_tool_call by toolName order
-    const beforeToolSequence: { toolName: string; entry: PendingToolEntry }[] = [];
-
-    /** Remove a matched entry from ALL indexes. */
-    function cleanupEntry(entry: PendingToolEntry): void {
-      for (const key of entry.mapKeys) {
-        pendingToolCalls.delete(key);
-      }
-      const seqIdx = beforeToolSequence.findIndex(e => e.entry === entry);
-      if (seqIdx !== -1) beforeToolSequence.splice(seqIdx, 1);
-    }
-
     // Track last explicit userId for inference
     let lastExplicitUserId: string | undefined;
+
+    // Track last user turn for inbound dedup (received → transcribed → preprocessed)
+    let lastUserTurn: ReconstructedTurn | undefined;
+    let lastUserMessageId: string | undefined;
+
+    // Track last assistant turn for strict dedup (llm_output → message_sent)
+    let lastAssistantTurn: ReconstructedTurn | undefined;
+
+    // Tool-call pairing: pending before_tool_call turns indexed by sequence
+    const pendingToolCalls: { turn: ReconstructedTurn; toolName: string }[] = [];
+
+    // Hooks that are saved to JSONL but produce no turn in reconstruction
+    const SKIPPED_HOOKS = new Set([
+      'before_model_resolve', 'before_agent_start', 'message_sending',
+      'before_message_write', 'subagent_spawning', 'subagent_delivery_target',
+    ]);
 
     for (const ev of events) {
       const hook = ev.hook;
       const payload = ev.event ?? {};
+
+      // --- Metadata-only hooks (no turn) ---
 
       if (hook === 'session_start') {
         session.startedAt = ev.eventTs;
@@ -170,163 +167,265 @@ export class EventReader {
         continue;
       }
 
-      if (hook === 'message_received') {
-        const role = resolveRole(payload, 'user');
-        const content = extractContent(payload);
-        const userId = ev.userId ?? payload.userId;
-        if (userId) lastExplicitUserId = userId;
+      if (hook === 'agent_end') {
+        if (!session.endedAt) session.endedAt = ev.eventTs;
+        continue;
+      }
 
+      // --- Legacy colon-separated hooks (backward compat) ---
+
+      if (hook === 'command:new') {
+        session.startedAt = ev.eventTs;
+        continue;
+      }
+
+      if (hook === 'command:stop') {
+        session.endedAt = ev.eventTs;
+        continue;
+      }
+
+      if (hook === 'command:reset') {
         session.turns.push({
-          role,
+          role: 'system',
+          content: extractContent(payload) ?? 'reset',
+          timestamp: ev.eventTs,
+          userAttribution: 'unknown',
+        });
+        lastUserTurn = undefined;
+        lastUserMessageId = undefined;
+        lastAssistantTurn = undefined;
+        continue;
+      }
+
+      // --- User message hooks ---
+
+      if (hook === 'message_received' || hook === 'message:received') {
+        // Strict dedup: consecutive user turns with same content from different naming → collapse
+        if (lastUserTurn && lastUserTurn.content != null && lastUserTurn.content === extractContent(payload)) {
+          continue;
+        }
+
+        const content = extractContent(payload);
+        const userId = ev.userId ?? payload.userId ?? payload.from ?? ev.event?.context?.from;
+        if (userId) lastExplicitUserId = userId;
+        const messageId = payload.messageId ?? payload.id;
+
+        const turn: ReconstructedTurn = {
+          role: 'user',
           content,
           userId,
           userAttribution: userId ? 'explicit' : 'unknown',
           timestamp: ev.eventTs,
+        };
+        session.turns.push(turn);
+        lastUserTurn = turn;
+        lastUserMessageId = messageId;
+        lastAssistantTurn = undefined;
+        continue;
+      }
+
+      if (hook === 'message:transcribed' || hook === 'message:preprocessed') {
+        const content = extractContent(payload);
+        const messageId = payload.messageId ?? payload.id;
+
+        // Dedup: upgrade last user turn if messageId matches or it's the most recent user turn
+        if (lastUserTurn && (messageId == null || lastUserMessageId == null || messageId === lastUserMessageId)) {
+          if (content) lastUserTurn.content = content;
+          continue;
+        }
+
+        // No matching user turn — create a new one
+        const userId = ev.userId ?? payload.userId ?? ev.event?.context?.from;
+        if (userId) lastExplicitUserId = userId;
+        const turn: ReconstructedTurn = {
+          role: 'user',
+          content,
+          userId,
+          userAttribution: userId ? 'explicit' : 'unknown',
+          timestamp: ev.eventTs,
+        };
+        session.turns.push(turn);
+        lastUserTurn = turn;
+        lastUserMessageId = messageId;
+        lastAssistantTurn = undefined;
+        continue;
+      }
+
+      // --- Assistant / LLM hooks ---
+
+      if (hook === 'llm_input') {
+        session.turns.push({
+          role: 'system',
+          content: extractContent(payload) ?? 'llm_input',
+          model: payload.model,
+          timestamp: ev.eventTs,
+          userAttribution: 'unknown',
         });
+        lastAssistantTurn = undefined;
         continue;
       }
 
       if (hook === 'llm_output') {
-        const role = resolveRole(payload, 'assistant');
-        const content = payload.content ?? payload.message?.content;
-        const model = payload.model ?? payload.message?.model;
+        const content = extractContent(payload) ?? payload.assistantTexts?.join('\n');
+        const model = payload.model;
         const inputTokens = payload.usage?.input_tokens ?? payload.usage?.prompt_tokens;
         const outputTokens = payload.usage?.output_tokens ?? payload.usage?.completion_tokens;
 
-        // Extract tool calls from llm_output
-        const rawToolCalls = payload.tool_calls ?? payload.message?.tool_calls ?? [];
-        const toolCalls: ReconstructedToolCall[] = rawToolCalls.map((tc: any) => ({
-          id: tc.id ?? randomId(),
-          toolName: tc.function?.name ?? tc.name ?? 'unknown',
-          arguments: tc.function?.arguments ? parseArgs(tc.function.arguments) : (tc.arguments ?? {}),
-          status: 'pending' as const,
-        }));
-
         const turn: ReconstructedTurn = {
-          role,
-          content: typeof content === 'string' ? content : undefined,
+          role: 'assistant',
+          content,
           model,
           userId: lastExplicitUserId,
           userAttribution: lastExplicitUserId ? 'inferred' : 'unknown',
           inputTokens,
           outputTokens,
-          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
           timestamp: ev.eventTs,
         };
         session.turns.push(turn);
+        lastUserTurn = undefined;
+        lastUserMessageId = undefined;
+        lastAssistantTurn = turn;
         continue;
       }
 
-      if (hook === 'before_tool_call') {
-        const toolCallId = payload.toolCallId ?? payload.tool_call_id;
-        const runId = payload.runId ?? payload.run_id;
-        const toolName = payload.toolName ?? payload.tool_name ?? payload.name ?? 'unknown';
-        const args = payload.arguments ?? payload.args ?? {};
+      if (hook === 'message_sent' || hook === 'message:sent') {
+        const content = extractContent(payload);
 
-        const call: ReconstructedToolCall = {
-          id: toolCallId ?? randomId(),
-          toolName,
-          arguments: typeof args === 'string' ? parseArgs(args) : args,
-          status: 'pending',
-        };
+        // Strict dedup: if last turn was llm_output with same content, skip this
+        if (lastAssistantTurn && lastAssistantTurn.content != null && lastAssistantTurn.content === content) {
+          lastAssistantTurn = undefined;
+          continue;
+        }
 
-        const turn: ReconstructedTurn = {
-          role: 'tool',
-          toolCallId,
+        const model = payload.model;
+        const inputTokens = payload.usage?.input_tokens ?? payload.usage?.prompt_tokens;
+        const outputTokens = payload.usage?.output_tokens ?? payload.usage?.completion_tokens;
+
+        session.turns.push({
+          role: 'assistant',
+          content,
+          model,
           userId: lastExplicitUserId,
           userAttribution: lastExplicitUserId ? 'inferred' : 'unknown',
-          toolCalls: [call],
+          inputTokens,
+          outputTokens,
           timestamp: ev.eventTs,
+        });
+        lastUserTurn = undefined;
+        lastUserMessageId = undefined;
+        lastAssistantTurn = undefined;
+        continue;
+      }
+
+      // --- Tool hooks ---
+
+      if (hook === 'before_tool_call') {
+        const toolName = payload.toolName ?? payload.tool_name ?? 'unknown';
+        const turn: ReconstructedTurn = {
+          role: 'tool',
+          content: toolName,
+          timestamp: ev.eventTs,
+          userId: lastExplicitUserId,
+          userAttribution: lastExplicitUserId ? 'inferred' : 'unknown',
+          toolCalls: [{
+            id: payload.toolCallId ?? payload.tool_call_id ?? `tc-${pendingToolCalls.length}`,
+            toolName,
+            arguments: payload.params ?? payload.arguments ?? {},
+            status: 'pending',
+          }],
         };
-
-        // Register for pairing — track all keys for cleanup
-        const entry: PendingToolEntry = { turn, call, ts: ev.eventTs, mapKeys: [] };
-        if (toolCallId) {
-          const key = `id:${toolCallId}`;
-          pendingToolCalls.set(key, entry);
-          entry.mapKeys.push(key);
-        }
-        if (runId && toolName) {
-          const key = `run:${runId}:${toolName}`;
-          pendingToolCalls.set(key, entry);
-          entry.mapKeys.push(key);
-        }
-        beforeToolSequence.push({ toolName, entry });
-
         session.turns.push(turn);
+        pendingToolCalls.push({ turn, toolName });
+        lastAssistantTurn = undefined;
         continue;
       }
 
       if (hook === 'after_tool_call') {
-        const toolCallId = payload.toolCallId ?? payload.tool_call_id;
-        const runId = payload.runId ?? payload.run_id;
-        const toolName = payload.toolName ?? payload.tool_name ?? payload.name ?? 'unknown';
-        const result = payload.result;
-        const error = payload.error;
-        const durationMs = payload.durationMs ?? payload.duration_ms;
-
-        // Try to pair with a before_tool_call
-        let matched: PendingToolEntry | undefined;
-
-        // Priority 1: toolCallId exact match
-        if (toolCallId && pendingToolCalls.has(`id:${toolCallId}`)) {
-          matched = pendingToolCalls.get(`id:${toolCallId}`);
-        }
-
-        // Priority 2: runId + toolName match
-        if (!matched && runId && toolName) {
-          const key = `run:${runId}:${toolName}`;
-          if (pendingToolCalls.has(key)) {
-            matched = pendingToolCalls.get(key);
+        const toolName = payload.toolName ?? payload.tool_name ?? 'unknown';
+        // Match by toolName sequence (LIFO for same name)
+        let matched = false;
+        for (let i = pendingToolCalls.length - 1; i >= 0; i--) {
+          if (pendingToolCalls[i].toolName === toolName) {
+            const tc = pendingToolCalls[i].turn.toolCalls?.[0];
+            if (tc) {
+              tc.result = payload.result;
+              tc.error = payload.error ? String(payload.error) : undefined;
+              tc.status = payload.error ? 'error' : 'success';
+              tc.durationMs = payload.durationMs ?? payload.duration_ms;
+            }
+            pendingToolCalls.splice(i, 1);
+            matched = true;
+            break;
           }
         }
-
-        // Priority 3: sequence-based (nth before paired with nth after for same tool name)
         if (!matched) {
-          const seqMatch = beforeToolSequence.find(e => e.toolName === toolName);
-          if (seqMatch) {
-            matched = seqMatch.entry;
-          }
+          // Orphan after_tool_call — create standalone turn
+          session.turns.push({
+            role: 'tool',
+            content: toolName,
+            timestamp: ev.eventTs,
+            userId: lastExplicitUserId,
+            userAttribution: lastExplicitUserId ? 'inferred' : 'unknown',
+            toolCalls: [{
+              id: payload.toolCallId ?? payload.tool_call_id ?? 'unknown',
+              toolName,
+              arguments: {},
+              result: payload.result,
+              error: payload.error ? String(payload.error) : undefined,
+              status: payload.error ? 'error' : 'success',
+              durationMs: payload.durationMs ?? payload.duration_ms,
+            }],
+          });
         }
-
-        if (matched) {
-          // Clean up ALL indexes for this entry before applying result
-          cleanupEntry(matched);
-
-          matched.call.result = result;
-          matched.call.error = typeof error === 'string' ? error : error?.message;
-          matched.call.status = error ? 'error' : 'success';
-          if (durationMs != null) {
-            matched.call.durationMs = durationMs;
-          } else if (matched.ts) {
-            matched.call.durationMs = ev.eventTs - matched.ts;
-          }
-        }
-        // If no match, after_tool_call is orphaned — we don't create a turn for it
+        lastAssistantTurn = undefined;
         continue;
       }
 
-      if (hook === 'message_sent') {
-        const role = resolveRole(payload, 'assistant');
+      if (hook === 'tool_result_persist') {
         const content = extractContent(payload);
+        const toolCallId = payload.toolCallId ?? payload.tool_call_id;
         session.turns.push({
-          role,
+          role: 'tool',
           content,
+          toolCallId,
           userId: lastExplicitUserId,
           userAttribution: lastExplicitUserId ? 'inferred' : 'unknown',
           timestamp: ev.eventTs,
         });
+        lastAssistantTurn = undefined;
         continue;
       }
 
-      // Other hooks (before_prompt_build, llm_input, tool_result_persist, agent_end,
-      // before_compaction, after_compaction) — system turns for traceability
+      // --- Skipped hooks (saved to JSONL, no turn) ---
+
+      if (SKIPPED_HOOKS.has(hook)) {
+        continue;
+      }
+
+      // --- System lifecycle hooks ---
+
+      if (hook === 'before_prompt_build' || hook === 'before_compaction' || hook === 'after_compaction' ||
+          hook === 'before_reset' || hook === 'subagent_spawned' || hook === 'subagent_ended' ||
+          hook === 'gateway_start' || hook === 'gateway_stop' ||
+          hook === 'agent:bootstrap' || hook === 'gateway:startup') {
+        session.turns.push({
+          role: 'system',
+          content: extractContent(payload) ?? hook,
+          timestamp: ev.eventTs,
+          userAttribution: 'unknown',
+        });
+        lastAssistantTurn = undefined;
+        continue;
+      }
+
+      // Unrecognized hooks — system turns for traceability
       session.turns.push({
         role: 'system',
         content: hook,
         timestamp: ev.eventTs,
         userAttribution: 'unknown',
       });
+      lastAssistantTurn = undefined;
     }
 
     return session;
@@ -335,28 +434,11 @@ export class EventReader {
 
 // --- Helpers ---
 
-function resolveRole(payload: any, fallback: 'user' | 'assistant'): 'user' | 'assistant' | 'system' | 'tool' {
-  const role = payload.role ?? payload.from;
-  if (role === 'user' || role === 'assistant' || role === 'system' || role === 'tool') return role;
-  return fallback;
-}
-
 function extractContent(payload: any): string | undefined {
   if (typeof payload.content === 'string') return payload.content;
+  if (typeof payload.context?.content === 'string') return payload.context.content;
+  if (typeof payload.messages?.[0]?.content === 'string') return payload.messages[0].content;
   if (typeof payload.message?.content === 'string') return payload.message.content;
   if (typeof payload.text === 'string') return payload.text;
   return undefined;
-}
-
-function parseArgs(args: unknown): Record<string, any> {
-  if (typeof args === 'string') {
-    try { return JSON.parse(args); } catch { return { _raw: args }; }
-  }
-  if (args && typeof args === 'object') return args as Record<string, any>;
-  return {};
-}
-
-let _counter = 0;
-function randomId(): string {
-  return `_gen_${Date.now()}_${_counter++}`;
 }

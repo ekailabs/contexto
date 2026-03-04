@@ -4,12 +4,22 @@ import { randomUUID } from 'node:crypto';
 import { SCHEMA_VERSION, sanitizeId } from './types.js';
 import type { AppendInput, StoreEvent } from './types.js';
 
+const REDACTED_KEYS = new Set([
+  'apikey', 'api_key', 'token', 'authorization',
+  'cookie', 'password', 'secret',
+  'access_token', 'refresh_token', 'x-api-key', 'set-cookie',
+]);
+
 /**
- * Safe JSON replacer — handles circular refs, BigInt, Error objects.
+ * Safe JSON replacer — handles circular refs, BigInt, Error objects,
+ * and redacts sensitive field names before they hit disk.
  */
 function safeReplacer() {
   const seen = new WeakSet();
   return (_key: string, value: unknown): unknown => {
+    if (typeof _key === 'string' && REDACTED_KEYS.has(_key.toLowerCase())) {
+      return '[REDACTED]';
+    }
     if (typeof value === 'bigint') return value.toString();
     if (value instanceof Error) return { message: value.message, stack: value.stack };
     if (value !== null && typeof value === 'object') {
