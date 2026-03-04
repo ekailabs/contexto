@@ -1,11 +1,16 @@
 # claw-contexto
 
-OpenClaw plugin that captures all 24 plugin lifecycle hooks to structured JSONL storage. Built for context, memory, and analytics.
+OpenClaw plugin that provides local-first memory — ingest conversation turns and recall relevant context automatically.
 
-Includes a local JSONL store (`src/store.ts`) so the plugin installs standalone without workspace dependencies.
+Uses [`@ekai/memory`](../../memory/) for semantic extraction, embedding, and SQLite storage.
 
 ## Install
 
+```bash
+openclaw plugins install claw-contexto
+```
+
+Or from source:
 ```bash
 openclaw plugins install ./integrations/openclaw
 ```
@@ -21,14 +26,22 @@ In your OpenClaw config:
     entries: {
       "claw-contexto": {
         enabled: true,
-        config: { "dataDir": "~/.openclaw/ekai/data" }
+        config: {
+          "dbPath": "~/.openclaw/ekai/memory.db",
+          "provider": "openai",
+          "apiKey": "sk-..."
+        }
       }
     }
   }
 }
 ```
 
-`dataDir` defaults to `~/.openclaw/ekai/data` if not set.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `dbPath` | `~/.openclaw/ekai/memory.db` | Path to SQLite memory file |
+| `provider` | (env-based) | LLM provider for extraction/embedding (`openai`, `gemini`, `openrouter`) |
+| `apiKey` | (env-based) | API key for the selected provider |
 
 ## Verify
 
@@ -37,44 +50,24 @@ openclaw plugins list       # should show claw-contexto
 openclaw hooks list         # should show plugin:claw-contexto:* hooks
 ```
 
-## Storage Layout
+## How It Works
 
-Events are organized as one JSONL file per session, grouped by agent:
+Two hooks:
 
-```
-{dataDir}/
-  {agent_id}/
-    {session_id}.jsonl
-```
+1. **`agent_end`** — Ingests new conversation turns into memory. Normalizes messages (user + assistant only), redacts secrets, extracts semantic memories via `@ekai/memory`.
 
-IDs are sanitized for safe file paths (`[a-zA-Z0-9_-]` + 8-char SHA-256 hash suffix). Missing IDs fall back to `_unknown-agent` / `_unknown-session`.
+2. **`before_prompt_build`** — Recalls relevant memories for the current query and prepends them as context (capped at 2000 chars).
 
-Each line is a JSON object with a versioned schema:
-
-```json
-{"id":"...","v":1,"eventTs":1709500000000,"ingestTs":1709500000050,"hook":"llm_output","sessionId":"abc-3f2a1b9c","agentId":"default-8e4c7d1a","event":{...},"ctx":{...}}
-```
-
-## What It Captures
-
-All 24 OpenClaw plugin lifecycle hooks defined in `PluginHookName` (`before_model_resolve` through `gateway_stop`).
-
-Additional fields extracted per event: `sessionId`, `agentId`, `userId`, `conversationId`.
-
-## Design
-
-- **Structured storage** — one JSONL file per session via local `EventWriter`
-- **Safe serialization** — handles circular refs, BigInt, Error objects (never throws)
-- **Never crashes OpenClaw** — all writes are fire-and-forget with `.catch(...)`
-- **Serialized async writes** — deterministic order per session file with async fs writes
-- **ID sanitization** — safe file paths with collision-resistant hashing
-- **Schema versioned** — every event carries `v: 1` for future migration
+Delta tracking is persisted to `{dbPath}.progress.json` so only new messages are ingested, even across restarts.
 
 ## Development
 
 ```bash
-# Type-check (no build needed — OpenClaw loads .ts via jiti)
+# Type-check (no build needed -- OpenClaw loads .ts via jiti)
 npm run type-check --workspace=integrations/openclaw
+
+# Run tests
+npm test --workspace=integrations/openclaw
 
 # Local dev install (symlink)
 openclaw plugins install -l ./integrations/openclaw

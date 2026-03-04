@@ -1,114 +1,55 @@
-import { appendFile, mkdir } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { Memory } from '@ekai/memory';
+import { readFileSync, mkdirSync } from 'node:fs';
+import { writeFile, rename } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
-import {
-  SCHEMA_VERSION,
-  REDACTED_KEYS,
-  sanitizeId,
-  safeStringify,
-  todayDate,
-  toolParamsFingerprint,
-  resolveConversationKey,
-  CorrelationCache,
-  ToolCallTracker,
-  type RouteKind,
-  type RouteResult,
-  type AppendInput,
-} from './routing';
+// --- Inline helpers ---
 
-// --- EventWriter (conversation-first routing) ---
+export function extractText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content))
+    return content
+      .filter((c: any) => c?.type === 'text' && c?.text)
+      .map((c: any) => c.text)
+      .join('\n');
+  if (content && typeof content === 'object' && 'text' in content) return String((content as any).text);
+  return '';
+}
 
-class EventWriter {
-  private chains = new Map<string, Promise<void>>();
+export function normalizeMessages(raw: unknown[]): Array<{ role: string; content: string }> {
+  return raw
+    .filter((m: any) => m?.role === 'user' || m?.role === 'assistant')
+    .map((m: any) => ({ role: m.role, content: extractText(m.content) }))
+    .filter((m) => m.content.trim().length > 0);
+}
 
-  constructor(private dataDir: string) {}
+export const REDACT_PATTERNS = [
+  /Bearer\s+[A-Za-z0-9._~+\/=-]+/g,
+  /\b(sk|pk|api)[_-][A-Za-z0-9]{20,}\b/g,
+  /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b/g,
+];
 
-  async append(input: AppendInput): Promise<void> {
-    const id = input.id ?? randomUUID();
-    const eventTs = input.ts ?? Date.now();
-    const ingestTs = Date.now();
+export function redact(text: string): string {
+  let out = text;
+  for (const p of REDACT_PATTERNS) out = out.replace(p, '[REDACTED]');
+  return out;
+}
 
-    const storeEvent: Record<string, unknown> = {
-      id,
-      v: SCHEMA_VERSION,
-      eventTs,
-      ingestTs,
-      hook: input.hook,
-      conversationKey: input.conversationKey,
-      routeKind: input.routeKind,
-      routeReason: input.routeReason,
-      userId: input.userId,
-      event: input.event,
-      ctx: input.ctx,
-    };
-
-    if (input._dedupTracked) {
-      storeEvent._dedupTracked = true;
-    }
-
-    let line: string;
-    try {
-      line = safeStringify(storeEvent);
-    } catch {
-      line = JSON.stringify({
-        id,
-        v: SCHEMA_VERSION,
-        eventTs,
-        ingestTs,
-        hook: input.hook,
-        conversationKey: input.conversationKey,
-        routeKind: input.routeKind,
-        event: {},
-        _error: 'serialization failed',
-      });
-    }
-
-    const { dir, filePath } = this.resolvePath(input.routeKind ?? 'orphan', input.conversationKey ?? 'unknown');
-
-    const prev = this.chains.get(filePath) ?? Promise.resolve();
-    const next = prev.catch(() => {}).then(() => this.writeLine(dir, filePath, line));
-    this.chains.set(filePath, next);
-
-    next
-      .then(() => {
-        if (this.chains.get(filePath) === next) this.chains.delete(filePath);
-      })
-      .catch(() => {
-        if (this.chains.get(filePath) === next) this.chains.delete(filePath);
-      });
-
-    return next;
-  }
-
-  async flush(): Promise<void> {
-    await Promise.all(this.chains.values());
-  }
-
-  private resolvePath(routeKind: RouteKind, conversationKey: string): { dir: string; filePath: string } {
-    const date = todayDate();
-    switch (routeKind) {
-      case 'conversation': {
-        const dir = join(this.dataDir, 'conversations');
-        const filePath = join(dir, `${sanitizeId(conversationKey)}.jsonl`);
-        return { dir, filePath };
-      }
-      case 'system': {
-        const dir = join(this.dataDir, 'system');
-        const filePath = join(dir, `system-${date}.jsonl`);
-        return { dir, filePath };
-      }
-      case 'orphan': {
-        const dir = join(this.dataDir, 'orphans');
-        const filePath = join(dir, `orphan-${date}.jsonl`);
-        return { dir, filePath };
-      }
+export function lastUserMessage(messages: unknown[]): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i] as any;
+    if (m?.role === 'user') {
+      const t = extractText(m.content);
+      if (t.trim()) return t;
     }
   }
+}
 
-  private async writeLine(dir: string, filePath: string, line: string): Promise<void> {
-    await mkdir(dir, { recursive: true });
-    await appendFile(filePath, line + '\n');
+export function loadProgress(path: string): Record<string, number> {
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return {};
   }
 }
 
@@ -117,167 +58,108 @@ class EventWriter {
 export default {
   id: 'claw-contexto',
   name: 'Ekai Contexto',
-  description: 'Context engine for OpenClaw — captures lifecycle events for memory and analytics',
+  description: 'Local-first memory for OpenClaw',
   configSchema: {
     type: 'object',
     additionalProperties: false,
     properties: {
-      dataDir: { type: 'string' },
+      dbPath: { type: 'string' },
+      provider: { type: 'string' },
+      apiKey: { type: 'string' },
     },
   },
 
   register(api: any) {
-    const dataDir = api.resolvePath(api.pluginConfig?.dataDir ?? '~/.openclaw/ekai/data');
-    const store = new EventWriter(dataDir);
-    const cache = new CorrelationCache();
+    const dbPath = api.resolvePath(api.pluginConfig?.dbPath ?? '~/.openclaw/ekai/memory.db');
+    mkdirSync(dirname(dbPath), { recursive: true });
+    const mem = new Memory({
+      provider: api.pluginConfig?.provider,
+      apiKey: api.pluginConfig?.apiKey,
+      dbPath,
+    });
 
-    // --- Emit helper: writes a single event to the store ---
+    // --- Agent management ---
+    const knownAgents = new Set<string>();
+    function ensureAgent(agentId: string) {
+      if (knownAgents.has(agentId)) return;
+      const exists = mem.getAgents().some((a) => a.id === agentId);
+      if (!exists) mem.addAgent(agentId, { name: agentId });
+      knownAgents.add(agentId);
+    }
+    // Seed from existing agents in DB (survives restarts)
+    for (const a of mem.getAgents()) knownAgents.add(a.id);
+    ensureAgent('main');
 
-    function emit(event: any, ctx: any, route: RouteResult, userId?: string, deduped?: boolean) {
-      void store.append({
-        hook: ctx?._hookName ?? 'unknown',
-        event: event ?? {},
-        ctx: ctx ? { ...ctx } : undefined,
-        conversationKey: route.conversationKey,
-        routeKind: route.routeKind,
-        routeReason: route.routeReason,
-        userId,
-        _dedupTracked: deduped,
-      }).catch((err) => api.logger.warn(`claw-contexto: ${ctx?._hookName ?? 'unknown'}: ${String(err)}`));
+    // --- Delta tracking (persisted) ---
+    const progressPath = dbPath.replace(/\.db$/, '') + '.progress.json';
+    const progress: Record<string, number> = loadProgress(progressPath);
+
+    async function saveProgress() {
+      const tmp = progressPath + '.tmp';
+      await writeFile(tmp, JSON.stringify(progress), 'utf-8');
+      await rename(tmp, progressPath);
     }
 
-    const toolDedup = new ToolCallTracker(emit);
+    const MAX_PREPEND_CHARS = 2000;
 
-    // --- Unified observe helper ---
-
-    function observe(hookName: string, event: any, ctx: any, overrideKind?: 'system') {
-      const userId = event?.from ?? ctx?.userId ?? undefined;
-      const ctxWithHook = ctx ? { ...ctx, _hookName: hookName } : { _hookName: hookName };
-
-      if (overrideKind === 'system') {
-        const route: RouteResult = {
-          conversationKey: `system-${todayDate()}`,
-          routeKind: 'system',
-          routeReason: 'system-hook',
-        };
-        emit(event, ctxWithHook, route, userId);
-        return;
-      }
-
-      const route = resolveConversationKey(event, ctx, cache);
-
-      if (hookName === 'before_tool_call') {
-        const fp = toolParamsFingerprint(event);
-        if (fp && route.routeKind === 'conversation') {
-          cache.seedToolCall(fp, route.conversationKey);
-        }
-      }
-
-      if (hookName === 'after_tool_call') {
-        let finalRoute = route;
-        if (route.routeKind === 'orphan') {
-          const fp = toolParamsFingerprint(event);
-          if (fp) {
-            const cached = cache.lookupToolCall(fp);
-            if (cached) {
-              finalRoute = {
-                conversationKey: cached,
-                routeKind: 'conversation',
-                routeReason: 'toolCall-cached-afterRetry',
-              };
-            }
-          }
-        }
-        toolDedup.receive(event, ctxWithHook, finalRoute, userId);
-        return;
-      }
-
-      emit(event, ctxWithHook, route, userId);
-    }
-
-    // --- Session hooks ---
-    api.on('session_start', (event: any, ctx: any) => { observe('session_start', event, ctx); });
-    api.on('session_end', (event: any, ctx: any) => { observe('session_end', event, ctx); });
-
-    // --- Message hooks ---
-    api.on('message_received', (event: any, ctx: any) => { observe('message_received', event, ctx); });
-    api.on('message_sending', (event: any, ctx: any) => { observe('message_sending', event, ctx); });
-    api.on('message_sent', (event: any, ctx: any) => { observe('message_sent', event, ctx); });
-
-    // --- Agent hooks ---
-    api.on('llm_input', (event: any, ctx: any) => { observe('llm_input', event, ctx); });
-    api.on('llm_output', (event: any, ctx: any) => { observe('llm_output', event, ctx); });
-    api.on('before_compaction', (event: any, ctx: any) => { observe('before_compaction', event, ctx); });
-    api.on('after_compaction', (event: any, ctx: any) => { observe('after_compaction', event, ctx); });
-    api.on('before_reset', (event: any, ctx: any) => { observe('before_reset', event, ctx); });
-
-    // Agent (modifying, return void — observe only)
-    api.on('before_model_resolve', (event: any, ctx: any) => { observe('before_model_resolve', event, ctx); });
-    api.on('before_prompt_build', (event: any, ctx: any) => { observe('before_prompt_build', event, ctx); });
-    api.on('before_agent_start', (event: any, ctx: any) => { observe('before_agent_start', event, ctx); });
-
-    // Tool hooks
-    api.on('before_tool_call', (event: any, ctx: any) => { observe('before_tool_call', event, ctx); });
-    api.on('after_tool_call', (event: any, ctx: any) => { observe('after_tool_call', event, ctx); });
-
-    // --- Sync hooks ---
-    api.on('tool_result_persist', (event: any, ctx: any) => { observe('tool_result_persist', event, ctx); });
-    api.on('before_message_write', (event: any, ctx: any) => { observe('before_message_write', event, ctx); });
-
-    // --- Subagent hooks ---
-    api.on('subagent_spawning', (event: any, ctx: any) => { observe('subagent_spawning', event, ctx); });
-    api.on('subagent_delivery_target', (event: any, ctx: any) => { observe('subagent_delivery_target', event, ctx); });
-    api.on('subagent_spawned', (event: any, ctx: any) => { observe('subagent_spawned', event, ctx); });
-    api.on('subagent_ended', (event: any, ctx: any) => { observe('subagent_ended', event, ctx); });
-
-    // --- Gateway hooks (system stream) ---
-    api.on('gateway_start', (event: any, ctx: any) => { observe('gateway_start', event, ctx, 'system'); });
-
-    // --- Flush hooks (async — await write + flush before shutdown) ---
-
+    // --- agent_end: ingest delta ---
     api.on('agent_end', async (event: any, ctx: any) => {
+      const sessionId = ctx?.sessionId ?? ctx?.sessionKey;
+      if (!sessionId || !event?.messages?.length) return;
+
+      const lastCount = progress[sessionId] ?? 0;
+      // Handle count shrink (e.g. compaction) — re-ingest from start
+      const startIdx = event.messages.length < lastCount ? 0 : lastCount;
+      if (startIdx >= event.messages.length) return;
+
       try {
-        const userId = event?.from ?? ctx?.userId ?? undefined;
-        const ctxWithHook = ctx ? { ...ctx, _hookName: 'agent_end' } : { _hookName: 'agent_end' };
-        const route = resolveConversationKey(event, ctx, cache);
-        await store.append({
-          hook: 'agent_end',
-          event: event ?? {},
-          ctx: ctxWithHook,
-          conversationKey: route.conversationKey,
-          routeKind: route.routeKind,
-          routeReason: route.routeReason,
-          userId,
-        });
-        toolDedup.flush();
-        await store.flush();
+        const agentId = ctx?.agentId ?? 'main';
+        ensureAgent(agentId);
+
+        const delta = event.messages.slice(startIdx);
+        const turns = normalizeMessages(delta);
+        if (turns.length === 0) {
+          progress[sessionId] = event.messages.length;
+          await saveProgress();
+          return;
+        }
+
+        const redacted = turns.map((t) => ({ role: t.role, content: redact(t.content) }));
+        await mem.agent(agentId).add(redacted, { userId: ctx?.userId });
+        progress[sessionId] = event.messages.length;
+        await saveProgress();
+
+        api.logger.info(`claw-contexto: ingested ${redacted.length} turns`);
       } catch (err) {
-        api.logger.warn(`claw-contexto: agent_end: ${String(err)}`);
+        api.logger.warn(`claw-contexto: ingest failed: ${String(err)}`);
       }
     });
 
-    api.on('gateway_stop', async (event: any, ctx: any) => {
+    // --- before_prompt_build: recall ---
+    api.on('before_prompt_build', async (event: any, ctx: any) => {
       try {
-        const route: RouteResult = {
-          conversationKey: `system-${todayDate()}`,
-          routeKind: 'system',
-          routeReason: 'system-hook',
-        };
-        await store.append({
-          hook: 'gateway_stop',
-          event: event ?? {},
-          ctx: ctx ? { ...ctx, _hookName: 'gateway_stop' } : { _hookName: 'gateway_stop' },
-          conversationKey: route.conversationKey,
-          routeKind: route.routeKind,
-          routeReason: route.routeReason,
-        });
-        toolDedup.flush();
-        await store.flush();
+        const agentId = ctx?.agentId ?? 'main';
+        if (!knownAgents.has(agentId)) return;
+
+        const query = lastUserMessage(event?.messages ?? []);
+        if (!query) return;
+
+        const results = await mem.agent(agentId).search(query, { userId: ctx?.userId });
+        if (results.length === 0) return;
+
+        let block = results
+          .slice(0, 5)
+          .map((r: any) => `- ${r.content}`)
+          .join('\n');
+
+        if (block.length > MAX_PREPEND_CHARS) block = block.slice(0, MAX_PREPEND_CHARS) + '…';
+
+        return { prependContext: `## Relevant memories\n${block}` };
       } catch (err) {
-        api.logger.warn(`claw-contexto: gateway_stop: ${String(err)}`);
+        api.logger.warn(`claw-contexto: recall failed: ${String(err)}`);
       }
     });
 
-    api.logger.info(`claw-contexto: storing events to ${dataDir}`);
+    api.logger.info(`claw-contexto: memory at ${dbPath}`);
   },
 };

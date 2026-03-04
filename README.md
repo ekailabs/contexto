@@ -4,14 +4,14 @@
 [![GitHub stars](https://img.shields.io/github/stars/ekailabs/ekai-gateway.svg?style=social)](https://github.com/ekailabs/ekai-gateway)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.com/invite/5VsUUEfbJk)
 
-Context engine for AI agents — event capture, persistent memory, and attribution. Use it as an OpenClaw plugin, drop it in front of any OpenAI-compatible client as a proxy, or integrate the store directly into your own agent.
+Context engine for AI agents — persistent memory, recall, and attribution. Use it as an OpenClaw plugin, drop it in front of any OpenAI-compatible client as a proxy, or integrate the memory library directly into your own agent.
 
 **Designed for self-hosted personal use** — run your own instance, bring your own keys.
 
 ## Features
 
 - 📦 **Event store**: Structured JSONL capture of agent lifecycle events ([`@ekai/store`](./store/))
-- 🔌 **OpenClaw plugin**: Drop-in context engine for any OpenClaw agent ([`claw-contexto`](./integrations/openclaw/))
+- 🔌 **OpenClaw plugin**: Local-first memory for any OpenClaw agent ([`claw-contexto`](./integrations/openclaw/))
 - 🔀 **OpenRouter proxy**: OpenAI-compatible `/v1/chat/completions` with embedded memory
 - 📊 **Memory dashboard**: Browse, search, and manage stored memories
 - 🔑 **BYOK**: Bring your own API keys — per-instance or per-request
@@ -111,7 +111,7 @@ ekai-gateway/
 
 ## OpenClaw Plugin
 
-[`claw-contexto`](https://www.npmjs.com/package/claw-contexto) is an OpenClaw plugin that captures all 13 lifecycle events to structured JSONL storage (powered by [`@ekai/store`](./store/)). Install it in any OpenClaw instance:
+[`claw-contexto`](https://www.npmjs.com/package/claw-contexto) is an OpenClaw plugin that provides local-first memory — automatic ingest and recall powered by [`@ekai/memory`](./memory/). Install it in any OpenClaw instance:
 
 ```bash
 openclaw plugins install claw-contexto
@@ -125,7 +125,11 @@ Configure in your OpenClaw config:
     entries: {
       "claw-contexto": {
         enabled: true,
-        config: { "dataDir": "~/.openclaw/ekai/data" }
+        config: {
+          "dbPath": "~/.openclaw/ekai/memory.db",
+          "provider": "openai",
+          "apiKey": "sk-..."
+        }
       }
     }
   }
