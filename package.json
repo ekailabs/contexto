@@ -3,11 +3,11 @@
   "version": "0.1.0-beta.1",
   "description": "Ekai Gateway - AI proxy with memory and dashboard",
   "private": true,
-  "workspaces": ["store", "ui/dashboard", "memory", "integrations/openrouter", "integrations/openclaw"],
+  "workspaces": ["ui/dashboard", "memory", "integrations/openrouter", "integrations/openclaw"],
   "scripts": {
     "dev": "node scripts/launcher.js --mode dev",
     "start": "node scripts/launcher.js --mode start",
-    "build": "npm install --workspaces && npm run build --workspace=store && npm run build --workspaces --if-present",
+    "build": "npm install --workspaces && npm run build --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "test": "npm run test --workspace=@ekai/openrouter",
     "dev:ui": "npm run dev --workspace=ui/dashboard",

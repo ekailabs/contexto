@@ -10,7 +10,6 @@ Context engine for AI agents — persistent memory, recall, and attribution. Use
 
 ## Features
 
-- 📦 **Event store**: Structured JSONL capture of agent lifecycle events ([`@ekai/store`](./store/))
 - 🔌 **OpenClaw plugin**: Local-first memory for any OpenClaw agent ([`claw-contexto`](./integrations/openclaw/))
 - 🔀 **OpenRouter proxy**: OpenAI-compatible `/v1/chat/completions` with embedded memory
 - 📊 **Memory dashboard**: Browse, search, and manage stored memories
@@ -98,7 +97,6 @@ ENABLE_OPENROUTER=true   # proxy + memory APIs (default: true)
 
 ```
 ekai-gateway/
-├── store/                # JSONL event storage library (@ekai/store)
 ├── integrations/
 │   ├── openrouter/       # Proxy server with embedded memory (@ekai/openrouter)
 │   └── openclaw/         # OpenClaw lifecycle plugin (claw-contexto)
