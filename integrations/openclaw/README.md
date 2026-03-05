@@ -40,9 +40,20 @@ In your OpenClaw config:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `dbPath` | `~/.openclaw/ekai/memory.db` | Path to SQLite memory file |
-| `provider` | (env-based) | LLM provider for extraction/embedding (`openai`, `gemini`, `openrouter`) |
-| `apiKey` | (env-based) | API key for the selected provider |
+| `provider` | (auto-detected) | LLM provider for extraction/embedding (`openai`, `gemini`, `openrouter`) |
+| `apiKey` | (auto-detected) | API key for the selected provider |
 | `bootstrapDelayMs` | `1000` | Milliseconds to wait between sessions during bootstrap backfill |
+
+### Provider auto-detection
+
+When `provider` and `apiKey` are not explicitly configured, the plugin auto-detects from environment variables:
+
+1. **Both `provider` + `apiKey` in config** — used as-is
+2. **Only `provider` in config** — API key resolved from the provider's env var (e.g. `OPENAI_API_KEY`)
+3. **Only `apiKey` in config** — ignored with a warning (ambiguous without provider)
+4. **`MEMORY_EMBED_PROVIDER` or `MEMORY_EXTRACT_PROVIDER` set** — defers to `@ekai/memory` core
+5. **Auto-detect from env** — checks `OPENAI_API_KEY` → `GOOGLE_API_KEY` → `OPENROUTER_API_KEY` (first match wins)
+6. **Nothing found** — passes no provider, lets core handle the error
 
 ## Verify
 

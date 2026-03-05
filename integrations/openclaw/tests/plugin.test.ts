@@ -27,7 +27,10 @@ import plugin, {
   redact,
   lastUserMessage,
   loadProgress,
+  resolveMemoryProvider,
 } from '../src/index';
+
+import { Memory } from '@ekai/memory';
 
 // --- extractText ---
 
@@ -212,14 +215,14 @@ describe('delta tracking', () => {
   });
 });
 
-// --- Hook behavior ---
+// --- Hook behavior + shared helpers ---
 
 function createApi(tmpDir: string) {
   const handlers: Record<string, Function> = {};
   const commands: Record<string, any> = {};
   return {
     resolvePath: () => join(tmpDir, 'memory.db'),
-    pluginConfig: {},
+    pluginConfig: {} as any,
     on: vi.fn((hook: string, handler: Function) => { handlers[hook] = handler; }),
     registerCommand: vi.fn((cmd: any) => { commands[cmd.name] = cmd; }),
     logger: { info: vi.fn(), warn: vi.fn() },
@@ -227,6 +230,148 @@ function createApi(tmpDir: string) {
     _command: (name: string) => commands[name],
   };
 }
+
+// --- resolveMemoryProvider ---
+
+describe('resolveMemoryProvider', () => {
+  const logger = { info: vi.fn(), warn: vi.fn() };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+  });
+
+  it('returns explicit config when both provider and apiKey set', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'env-key');
+    const result = resolveMemoryProvider({ provider: 'gemini', apiKey: 'explicit' }, logger);
+    expect(result).toEqual({ provider: 'gemini', apiKey: 'explicit', source: 'config' });
+  });
+
+  it('auto-detects openai from env when no config', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'oai-key');
+    const result = resolveMemoryProvider({}, logger);
+    expect(result).toEqual({ provider: 'openai', apiKey: 'oai-key', source: 'env' });
+  });
+
+  it('auto-detects gemini when only GOOGLE_API_KEY set', () => {
+    const result = resolveMemoryProvider({}, logger);
+    // no env keys → undefined
+    expect(result).toBeUndefined();
+
+    vi.stubEnv('GOOGLE_API_KEY', 'goog-key');
+    const result2 = resolveMemoryProvider({}, logger);
+    expect(result2).toEqual({ provider: 'gemini', apiKey: 'goog-key', source: 'env' });
+  });
+
+  it('resolves key from env when only provider configured', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'oai-key');
+    const result = resolveMemoryProvider({ provider: 'openai' }, logger);
+    expect(result).toEqual({ provider: 'openai', apiKey: 'oai-key', source: 'config+env' });
+  });
+
+  it('warns when provider configured but env key missing', () => {
+    const result = resolveMemoryProvider({ provider: 'openai' }, logger);
+    expect(result).toBeUndefined();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("provider 'openai' configured but OPENAI_API_KEY not set"),
+    );
+  });
+
+  it('warns and ignores apiKey without provider', () => {
+    const result = resolveMemoryProvider({ apiKey: 'orphan-key' }, logger);
+    expect(result).toBeUndefined();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('apiKey configured without provider'),
+    );
+  });
+
+  it('defers to core when MEMORY_EMBED_PROVIDER is set', () => {
+    vi.stubEnv('MEMORY_EMBED_PROVIDER', 'openai');
+    vi.stubEnv('OPENAI_API_KEY', 'oai-key');
+    const result = resolveMemoryProvider({}, logger);
+    expect(result).toBeUndefined();
+  });
+
+  it('defers to core when MEMORY_EXTRACT_PROVIDER is set', () => {
+    vi.stubEnv('MEMORY_EXTRACT_PROVIDER', 'gemini');
+    vi.stubEnv('GOOGLE_API_KEY', 'goog-key');
+    const result = resolveMemoryProvider({}, logger);
+    expect(result).toBeUndefined();
+  });
+});
+
+describe('plugin.register provider logging', () => {
+  let tmpDir: string;
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('logs provider and source when auto-detected', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'oai-key');
+    tmpDir = join(tmpdir(), `claw-prov-${Date.now()}`);
+    mkdirSync(tmpDir, { recursive: true });
+    mockGetAgents.mockReturnValue([]);
+    mockAddAgent.mockImplementation((id: string, opts?: any) => ({ id, name: opts?.name }));
+    mockAgent.mockReturnValue({ add: mockAdd, search: mockSearch });
+
+    const api = createApi(tmpDir);
+    plugin.register(api);
+
+    expect(api.logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('(openai via env)'),
+    );
+  });
+
+  it('logs provider and source from explicit config', () => {
+    tmpDir = join(tmpdir(), `claw-prov-${Date.now()}`);
+    mkdirSync(tmpDir, { recursive: true });
+    mockGetAgents.mockReturnValue([]);
+    mockAddAgent.mockImplementation((id: string, opts?: any) => ({ id, name: opts?.name }));
+    mockAgent.mockReturnValue({ add: mockAdd, search: mockSearch });
+
+    const api = createApi(tmpDir);
+    api.pluginConfig = { provider: 'gemini', apiKey: 'gk' };
+    plugin.register(api);
+
+    expect(api.logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('(gemini via config)'),
+    );
+  });
+
+  it('passes resolved provider/apiKey to Memory constructor', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'oai-key');
+    tmpDir = join(tmpdir(), `claw-prov-${Date.now()}`);
+    mkdirSync(tmpDir, { recursive: true });
+    mockGetAgents.mockReturnValue([]);
+    mockAddAgent.mockImplementation((id: string, opts?: any) => ({ id, name: opts?.name }));
+    mockAgent.mockReturnValue({ add: mockAdd, search: mockSearch });
+
+    const api = createApi(tmpDir);
+    plugin.register(api);
+
+    expect(Memory).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'openai', apiKey: 'oai-key' }),
+    );
+  });
+
+  it('omits provider/apiKey from Memory when nothing resolved', () => {
+    tmpDir = join(tmpdir(), `claw-prov-${Date.now()}`);
+    mkdirSync(tmpDir, { recursive: true });
+    mockGetAgents.mockReturnValue([]);
+    mockAddAgent.mockImplementation((id: string, opts?: any) => ({ id, name: opts?.name }));
+    mockAgent.mockReturnValue({ add: mockAdd, search: mockSearch });
+
+    const api = createApi(tmpDir);
+    plugin.register(api);
+
+    const callArg = (Memory as any).mock.calls.at(-1)?.[0];
+    expect(callArg).not.toHaveProperty('provider');
+    expect(callArg).not.toHaveProperty('apiKey');
+  });
+});
 
 describe('plugin.register', () => {
   let tmpDir: string;
