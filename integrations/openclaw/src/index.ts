@@ -1,4 +1,4 @@
-import { Memory } from '@ekai/memory';
+import { Memory, type ProviderName } from '@ekai/memory';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { writeFile, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -55,6 +55,65 @@ export function loadProgress(path: string): BootstrapProgress {
   }
 }
 
+// --- Provider auto-detection ---
+
+const PROVIDER_ENV_KEYS: Record<ProviderName, string> = {
+  openai: 'OPENAI_API_KEY',
+  gemini: 'GOOGLE_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+};
+
+const AUTO_DETECT_ORDER: Array<{ env: string; provider: ProviderName }> = [
+  { env: 'OPENAI_API_KEY', provider: 'openai' },
+  { env: 'GOOGLE_API_KEY', provider: 'gemini' },
+  { env: 'OPENROUTER_API_KEY', provider: 'openrouter' },
+];
+
+export function resolveMemoryProvider(
+  pluginConfig: any,
+  logger: { info(m: string): void; warn(m: string): void },
+): { provider: ProviderName; apiKey: string; source: string } | undefined {
+  const cfgProvider = pluginConfig?.provider;
+  const cfgApiKey = pluginConfig?.apiKey;
+
+  // Case 1: both explicit
+  if (cfgProvider && cfgApiKey) {
+    return { provider: cfgProvider as ProviderName, apiKey: cfgApiKey, source: 'config' };
+  }
+
+  // Case 2: provider only → resolve key from env
+  if (cfgProvider && !cfgApiKey) {
+    const envVar = PROVIDER_ENV_KEYS[cfgProvider];
+    const key = envVar && process.env[envVar];
+    if (key) {
+      return { provider: cfgProvider as ProviderName, apiKey: key, source: 'config+env' };
+    }
+    logger.warn(`claw-contexto: provider '${cfgProvider}' configured but ${envVar ?? 'API key env var'} not set`);
+    return undefined;
+  }
+
+  // Case 3: apiKey only → ambiguous, warn and ignore
+  if (!cfgProvider && cfgApiKey) {
+    logger.warn('claw-contexto: apiKey configured without provider — ignoring (set provider to use it)');
+  }
+
+  // Case 4: defer to core if MEMORY_*_PROVIDER is set
+  if (process.env.MEMORY_EMBED_PROVIDER || process.env.MEMORY_EXTRACT_PROVIDER) {
+    return undefined;
+  }
+
+  // Case 5: auto-detect from env keys
+  for (const { env, provider } of AUTO_DETECT_ORDER) {
+    const key = process.env[env];
+    if (key) {
+      return { provider, apiKey: key, source: 'env' };
+    }
+  }
+
+  // Case 6: nothing found, let core handle
+  return undefined;
+}
+
 // --- Plugin definition ---
 
 export default {
@@ -74,9 +133,9 @@ export default {
   register(api: any) {
     const dbPath = api.resolvePath(api.pluginConfig?.dbPath ?? '~/.openclaw/ekai/memory.db');
     mkdirSync(dirname(dbPath), { recursive: true });
+    const resolved = resolveMemoryProvider(api.pluginConfig, api.logger);
     const mem = new Memory({
-      provider: api.pluginConfig?.provider,
-      apiKey: api.pluginConfig?.apiKey,
+      ...(resolved ? { provider: resolved.provider, apiKey: resolved.apiKey } : {}),
       dbPath,
     });
 
@@ -205,6 +264,7 @@ export default {
       },
     });
 
-    api.logger.info(`claw-contexto: memory at ${dbPath}`);
+    const providerInfo = resolved ? ` (${resolved.provider} via ${resolved.source})` : '';
+    api.logger.info(`claw-contexto: memory at ${dbPath}${providerInfo}`);
   },
 };
