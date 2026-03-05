@@ -216,12 +216,15 @@ describe('delta tracking', () => {
 
 function createApi(tmpDir: string) {
   const handlers: Record<string, Function> = {};
+  const commands: Record<string, any> = {};
   return {
     resolvePath: () => join(tmpDir, 'memory.db'),
     pluginConfig: {},
     on: vi.fn((hook: string, handler: Function) => { handlers[hook] = handler; }),
+    registerCommand: vi.fn((cmd: any) => { commands[cmd.name] = cmd; }),
     logger: { info: vi.fn(), warn: vi.fn() },
     _trigger: async (hook: string, ...args: any[]) => handlers[hook]?.(...args),
+    _command: (name: string) => commands[name],
   };
 }
 
@@ -398,7 +401,7 @@ describe('plugin.register', () => {
       const progressPath = join(tmpDir, 'memory.progress.json');
       expect(existsSync(progressPath)).toBe(true);
       const data = JSON.parse(readFileSync(progressPath, 'utf-8'));
-      expect(data['sess-1']).toBe(2);
+      expect(data['main:sess-1']).toBe(2);
     });
 
     it('redacts secrets before ingesting', async () => {

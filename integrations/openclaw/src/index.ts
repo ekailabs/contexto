@@ -2,6 +2,8 @@ import { Memory } from '@ekai/memory';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { writeFile, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import os from 'node:os';
+import { runBootstrap, type BootstrapProgress } from './bootstrap.js';
 
 // --- Inline helpers ---
 
@@ -45,7 +47,7 @@ export function lastUserMessage(messages: unknown[]): string | undefined {
   }
 }
 
-export function loadProgress(path: string): Record<string, number> {
+export function loadProgress(path: string): BootstrapProgress {
   try {
     return JSON.parse(readFileSync(path, 'utf-8'));
   } catch {
@@ -92,7 +94,7 @@ export default {
 
     // --- Delta tracking (persisted) ---
     const progressPath = dbPath.replace(/\.db$/, '') + '.progress.json';
-    const progress: Record<string, number> = loadProgress(progressPath);
+    const progress: BootstrapProgress = loadProgress(progressPath);
 
     async function saveProgress() {
       const tmp = progressPath + '.tmp';
@@ -107,26 +109,27 @@ export default {
       const sessionId = ctx?.sessionId ?? ctx?.sessionKey;
       if (!sessionId || !event?.messages?.length) return;
 
-      const lastCount = progress[sessionId] ?? 0;
+      const agentId = ctx?.agentId ?? 'main';
+      const progressKey = `${agentId}:${sessionId}`;
+      const lastCount = (progress[progressKey] as number) ?? 0;
       // Handle count shrink (e.g. compaction) — re-ingest from start
       const startIdx = event.messages.length < lastCount ? 0 : lastCount;
       if (startIdx >= event.messages.length) return;
 
       try {
-        const agentId = ctx?.agentId ?? 'main';
         ensureAgent(agentId);
 
         const delta = event.messages.slice(startIdx);
         const turns = normalizeMessages(delta);
         if (turns.length === 0) {
-          progress[sessionId] = event.messages.length;
+          progress[progressKey] = event.messages.length;
           await saveProgress();
           return;
         }
 
         const redacted = turns.map((t) => ({ role: t.role, content: redact(t.content) }));
         await mem.agent(agentId).add(redacted, { userId: ctx?.userId });
-        progress[sessionId] = event.messages.length;
+        progress[progressKey] = event.messages.length;
         await saveProgress();
 
         api.logger.info(`claw-contexto: ingested ${redacted.length} turns`);
@@ -158,6 +161,48 @@ export default {
       } catch (err) {
         api.logger.warn(`claw-contexto: recall failed: ${String(err)}`);
       }
+    });
+
+    // --- /memory-bootstrap command ---
+    api.registerCommand({
+      name: 'memory-bootstrap',
+      description: 'Backfill existing session history into memory',
+      acceptsArgs: false,
+      requireAuth: true,
+      handler: async () => {
+        if (progress.__bootstrap?.status === 'done') {
+          return { text: 'Bootstrap already completed.' };
+        }
+        if (progress.__bootstrap?.status === 'running') {
+          return { text: 'Bootstrap already in progress.' };
+        }
+
+        const stateDir = api.runtime?.state?.resolveStateDir?.(process.env, os.homedir());
+        if (!stateDir) {
+          return { text: 'Could not resolve state directory.' };
+        }
+
+        progress.__bootstrap = { status: 'running', startedAt: Date.now() };
+        await saveProgress();
+
+        runBootstrap({
+          stateDir,
+          mem,
+          progress,
+          saveProgress,
+          logger: api.logger,
+          ensureAgent,
+          delayMs: Math.max(0, Number(api.pluginConfig?.bootstrapDelayMs) || 1000),
+        })
+          .then((r) => api.logger.info(`claw-contexto: bootstrap done — ${r.sessionsProcessed} sessions`))
+          .catch((err) => {
+            api.logger.warn(`claw-contexto: bootstrap failed: ${err}`);
+            progress.__bootstrap = undefined;
+            saveProgress();
+          });
+
+        return { text: 'Memory bootstrap started. Check logs for progress.' };
+      },
     });
 
     api.logger.info(`claw-contexto: memory at ${dbPath}`);

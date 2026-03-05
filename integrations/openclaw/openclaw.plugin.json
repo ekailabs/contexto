@@ -6,7 +6,8 @@
     "properties": {
       "dbPath": { "type": "string" },
       "provider": { "type": "string" },
-      "apiKey": { "type": "string" }
+      "apiKey": { "type": "string" },
+      "bootstrapDelayMs": { "type": "number" }
     }
   },
   "uiHints": {
@@ -21,6 +22,11 @@
     "apiKey": {
       "label": "API key",
       "description": "API key for the selected provider"
+    },
+    "bootstrapDelayMs": {
+      "label": "Bootstrap delay",
+      "description": "ms between sessions during backfill (default: 1000)",
+      "advanced": true
     }
   }
 }

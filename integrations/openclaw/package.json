@@ -1,6 +1,6 @@
 {
   "name": "claw-contexto",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "OpenClaw plugin — local-first memory for context recall and ingest",
   "type": "module",
   "license": "MIT",
