@@ -1,4 +1,4 @@
-# claw-contexto
+# @ekai/contexto
 
 OpenClaw plugin that provides local-first memory — ingest conversation turns and recall relevant context automatically.
 
@@ -7,7 +7,7 @@ Uses [`@ekai/memory`](../../memory/) for semantic extraction, embedding, and SQL
 ## Install
 
 ```bash
-openclaw plugins install claw-contexto
+openclaw plugins install @ekai/contexto
 ```
 
 Or from source:
@@ -22,9 +22,9 @@ In your OpenClaw config:
 ```json5
 {
   plugins: {
-    allow: ["claw-contexto"],
+    allow: ["@ekai/contexto"],
     entries: {
-      "claw-contexto": {
+      "@ekai/contexto": {
         enabled: true,
         config: {
           "dbPath": "~/.openclaw/ekai/memory.db",
@@ -58,8 +58,8 @@ When `provider` and `apiKey` are not explicitly configured, the plugin auto-dete
 ## Verify
 
 ```bash
-openclaw plugins list       # should show claw-contexto
-openclaw hooks list         # should show plugin:claw-contexto:* hooks
+openclaw plugins list       # should show @ekai/contexto
+openclaw hooks list         # should show plugin:@ekai/contexto:* hooks
 ```
 
 ## Bootstrap

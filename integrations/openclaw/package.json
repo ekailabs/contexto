@@ -1,9 +1,12 @@
 {
-  "name": "claw-contexto",
-  "version": "0.2.3",
+  "name": "@ekai/contexto",
+  "version": "0.1.1",
   "description": "OpenClaw plugin — local-first memory for context recall and ingest",
   "type": "module",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "src/index.ts",
   "files": [
     "src/",
@@ -20,7 +23,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/ekai-labs/ekai-gateway",
+    "url": "https://github.com/ekailabs/contexto",
     "directory": "integrations/openclaw"
   },
   "author": "Ekai Labs",
