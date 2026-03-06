@@ -4,6 +4,10 @@
 [![GitHub stars](https://img.shields.io/github/stars/ekailabs/ekai-gateway.svg?style=social)](https://github.com/ekailabs/ekai-gateway)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.com/invite/5VsUUEfbJk)
 
+Archieved Repo:
+For our latest work, check https://github.com/ekailabs/contexto
+
+
 Multi-provider AI proxy with usage dashboard supporting Anthropic, OpenAI, Google Gemini, xAI, and OpenRouter models through OpenAI-compatible and Anthropic-compatible APIs.
 
 **Designed for self-hosted personal use** - run your own instance to securely proxy AI requests using your API keys.
