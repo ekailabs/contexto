@@ -1,16 +1,32 @@
 {
-  "id": "ekai-contexto",
+  "id": "claw-contexto",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "dataDir": { "type": "string" }
+      "dbPath": { "type": "string" },
+      "provider": { "type": "string" },
+      "apiKey": { "type": "string" },
+      "bootstrapDelayMs": { "type": "number" }
     }
   },
   "uiHints": {
-    "dataDir": {
-      "label": "Event data directory",
-      "description": "Directory for structured JSONL event storage (one file per session)"
+    "dbPath": {
+      "label": "Memory database path",
+      "description": "Path to SQLite memory file (default: ~/.openclaw/ekai/memory.db)"
+    },
+    "provider": {
+      "label": "LLM provider",
+      "description": "Provider for extraction and embedding (openai, gemini, openrouter)"
+    },
+    "apiKey": {
+      "label": "API key",
+      "description": "API key for the selected provider"
+    },
+    "bootstrapDelayMs": {
+      "label": "Bootstrap delay",
+      "description": "ms between sessions during backfill (default: 1000)",
+      "advanced": true
     }
   }
 }

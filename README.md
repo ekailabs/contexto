@@ -4,16 +4,16 @@
 [![GitHub stars](https://img.shields.io/github/stars/ekailabs/ekai-gateway.svg?style=social)](https://github.com/ekailabs/ekai-gateway)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.com/invite/5VsUUEfbJk)
 
-OpenRouter proxy with embedded agent memory and a management dashboard. Drop it in front of any OpenAI-compatible client and your AI tools gain persistent memory across conversations.
+Context engine for AI agents — persistent memory, recall, and attribution. Use it as an OpenClaw plugin, drop it in front of any OpenAI-compatible client as a proxy, or integrate the memory library directly into your own agent.
 
-**Designed for self-hosted personal use** — run your own instance using your OpenRouter API key.
+**Designed for self-hosted personal use** — run your own instance, bring your own keys.
 
 ## Features
 
-- 🔀 **OpenRouter proxy**: Full OpenAI-compatible `/v1/chat/completions` endpoint
-- 🧠 **Embedded memory**: Automatically stores and injects relevant context from past conversations
+- 🔌 **OpenClaw plugin**: Local-first memory for any OpenClaw agent ([`claw-contexto`](./integrations/openclaw/))
+- 🔀 **OpenRouter proxy**: OpenAI-compatible `/v1/chat/completions` with embedded memory
 - 📊 **Memory dashboard**: Browse, search, and manage stored memories
-- 🔑 **BYOK**: Bring your own OpenRouter API key — or pass a key per-request
+- 🔑 **BYOK**: Bring your own API keys — per-instance or per-request
 
 ## Quick Start
 
@@ -97,10 +97,9 @@ ENABLE_OPENROUTER=true   # proxy + memory APIs (default: true)
 
 ```
 ekai-gateway/
-├── store/                # JSONL event storage library (@ekai/store)
 ├── integrations/
 │   ├── openrouter/       # Proxy server with embedded memory (@ekai/openrouter)
-│   └── openclaw/         # OpenClaw lifecycle plugin (@ekai/contexto)
+│   └── openclaw/         # OpenClaw lifecycle plugin (claw-contexto)
 ├── memory/               # Agent memory library (@ekai/memory)
 ├── ui/dashboard/         # Memory management dashboard (Next.js)
 ├── scripts/
@@ -110,21 +109,25 @@ ekai-gateway/
 
 ## OpenClaw Plugin
 
-[`@ekai/contexto`](https://www.npmjs.com/package/@ekai/contexto) is an OpenClaw plugin that captures all 13 lifecycle events to structured JSONL storage (powered by [`@ekai/store`](./store/)). Install it in any OpenClaw instance:
+[`claw-contexto`](https://www.npmjs.com/package/claw-contexto) is an OpenClaw plugin that provides local-first memory — automatic ingest and recall powered by [`@ekai/memory`](./memory/). Install it in any OpenClaw instance:
 
 ```bash
-openclaw plugins install @ekai/contexto
+openclaw plugins install claw-contexto
 ```
 
 Configure in your OpenClaw config:
 ```json5
 {
   plugins: {
-    allow: ["ekai-contexto"],
+    allow: ["claw-contexto"],
     entries: {
-      "ekai-contexto": {
+      "claw-contexto": {
         enabled: true,
-        config: { "dataDir": "~/.openclaw/ekai/data" }
+        config: {
+          "dbPath": "~/.openclaw/ekai/memory.db",
+          "provider": "openai",
+          "apiKey": "sk-..."
+        }
       }
     }
   }

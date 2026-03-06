@@ -1,13 +1,18 @@
-# @ekai/contexto
+# claw-contexto
 
-OpenClaw plugin that captures all 13 lifecycle events to structured JSONL storage. Built for context, memory, and analytics.
+OpenClaw plugin that provides local-first memory — ingest conversation turns and recall relevant context automatically.
 
-Uses [`@ekai/store`](../../store/) for event normalization, safe serialization, and per-session file organization.
+Uses [`@ekai/memory`](../../memory/) for semantic extraction, embedding, and SQLite storage.
 
 ## Install
 
 ```bash
-openclaw plugins install @ekai/contexto
+openclaw plugins install claw-contexto
+```
+
+Or from source:
+```bash
+openclaw plugins install ./integrations/openclaw
 ```
 
 ## Configure
@@ -17,86 +22,76 @@ In your OpenClaw config:
 ```json5
 {
   plugins: {
-    allow: ["ekai-contexto"],
+    allow: ["claw-contexto"],
     entries: {
-      "ekai-contexto": {
+      "claw-contexto": {
         enabled: true,
-        config: { "dataDir": "~/.openclaw/ekai/data" }
+        config: {
+          "dbPath": "~/.openclaw/ekai/memory.db",
+          "provider": "openai",
+          "apiKey": "sk-..."
+        }
       }
     }
   }
 }
 ```
 
-`dataDir` defaults to `~/.openclaw/ekai/data` if not set.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `dbPath` | `~/.openclaw/ekai/memory.db` | Path to SQLite memory file |
+| `provider` | (auto-detected) | LLM provider for extraction/embedding (`openai`, `gemini`, `openrouter`) |
+| `apiKey` | (auto-detected) | API key for the selected provider |
+| `bootstrapDelayMs` | `1000` | Milliseconds to wait between sessions during bootstrap backfill |
+
+### Provider auto-detection
+
+When `provider` and `apiKey` are not explicitly configured, the plugin auto-detects from environment variables:
+
+1. **Both `provider` + `apiKey` in config** — used as-is
+2. **Only `provider` in config** — API key resolved from the provider's env var (e.g. `OPENAI_API_KEY`)
+3. **Only `apiKey` in config** — ignored with a warning (ambiguous without provider)
+4. **`MEMORY_EMBED_PROVIDER` or `MEMORY_EXTRACT_PROVIDER` set** — defers to `@ekai/memory` core
+5. **Auto-detect from env** — checks `OPENAI_API_KEY` → `GOOGLE_API_KEY` → `OPENROUTER_API_KEY` (first match wins)
+6. **Nothing found** — passes no provider, lets core handle the error
 
 ## Verify
 
 ```bash
-openclaw plugins list       # should show ekai-contexto
-openclaw hooks list          # should show plugin:ekai-contexto:contexto:* hooks
+openclaw plugins list       # should show claw-contexto
+openclaw hooks list         # should show plugin:claw-contexto:* hooks
 ```
 
-## Storage Layout
+## Bootstrap
 
-Events are organized as one JSONL file per session, grouped by agent:
+If the plugin is installed on an existing OpenClaw instance with historical conversations, use the `/memory-bootstrap` slash command to backfill all session transcripts into memory:
 
 ```
-{dataDir}/
-  {agent_id}/
-    {session_id}.jsonl
+/memory-bootstrap
 ```
 
-IDs are sanitized for safe file paths (`[a-zA-Z0-9_-]` + 8-char SHA-256 hash suffix). Missing IDs fall back to `_unknown-agent` / `_unknown-session`.
+Bootstrap scans `{stateDir}/agents/*/sessions/*.jsonl`, parses each session, and ingests the messages. Progress is tracked per-session so it can resume if interrupted. Running the command again after completion returns immediately. Configure `bootstrapDelayMs` to control pacing.
 
-Each line is a JSON object with a versioned schema:
+## How It Works
 
-```json
-{"id":"...","v":1,"eventTs":1709500000000,"ingestTs":1709500000050,"hook":"llm_output","sessionId":"abc-3f2a1b9c","agentId":"default-8e4c7d1a","event":{...},"ctx":{...}}
-```
+Two hooks and a slash command:
 
-## What It Captures
+1. **`agent_end`** — Ingests new conversation turns into memory (ongoing). Normalizes messages (user + assistant only), redacts secrets, extracts semantic memories via `@ekai/memory`. Only processes the delta since the last ingestion.
 
-All 13 OpenClaw lifecycle hooks:
+2. **`before_prompt_build`** — Recalls relevant memories for the current query and prepends them as context (capped at 2000 chars).
 
-| Hook | Description |
-|------|-------------|
-| `session_start` | Session opened |
-| `session_end` | Session closed |
-| `message_received` | Inbound message |
-| `message_sent` | Outbound message |
-| `before_prompt_build` | Pre-prompt state |
-| `llm_input` | LLM request |
-| `llm_output` | LLM response |
-| `before_tool_call` | Pre-tool invocation |
-| `after_tool_call` | Tool result |
-| `tool_result_persist` | Tool result persistence |
-| `agent_end` | Agent completion |
-| `before_compaction` | Pre-compaction state |
-| `after_compaction` | Post-compaction state |
+3. **`/memory-bootstrap`** — One-time backfill of all existing session transcripts. Scans the OpenClaw state directory for historical JSONL session files and ingests them into memory. Runs in the background with configurable delay between sessions. Idempotent — safe to re-run.
 
-Additional fields extracted per event: `sessionId`, `agentId`, `userId`, `conversationId`.
-
-## Design
-
-- **Structured storage** — one JSONL file per session via `@ekai/store` EventWriter
-- **Safe serialization** — handles circular refs, BigInt, Error objects (never throws)
-- **Never crashes OpenClaw** — every handler wrapped in try/catch
-- **Sync writes** — `appendFileSync` for `tool_result_persist` compatibility
-- **ID sanitization** — safe file paths with collision-resistant hashing
-- **Schema versioned** — every event carries `v: 1` for future migration
+Delta tracking is persisted to `{dbPath}.progress.json` using composite keys (`agentId:sessionId`) so only new messages are ingested, even across restarts. Both ongoing ingestion and bootstrap share the same progress file.
 
 ## Development
 
 ```bash
-# Type-check (no build needed — OpenClaw loads .ts via jiti)
-npm run type-check --workspace=@ekai/contexto
+# Type-check (no build needed -- OpenClaw loads .ts via jiti)
+npm run type-check --workspace=integrations/openclaw
 
-# Build the store dependency
-npm run build --workspace=store
-
-# Run store tests
-npm run test --workspace=store
+# Run tests
+npm test --workspace=integrations/openclaw
 
 # Local dev install (symlink)
 openclaw plugins install -l ./integrations/openclaw
