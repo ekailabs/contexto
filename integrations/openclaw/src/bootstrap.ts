@@ -73,7 +73,8 @@ export async function runBootstrap(opts: {
     const files = listJsonl(sessionsDir);
 
     for (const file of files) {
-      const compositeKey = `${agentId}:${file}`;
+      const sessionId = basename(file, '.jsonl');
+      const compositeKey = `${agentId}:${sessionId}`;
       if (compositeKey in progress) continue;
 
       const filePath = join(sessionsDir, file);

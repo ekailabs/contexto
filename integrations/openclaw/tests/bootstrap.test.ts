@@ -79,7 +79,7 @@ describe('runBootstrap', () => {
 
     expect(result.sessionsProcessed).toBe(1);
     expect(progress.__bootstrap?.status).toBe('done');
-    expect(progress['bot1:sess1.jsonl']).toBe(2);
+    expect(progress['bot1:sess1']).toBe(2);
     expect(mockAdd).toHaveBeenCalledOnce();
     expect(mockAdd).toHaveBeenCalledWith([
       { role: 'user', content: 'hello' },
@@ -111,8 +111,8 @@ describe('runBootstrap', () => {
     });
 
     expect(result.sessionsProcessed).toBe(2);
-    expect(progress['agentA:shared.jsonl']).toBe(1);
-    expect(progress['agentB:shared.jsonl']).toBe(1);
+    expect(progress['agentA:shared']).toBe(1);
+    expect(progress['agentB:shared']).toBe(1);
     expect(mockAdd).toHaveBeenCalledTimes(2);
   });
 
@@ -144,7 +144,7 @@ describe('runBootstrap', () => {
 
     const progress: BootstrapProgress = {
       __bootstrap: { status: 'running', startedAt: Date.now() - 5000 },
-      'bot1:done.jsonl': 1,
+      'bot1:done': 1,
     };
     const saveProgress = vi.fn().mockResolvedValue(undefined);
     const ensureAgent = vi.fn();
@@ -160,7 +160,7 @@ describe('runBootstrap', () => {
     });
 
     expect(result.sessionsProcessed).toBe(1);
-    expect(progress['bot1:new.jsonl']).toBe(1);
+    expect(progress['bot1:new']).toBe(1);
     expect(mockAdd).toHaveBeenCalledOnce();
     expect(mockAdd).toHaveBeenCalledWith([{ role: 'user', content: 'fresh' }]);
   });
@@ -287,7 +287,7 @@ describe('runBootstrap', () => {
     });
 
     expect(mockAdd).toHaveBeenCalledOnce();
-    expect(progress['bot1:normal.jsonl']).toBe(1);
+    expect(progress['bot1:normal']).toBe(1);
     expect(progress['bot1:some.reset.jsonl']).toBeUndefined();
   });
 
