@@ -1,129 +1,78 @@
-# Ekai Gateway
+<p align="center">
+  <h1 align="center">Contexto</h1>
+  <p align="center"><strong>The Local-First Context Engine for AI Agents</strong></p>
+  <p align="center">Neuroscience-inspired · Open source</p>
+</p>
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![GitHub stars](https://img.shields.io/github/stars/ekailabs/ekai-gateway.svg?style=social)](https://github.com/ekailabs/ekai-gateway)
+[![GitHub stars](https://img.shields.io/github/stars/ekailabs/contexto.svg?style=social)](https://github.com/ekailabs/contexto)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.com/invite/5VsUUEfbJk)
 
-Context engine for AI agents — persistent memory, recall, and attribution. Use it as an OpenClaw plugin, drop it in front of any OpenAI-compatible client as a proxy, or integrate the memory library directly into your own agent.
 
-**Designed for self-hosted personal use** — run your own instance, bring your own keys.
+Persistent conversation memory today. Document knowledge and tool execution memory next.
 
-## Features
+Your conversations stay on your machine — no data sent to third-party memory services. Bring your own keys, run your own instance.
 
-- 🔌 **OpenClaw plugin**: Local-first memory for any OpenClaw agent ([`claw-contexto`](./integrations/openclaw/))
-- 🔀 **OpenRouter proxy**: OpenAI-compatible `/v1/chat/completions` with embedded memory
-- 📊 **Memory dashboard**: Browse, search, and manage stored memories
-- 🔑 **BYOK**: Bring your own API keys — per-instance or per-request
+Start with the **OpenClaw plugin**, the **OpenAI-compatible proxy**, or the **memory SDK**.
+
+```bash
+openclaw plugins install @ekai/contexto
+```
+
+## See the Difference
+
+**Without Contexto:**
+```
+User: I prefer concise answers. I'm building a RAG pipeline with LangChain.
+
+[new session]
+
+User: How should I chunk my documents?
+Assistant: Great question! There are many approaches to document chunking. First, let me explain
+         what chunking is...
+```
+
+**With Contexto:**
+```
+Retrieved context:
+  → user prefers concise answers
+  → user is building a RAG pipeline with LangChain
+
+User: How should I chunk my documents?
+Assistant: For your LangChain RAG pipeline — use RecursiveCharacterTextSplitter, 512 tokens,
+         50-token overlap. It handles nested markdown and code blocks well.
+```
+
+## Three Pillars
+
+Contexto's architecture is inspired by how human memory actually works — episodic memory (what happened), semantic memory (what you know), and procedural memory (how to do things). Instead of treating context as a flat key-value store, Contexto models these as distinct systems that work together.
+
+| Pillar | What it does | Status |
+| --- | --- | --- |
+| 🧠 **Conversation Memory** | Episodic recall from past conversations. Your agent remembers what happened last Tuesday. | ✅ Live |
+| 📚 **Document Knowledge** | Semantic knowledge from your documents, surfaced at the right time. No more re-uploading files. | 🚧 Coming soon |
+| 🔧 **Tool Execution Memory** | Procedural memory from tool calls — what succeeded, what failed, what was retried. Agents get smarter with every execution. | 📋 Roadmap |
 
 ## Quick Start
 
-**Option 1: npm**
-```bash
-npm install
-cp .env.example .env
-# Add OPENROUTER_API_KEY to .env
-npm run build
-npm start
-```
+### OpenClaw Plugin (recommended)
 
-**Option 2: Docker (published image)**
-```bash
-cp .env.example .env
-# Add OPENROUTER_API_KEY to .env
-docker compose up -d
-```
-
-**Access points (default ports):**
-- OpenRouter proxy + memory APIs: port `4010` (`OPENROUTER_PORT`)
-- Memory dashboard: port `3000` (`UI_PORT`)
-
-### Build the image yourself (optional)
+The fastest way to add persistent context to any OpenClaw agent:
 
 ```bash
-docker build --target ekai-cloudrun -t ekai-gateway .
-docker run --env-file .env -p 4010:4010 ekai-gateway
+openclaw plugins install @ekai/contexto
 ```
 
-## Usage
+Add to your OpenClaw config:
 
-Point any OpenAI-compatible client at `http://localhost:4010`:
-
-```bash
-# Chat completions — memory is injected automatically
-curl -X POST http://localhost:4010/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "anthropic/claude-sonnet-4-5", "messages": [{"role": "user", "content": "Hello"}]}'
-
-# Pass your own OpenRouter key per-request
-curl -X POST http://localhost:4010/v1/chat/completions \
-  -H "Authorization: Bearer sk-or-..." \
-  -H "Content-Type: application/json" \
-  -d '{"model": "openai/gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
-
-# Health check
-curl http://localhost:4010/health
-```
-
-## Running Services
-
-### npm (local development)
-
-```bash
-npm run dev    # dashboard + openrouter with hot-reload
-npm start      # production mode
-```
-
-Disable individual services via env:
-```bash
-ENABLE_DASHBOARD=false npm run dev      # openrouter only
-ENABLE_OPENROUTER=false npm run dev     # dashboard only
-```
-
-### Docker
-
-```bash
-docker compose up -d    # start all services
-docker compose logs -f  # view logs
-docker compose down     # stop
-```
-
-**Docker service toggles (`.env`):**
-```bash
-ENABLE_DASHBOARD=true    # memory dashboard (default: true)
-ENABLE_OPENROUTER=true   # proxy + memory APIs (default: true)
-```
-
-## Project Structure
-
-```
-ekai-gateway/
-├── integrations/
-│   ├── openrouter/       # Proxy server with embedded memory (@ekai/openrouter)
-│   └── openclaw/         # OpenClaw lifecycle plugin (claw-contexto)
-├── memory/               # Agent memory library (@ekai/memory)
-├── ui/dashboard/         # Memory management dashboard (Next.js)
-├── scripts/
-│   └── launcher.js       # Unified service launcher
-└── package.json          # Root workspace configuration
-```
-
-## OpenClaw Plugin
-
-[`claw-contexto`](https://www.npmjs.com/package/claw-contexto) is an OpenClaw plugin that provides local-first memory — automatic ingest and recall powered by [`@ekai/memory`](./memory/). Install it in any OpenClaw instance:
-
-```bash
-openclaw plugins install claw-contexto
-```
-
-Configure in your OpenClaw config:
-```json5
+```json
 {
-  plugins: {
-    allow: ["claw-contexto"],
-    entries: {
-      "claw-contexto": {
-        enabled: true,
-        config: {
+  "plugins": {
+    "allow": ["@ekai/contexto"],
+    "entries": {
+      "@ekai/contexto": {
+        "enabled": true,
+        "config": {
           "dbPath": "~/.openclaw/ekai/memory.db",
           "provider": "openai",
           "apiKey": "sk-..."
@@ -134,20 +83,155 @@ Configure in your OpenClaw config:
 }
 ```
 
-See [`integrations/openclaw/`](./integrations/openclaw/) for source and details.
+That's it. Your agent now remembers across conversations. Memory stays on your machine in a local SQLite DB — nothing leaves your device.
 
-## Beta Testing Notes
+### Drop-in Proxy
 
-🚧 **This is a beta release** — please report issues and feedback!
+Contexto speaks the OpenAI API format and routes through OpenRouter by default. Drop it in front of any compatible client — memory recall and injection happen automatically. (Automatic persistence currently requires the OpenClaw plugin or the memory SDK; proxy-side ingest is paused pending deduplication.)
 
-**Getting help:**
-- Join the [Discord](https://discord.com/invite/5VsUUEfbJk)
-- Check logs with `docker compose logs -f`
-- Ensure your OpenRouter API key has sufficient credits
+```bash
+npm install
+cp .env.example .env       # add your OPENROUTER_API_KEY
+npm run build && npm start
+```
+
+```bash
+curl -X POST http://localhost:4010/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "anthropic/claude-sonnet-4-5", "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+No code changes. No SDK. Just point your client at `localhost:4010`.
+
+### Memory SDK
+
+Use `@ekai/memory` directly in your own agent code. See [`memory/README.md`](memory/README.md) for the full API.
+
+```ts
+import { Memory } from '@ekai/memory';
+
+const mem = new Memory({ provider: 'openai', apiKey: 'sk-...' });
+mem.addAgent('my-bot', { name: 'My Bot' });
+
+const bot = mem.agent('my-bot');
+await bot.add(messages, { userId: 'alice' });
+const memories = await bot.retrieve('What does Alice like?', { userId: 'alice' });
+```
+
+### Docker
+
+```bash
+cp .env.example .env       # add your OPENROUTER_API_KEY
+docker compose up -d
+```
+
+**Default ports:** Proxy + memory APIs on `4010` · Dashboard on `3000`
+
+## Memory Dashboard
+
+Browse, search, and manage everything your agent remembers. Inspect the memories available for recall.
+
+**→ `http://localhost:3000`**
+
+
+## Why Contexto?
+
+| | Typical alternatives | Contexto |
+| --- | --- | --- |
+| Where data lives | Cloud-hosted or server-based | Local SQLite — your machine, your file |
+| Architecture | Flat key-value memory | Neuroscience-inspired (episodic, semantic, procedural) |
+| Scope | Conversation memory only | Conversations today; documents + tool execution next |
+| Integration | SDK required | Drop-in proxy, OpenClaw plugin, or memory SDK |
+| Data sent to third parties | Often required | No third-party memory service — only your configured model provider |
+
+## How It Works
+
+```
+                    ┌──────────────────────────────┐
+                    │          Your Agent           │
+                    │  (OpenClaw, Claude Code,      │
+                    │   LangChain, custom, ...)     │
+                    └──────────────┬───────────────┘
+                                   │
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │           Contexto            │
+                    │                              │
+                    │  ┌────────┐ ┌─────┐ ┌──────┐ │
+                    │  │Conver- │ │Doc  │ │Tool  │ │
+                    │  │sation  │ │Know-│ │Exec  │ │
+                    │  │Memory  │ │ledge│ │Memory│ │
+                    │  └───┬────┘ └──┬──┘ └──┬───┘ │
+                    │      └────┬────┘───────┘     │
+                    │           ▼                  │
+                    │   Unified Context Layer       │
+                    └──────────────────────────────┘
+```
+
+## Project Structure
+
+```
+contexto/
+├── integrations/
+│   ├── openrouter/       # Drop-in proxy with embedded memory
+│   └── openclaw/         # OpenClaw lifecycle plugin (@ekai/contexto)
+├── memory/               # Core memory library (@ekai/memory)
+├── ui/dashboard/         # Memory dashboard (Next.js)
+├── scripts/
+│   └── launcher.js       # Unified service launcher
+└── package.json
+```
+
+## Roadmap
+
+- [x] Persistent conversation memory
+- [x] OpenClaw plugin (`@ekai/contexto`)
+- [x] Drop-in OpenAI-compatible proxy
+- [x] Memory dashboard
+- [ ] **Document knowledge** — ingestion, chunking, retrieval
+- [ ] **Claude Code integration**
+- [ ] **Tool execution memory** — learn from tool call successes and failures
+- [ ] MCP server for universal agent integration
+- [ ] Benchmarks on LOCOMO and agent task completion
+
+## Configuration
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `OPENROUTER_API_KEY` | Your OpenRouter API key | Required |
+| `ENABLE_DASHBOARD` | Enable memory dashboard | `true` |
+| `ENABLE_OPENROUTER` | Enable proxy + memory APIs | `true` |
+| `OPENROUTER_PORT` | Proxy port | `4010` |
+| `DASHBOARD_PORT` | Dashboard port | `3000` |
+
+```bash
+# Development (hot-reload)
+npm run dev
+
+# Production
+npm start
+
+# Individual services
+ENABLE_DASHBOARD=false npm run dev      # proxy only
+ENABLE_OPENROUTER=false npm run dev     # dashboard only
+```
+
+## Enterprise
+
+Building AI agents for your team or product? We work with companies deploying agents at scale to ensure they always have the right context.
+
+**→ [Talk to us](mailto:s@ekailabs.xyz)**
 
 ## Contributing
 
-Contributions are highly valued and welcomed! See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Community
+
+- 💬 [Discord](https://discord.com/invite/5VsUUEfbJk) — Chat with the team
+- 📖 [Docs](https://docs.ekailabs.xyz/) — Documentation
+- 🐛 [Issues](https://github.com/ekailabs/contexto/issues) — Bugs & feature requests
 
 ## License
-Licensed under the [Apache License 2.0](./LICENSE).
+
+Apache 2.0 — see [LICENSE](LICENSE).

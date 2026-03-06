@@ -90,7 +90,7 @@ export async function runBootstrap(opts: {
         try {
           entry = JSON.parse(line);
         } catch {
-          logger.warn(`claw-contexto: malformed JSON in ${file} line ${i + 1}`);
+          logger.warn(`@ekai/contexto: malformed JSON in ${file} line ${i + 1}`);
           continue;
         }
 

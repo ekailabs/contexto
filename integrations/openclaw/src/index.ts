@@ -88,13 +88,13 @@ export function resolveMemoryProvider(
     if (key) {
       return { provider: cfgProvider as ProviderName, apiKey: key, source: 'config+env' };
     }
-    logger.warn(`claw-contexto: provider '${cfgProvider}' configured but ${envVar ?? 'API key env var'} not set`);
+    logger.warn(`@ekai/contexto: provider '${cfgProvider}' configured but ${envVar ?? 'API key env var'} not set`);
     return undefined;
   }
 
   // Case 3: apiKey only → ambiguous, warn and ignore
   if (!cfgProvider && cfgApiKey) {
-    logger.warn('claw-contexto: apiKey configured without provider — ignoring (set provider to use it)');
+    logger.warn('@ekai/contexto: apiKey configured without provider — ignoring (set provider to use it)');
   }
 
   // Case 4: defer to core if MEMORY_*_PROVIDER is set
@@ -117,7 +117,7 @@ export function resolveMemoryProvider(
 // --- Plugin definition ---
 
 export default {
-  id: 'claw-contexto',
+  id: '@ekai/contexto',
   name: 'Ekai Contexto',
   description: 'Local-first memory for OpenClaw',
   configSchema: {
@@ -191,9 +191,9 @@ export default {
         progress[progressKey] = event.messages.length;
         await saveProgress();
 
-        api.logger.info(`claw-contexto: ingested ${redacted.length} turns`);
+        api.logger.info(`@ekai/contexto: ingested ${redacted.length} turns`);
       } catch (err) {
-        api.logger.warn(`claw-contexto: ingest failed: ${String(err)}`);
+        api.logger.warn(`@ekai/contexto: ingest failed: ${String(err)}`);
       }
     });
 
@@ -218,7 +218,7 @@ export default {
 
         return { prependContext: `## Relevant memories\n${block}` };
       } catch (err) {
-        api.logger.warn(`claw-contexto: recall failed: ${String(err)}`);
+        api.logger.warn(`@ekai/contexto: recall failed: ${String(err)}`);
       }
     });
 
@@ -253,9 +253,9 @@ export default {
           ensureAgent,
           delayMs: Math.max(0, Number(api.pluginConfig?.bootstrapDelayMs) || 1000),
         })
-          .then((r) => api.logger.info(`claw-contexto: bootstrap done — ${r.sessionsProcessed} sessions`))
+          .then((r) => api.logger.info(`@ekai/contexto: bootstrap done — ${r.sessionsProcessed} sessions`))
           .catch((err) => {
-            api.logger.warn(`claw-contexto: bootstrap failed: ${err}`);
+            api.logger.warn(`@ekai/contexto: bootstrap failed: ${err}`);
             progress.__bootstrap = undefined;
             saveProgress();
           });
@@ -265,6 +265,6 @@ export default {
     });
 
     const providerInfo = resolved ? ` (${resolved.provider} via ${resolved.source})` : '';
-    api.logger.info(`claw-contexto: memory at ${dbPath}${providerInfo}`);
+    api.logger.info(`@ekai/contexto: memory at ${dbPath}${providerInfo}`);
   },
 };

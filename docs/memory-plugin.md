@@ -91,12 +91,12 @@ All endpoints accept an `agent` query/body param. Full API reference: [`memory/R
 
 ---
 
-## Way 2: OpenClaw Plugin (claw-contexto)
+## Way 2: OpenClaw Plugin (@ekai/contexto)
 
 ### Install
 
 ```bash
-openclaw plugins install claw-contexto
+openclaw plugins install @ekai/contexto
 ```
 
 Or from source:
@@ -112,9 +112,9 @@ In your OpenClaw config:
 ```json5
 {
   plugins: {
-    allow: ["claw-contexto"],
+    allow: ["@ekai/contexto"],
     entries: {
-      "claw-contexto": {
+      "@ekai/contexto": {
         enabled: true,
         config: {
           "dbPath": "~/.openclaw/ekai/memory.db",
@@ -158,8 +158,8 @@ Note: `agent_end` ingests with `userId` scoping when available, while bootstrap 
 ### Verify
 
 ```bash
-openclaw plugins list       # should show claw-contexto
-openclaw hooks list         # should show plugin:claw-contexto:* hooks
+openclaw plugins list       # should show @ekai/contexto
+openclaw hooks list         # should show plugin:@ekai/contexto:* hooks
 ```
 
 ---
@@ -189,7 +189,7 @@ openclaw hooks list         # should show plugin:claw-contexto:* hooks
 | `MEMORY_PORT` | `4005` | Standalone server port |
 | `MEMORY_CORS_ORIGIN` | `*` | CORS origins (standalone mode) |
 
-### Plugin Config (claw-contexto)
+### Plugin Config (@ekai/contexto)
 
 | Setting | Default | Description |
 |---------|---------|-------------|

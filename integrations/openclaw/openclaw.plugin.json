@@ -1,5 +1,5 @@
 {
-  "id": "claw-contexto",
+  "id": "@ekai/contexto",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
