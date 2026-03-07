@@ -1,0 +1,16 @@
+{
+  "id": "ekai-contexto",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "dataDir": { "type": "string" }
+    }
+  },
+  "uiHints": {
+    "dataDir": {
+      "label": "Event data directory",
+      "description": "Directory for structured JSONL event storage (one file per session)"
+    }
+  }
+}

@@ -1,146 +1,423 @@
-# Memory Service (Ekai)
+# Memory SDK (Ekai)
 
-Neuroscience-inspired, sectorized memory kernel. Runs as a standalone service (default port 4005) and is currently opt-in.
+Neuroscience-inspired, agent-centric memory kernel. Sectorized storage with PBWM gating — the agent reflects on conversations and decides what to learn. Memory is first-person, not a passive database about users.
 
-## Quickstart (standalone)
+## Quickstart
+
+By default, memory is embedded inside the OpenRouter integration and served on port `4010`. No separate service needed.
 
 ```bash
-npm install -w memory
-npm run build -w memory
-npm start -w memory
+npm install -w @ekai/memory
+npm run build -w @ekai/memory
 ```
 
-Env (root `.env` or `memory/.env`):
+See [Usage Modes](#usage-modes) below for SDK, mountable router, and standalone options.
 
-- `GOOGLE_API_KEY` (required for Gemini extract/embeds)
-- Optional: `GEMINI_EXTRACT_MODEL` (default `gemini-2.5-flash`)
-- Optional: `GEMINI_EMBED_MODEL` (default `text-embedding-004`)
-- Optional: `MEMORY_PORT` (default `4005`)
-- Optional: `MEMORY_DB_PATH` (default `./memory.db`)
-- Optional: `MEMORY_CORS_ORIGIN`
+### SDK Usage
 
-## API (v0)
+```ts
+import { Memory } from '@ekai/memory';
 
-- `POST /v1/ingest` — ingest an experience  
-  Body:
-  ```json
-  {
-  "messages": [
-    { "role": "user", "content": "..." },
-    { "role": "assistant", "content": "..." }
-  ],
-  "reasoning": "optional",
-  "feedback": {
-    "type": "success|failure",
-    "value": 0
-  },
-  "metadata": {}
-  }
-  ```
-  Requires at least one user message. `reasoning`, `feedback`, and `metadata` are optional and currently not used in extraction/scoring (feedback is not yet applied; retrieval_count drives expected_value).
+// Provider config is global — shared across all agents
+const mem = new Memory({ provider: 'openai', apiKey: 'sk-...' });
 
-- `POST /v1/search` — body `{ "query": "..." }` → returns `{ workingMemory, perSector }` with PBWM gating.
+// Register an agent (soul and relevancePrompt are optional)
+mem.addAgent('my-bot', { name: 'My Bot', soul: 'You are helpful' });
+mem.addAgent('chef-bot', { name: 'Chef', relevancePrompt: 'Only store memories about cooking and recipes' });
 
-- `GET /v1/summary` — per-sector counts + recent items (includes procedural details).
+// Get a scoped instance — all data ops go through this
+const bot = mem.agent('my-bot');
+await bot.add(messages, { userId: 'alice' });
+await bot.search('preferences', { userId: 'alice' });
+bot.users();                            // agent's known users
+bot.memories();                         // all agent memories
+bot.memories({ userId: 'alice' });      // memories about alice
+bot.memories({ scope: 'global' });      // non-user-scoped memories
+bot.delete(id);
+```
 
-- `DELETE /v1/memory/:id` — delete one; `DELETE /v1/memory` — delete all.
+### Environment Variables
 
-- `GET /health`
+| Variable | Default | Required |
+|----------|---------|----------|
+| `GOOGLE_API_KEY` | — | Yes (if using Gemini provider) |
+| `OPENAI_API_KEY` | — | Yes (if using OpenAI provider) |
+| `OPENROUTER_API_KEY` | — | Yes (if using OpenRouter provider) |
+| `MEMORY_EMBED_PROVIDER` | `gemini` | No |
+| `MEMORY_EXTRACT_PROVIDER` | `gemini` | No |
+| `MEMORY_DB_PATH` | `./memory.db` | No |
+| `MEMORY_CORS_ORIGIN` | `*` | No (standalone mode only) |
 
-## Data model (SQLite)
+## Usage Modes
 
-- `memory` table for episodic / semantic / affective:  
-  `id, sector, content, embedding, created_at, last_accessed, event_start, event_end`.
-- `procedural_memory` table for structured procedures:  
-  `trigger, goal, context, result, steps[], embedding, timestamps`.
-- `retrieval_count` tracks how often a memory enters working memory; used in PBWM expected_value.
-- `semantic_memory` (graph-lite facts): `subject, predicate, object, valid_from, valid_to, strength, embedding, metadata`.
+### 1. SDK (recommended)
 
-## Semantic Consolidation
+```ts
+import { Memory } from '@ekai/memory';
 
-When ingesting semantic facts, the system applies consolidation logic using **semantic similarity** for predicate matching:
+// Provider config is global
+const mem = new Memory({ provider: 'openai', apiKey: 'sk-...' });
 
-1. **Find existing facts**: Query all active facts for the same subject
-2. **Semantic predicate matching**: Use embeddings to find predicates with ≥0.9 cosine similarity
-   - "is co-founder of" ≈ "cofounded" ≈ "founded" → treated as same slot
-3. **Consolidation action**:
-   - **Merge**: Same object exists → strengthen it (increment `strength`)
-   - **Supersede**: Different object for similar predicate → close old fact (`valid_to = now`), insert new
-   - **Insert**: No matching predicate → insert new with `strength = 1.0`
+// Register agents (soul is optional)
+mem.addAgent('my-bot', { name: 'My Bot', soul: 'You are helpful' });
+mem.addAgent('support-bot', { name: 'Support Bot' });
+mem.getAgents();
 
-This approach:
-- Handles natural language variation in predicates (synonyms, paraphrases)
-- Preserves history while avoiding duplicate facts
-- Superseded facts remain queryable for temporal reasoning
+// Scope to an agent for data ops
+const bot = mem.agent('my-bot');
+await bot.add(messages, { userId: 'alice' });
+await bot.search('query', { userId: 'alice' });
+bot.users();
+bot.memories({ userId: 'alice' });
+bot.delete(id);
+```
 
-## Retrieval
+### 2. Mountable router
 
-- Query is embedded per sector.
-- Candidates with cosine `< 0.2` are dropped.
-- PBWM-inspired gate (prefrontal–basal ganglia model) scores the rest:
+Mount memory endpoints into an existing Express app:
 
-  ```
-  x = 1.0 * relevance + 0.4 * expected_value + 0.05 * control - 0.02 * noise
-  gate_score = sigmoid(x)
-  ```
-- We use retrieval_count (log-normalized) for `expected_value` and keep `control = 0.3` for now; small Gaussian noise is applied.
-- Candidates with `gate_score > 0.5` are kept, then top-k per sector are merged and capped to a working-memory size of 8.
+```ts
+import { Memory, createMemoryRouter } from '@ekai/memory';
 
-## Architecture (v0)
+const memory = new Memory({ provider: 'openai', apiKey: 'sk-...' });
+app.use(createMemoryRouter(memory._store, memory._extractFn));
+```
+
+This is how the OpenRouter integration embeds memory on port `4010`.
+
+### 3. Standalone server
+
+Run memory as its own HTTP server (useful for development or isolated deployments):
+
+```bash
+npm run start -w @ekai/memory
+```
+
+## How It Works
 
 ```mermaid
 graph TB
-  classDef inputStyle fill:#eceff1,stroke:#546e7a,stroke-width:2px,color:#37474f
-  classDef processStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#0d47a1
-  classDef sectorStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100
-  classDef storageStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f
-  classDef engineStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
-  classDef outputStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
+  classDef input fill:#eceff1,stroke:#546e7a,stroke-width:2px
+  classDef process fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+  classDef sector fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+  classDef store fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+  classDef engine fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+  classDef output fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
 
-  EXP["Experience Ingest<br>messages + reasoning/feedback"]:::inputStyle
-  EXTRACT["Extractor (Gemini)<br>episodic / semantic / procedural / affective"]:::processStyle
+  IN["POST /v1/ingest<br>messages + userId"]:::input
+  RG{"Relevance Gate<br>(if relevancePrompt)"}:::engine
+  EXT["Agent Reflection (LLM)<br>first-person, multi-fact"]:::process
 
-  EPISODIC["Episodic"]:::sectorStyle
-  SEMANTIC["Semantic"]:::sectorStyle
-  PROCEDURAL["Procedural<br>structured: trigger / goal / steps"]:::sectorStyle
-  AFFECTIVE["Affective"]:::sectorStyle
+  EP["Episodic"]:::sector
+  SE["Semantic[]<br>+ domain"]:::sector
+  PR["Procedural"]:::sector
+  RE["Reflective"]:::sector
 
-  EMBED["Embedder (Gemini)<br>text-embedding-004"]:::processStyle
+  EMB["Embed"]:::process
+  CON["Consolidate"]:::process
+  DB["SQLite"]:::store
+  AU["agent_users"]:::store
 
-  STORE["(SQLite)<br>memory table (event_start/end)<br>procedural_memory table"]:::storageStyle
-  FACTGRAPH["Semantic Facts<br>subject/predicate/object graph"]:::storageStyle
-  STEPGRAPH["Action DAG<br>ordered steps"]:::storageStyle
+  SEARCH["POST /v1/search<br>query + userId"]:::input
+  SCOPE["user_scope filter"]:::engine
+  PBWM["PBWM Gate"]:::engine
+  WM["Working Memory (cap 8)"]:::engine
+  OUT["Response"]:::output
+  SUM["GET /v1/summary"]:::input
 
-  QUERY["Search Query"]:::inputStyle
-  QEMBED["Query Embeds<br>per sector"]:::processStyle
-  CANDIDATES["Candidates<br>(cosine ≥ 0.2)"]:::engineStyle
-  PBWM["PBWM Gate<br>sigmoid(1.0*rel + 0.4*exp + 0.05*ctrl - 0.02*noise)"]:::engineStyle
-  WM["Working Memory<br>top-k per sector → cap 8"]:::engineStyle
+  IN --> RG -->|relevant| EXT
+  RG -->|irrelevant| OUT
+  EXT --> EP & SE & PR & RE
+  SE --> CON
+  EP & CON & PR & RE --> EMB --> DB
+  IN -.-> AU
 
-  OUTPUT["Recall Response<br>(workingMemory + perSector)"]:::outputStyle
-  UI["Dashboard Memory Vault<br>summary + recent + delete"]:::outputStyle
-
-  EXP --> EXTRACT
-  EXTRACT --> EPISODIC
-  EXTRACT --> SEMANTIC
-  EXTRACT --> PROCEDURAL
-  EXTRACT --> AFFECTIVE
-
-  EPISODIC --> EMBED
-  SEMANTIC --> FACTGRAPH
-  FACTGRAPH --> EMBED
-  PROCEDURAL --> STEPGRAPH
-  STEPGRAPH --> EMBED
-  AFFECTIVE --> EMBED
-
-  EMBED --> STORE
-
-  QUERY --> QEMBED --> CANDIDATES --> PBWM --> WM --> OUTPUT
-  STORE --> CANDIDATES
-
-  OUTPUT --> UI
+  SEARCH --> SCOPE --> PBWM --> WM --> OUT
+  DB --> SCOPE
+  SUM --> DB
 ```
 
-## Notes / Limitations
+### Four Sectors
 
-- Only Gemini provider is wired (provider abstraction is pending). OpenAI would need wiring.
+| Sector | What it stores | Example |
+|--------|---------------|---------|
+| **Episodic** | Events, conversations | "I discussed architecture with Sha on Monday" |
+| **Semantic** | Facts as triples + domain | `Sha / prefers / dark mode` (domain: `user`) |
+| **Procedural** | Multi-step workflows | When deploying: test -> build -> push |
+| **Reflective** | Agent self-observations | "I tend to overcomplicate solutions" |
+
+### Domain & User Scoping
+
+```mermaid
+graph LR
+  classDef usr fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+  classDef wld fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+  classDef slf fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+
+  U["user domain<br>scoped to userId<br><i>Sha prefers dark mode</i>"]:::usr
+  W["world domain<br>visible to all<br><i>TypeScript supports generics</i>"]:::wld
+  S["self domain<br>visible to all<br><i>I use GPT-4 for extraction</i>"]:::slf
+```
+
+When `userId` is passed: `user`-domain facts are only visible to that user. `world`/`self` facts are shared.
+
+### Attribution
+
+Every memory tracks its origin: `origin_type` (conversation/document/api), `origin_actor` (who), `origin_ref` (source reference).
+
+### Consolidation
+
+Semantic triples go through consolidation per triple:
+- **Merge** — same fact exists -> strengthen it
+- **Supersede** — different value for same slot -> close old, insert new
+- **Insert** — new fact
+
+Predicate matching uses embeddings (>=0.9 cosine): "cofounded" ~ "is co-founder of" -> same slot.
+
+## API
+
+### `POST /v1/ingest`
+
+Ingest a conversation. Full conversation (user + assistant) goes to the LLM for agent-centric reflection.
+
+```json
+{
+  "messages": [
+    { "role": "user", "content": "I prefer dark mode and use TypeScript" },
+    { "role": "assistant", "content": "Noted!" }
+  ],
+  "agent": "my-bot",
+  "userId": "sha"
+}
+```
+```json
+{ "stored": 3, "ids": ["...", "...", "..."], "agent": "my-bot" }
+```
+
+If the agent has a `relevancePrompt` and the content is irrelevant, the response short-circuits:
+
+```json
+{ "stored": 0, "ids": [], "filtered": true, "reason": "Content is about geography, not cooking" }
+```
+
+### `POST /v1/search`
+
+Search with PBWM gating. Pass `userId` for user-scoped retrieval.
+
+```json
+{ "query": "what does Sha prefer?", "agent": "my-bot", "userId": "sha" }
+```
+```json
+{
+  "workingMemory": [
+    { "sector": "semantic", "content": "Sha prefers dark mode", "score": 0.87, "details": { "subject": "Sha", "predicate": "prefers", "object": "dark mode", "domain": "user" } }
+  ],
+  "perSector": { "episodic": [], "semantic": [...], "procedural": [] },
+  "agentId": "my-bot"
+}
+```
+
+### `GET /v1/summary`
+
+Per-sector counts + recent memories.
+
+```
+GET /v1/summary?agent=my-bot&limit=20
+```
+```json
+{
+  "summary": [
+    { "sector": "episodic", "count": 3, "lastCreatedAt": 1700000000 },
+    { "sector": "semantic", "count": 12, "lastCreatedAt": 1700100000 },
+    { "sector": "procedural", "count": 1, "lastCreatedAt": 1700050000 }
+  ],
+  "recent": [{ "id": "...", "sector": "semantic", "preview": "dark mode", "details": {...} }],
+  "agent": "my-bot"
+}
+```
+
+### `GET /v1/agents`
+
+List all registered agents.
+
+```json
+{
+  "agents": [{ "id": "my-bot", "name": "My Bot", "soulMd": "You are helpful", "createdAt": 1700000000 }]
+}
+```
+
+### `POST /v1/agents`
+
+Register a new agent. `name`, `soul`, and `relevancePrompt` are optional.
+
+```json
+{ "id": "my-bot", "name": "My Bot", "soul": "You are helpful", "relevancePrompt": "Only store cooking-related memories" }
+```
+```json
+{ "agent": { "id": "my-bot", "name": "My Bot", "soulMd": "You are helpful", "relevancePrompt": "Only store cooking-related memories", "createdAt": 1700000000 } }
+```
+
+### `GET /v1/agents/:slug`
+
+Get a single agent by ID.
+
+```json
+{ "agent": { "id": "my-bot", "name": "My Bot", "relevancePrompt": "...", "createdAt": 1700000000 } }
+```
+
+### `PUT /v1/agents/:slug`
+
+Update agent properties. Set `relevancePrompt` to `null` to remove it.
+
+```json
+{ "name": "Updated Name", "relevancePrompt": null }
+```
+
+### `DELETE /v1/agents/:slug`
+
+Delete an agent and all its memories. Cannot delete the `default` agent.
+
+```json
+{ "deleted": 5, "agent": "my-bot" }
+```
+
+### `PUT /v1/memory/:id`
+
+Update a memory's content and/or user scope. Body: `{ "content": "...", "sector?": "episodic", "agent?": "my-bot", "userScope?": "sha" }`. Set `userScope` to `null` to make a memory shared/global.
+
+### `DELETE /v1/memory/:id`
+
+Delete a single memory. Query: `?agent=my-bot`.
+
+### `DELETE /v1/memory`
+
+Delete all memories for an agent. Query: `?agent=my-bot`.
+
+### `GET /v1/users`
+
+List all users the agent has interacted with.
+
+```
+GET /v1/users?agent=my-bot
+```
+```json
+{
+  "users": [{ "userId": "sha", "firstSeen": 1700000000, "lastSeen": 1700100000, "interactionCount": 5 }],
+  "agent": "my-bot"
+}
+```
+
+### `GET /v1/users/:id/memories`
+
+Get memories scoped to a specific user. Query: `?agent=my-bot&limit=20`.
+
+### `GET /v1/graph/triples`
+
+Query semantic triples by entity. Query: `?entity=Sha&direction=outgoing&agent=my-bot&predicate=...&maxResults=100&userId=...`.
+
+### `DELETE /v1/graph/triple/:id`
+
+Delete a single semantic triple. Query: `?agent=my-bot`.
+
+### `GET /v1/graph/visualization`
+
+Graph visualization data (nodes + edges). Query: `?entity=Sha&maxDepth=2&maxNodes=50&agent=my-bot&includeHistory=true&userId=...`.
+
+### All Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/agents` | List agents |
+| POST | `/v1/agents` | Create agent |
+| GET | `/v1/agents/:slug` | Get single agent |
+| PUT | `/v1/agents/:slug` | Update agent |
+| DELETE | `/v1/agents/:slug` | Delete agent + memories |
+| POST | `/v1/ingest` | Ingest conversation |
+| POST | `/v1/search` | Search with PBWM gating |
+| GET | `/v1/summary` | Sector counts + recent |
+| PUT | `/v1/memory/:id` | Update a memory |
+| DELETE | `/v1/memory/:id` | Delete one memory |
+| DELETE | `/v1/memory` | Delete all for agent |
+| GET | `/v1/users` | List agent's users |
+| GET | `/v1/users/:id/memories` | User-scoped memories |
+| GET | `/v1/graph/triples` | Query semantic triples by entity |
+| GET | `/v1/graph/visualization` | Graph visualization data (dashboard) |
+| DELETE | `/v1/graph/triple/:id` | Delete a triple |
+| GET | `/health` | Health check |
+
+All endpoints support `agent` query/body param. In the default deployment, these are served on the OpenRouter port (`4010`).
+
+## Retrieval Pipeline
+
+```mermaid
+graph LR
+  classDef i fill:#eceff1,stroke:#546e7a,stroke-width:2px
+  classDef p fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+  classDef e fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+  classDef o fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+  Q["Query + userId"]:::i
+  EMB["3 embeddings<br>(per sector)"]:::p
+  ANN["sqlite-vec KNN<br>(cosine distance)"]:::p
+  F["similarity >= 0.2<br>+ user_scope"]:::e
+  G["PBWM gate<br>sigmoid(1.0r + 0.4e + 0.05c - 0.02n)"]:::e
+  W["Working Memory<br>top-4/sector, cap 8"]:::o
+
+  Q --> EMB --> ANN --> F --> G --> W
+```
+
+## Data Model
+
+```mermaid
+erDiagram
+    agents ||--o{ memory : has
+    agents ||--o{ semantic_memory : has
+    agents ||--o{ procedural_memory : has
+    agents ||--o{ reflective_memory : has
+    agents ||--o{ agent_users : has
+    memory ||--|| memory_vec : "vec index"
+    procedural_memory ||--|| procedural_vec : "vec index"
+    semantic_memory ||--|| semantic_vec : "vec index"
+    reflective_memory ||--|| reflective_vec : "vec index"
+
+    memory { text id PK; text sector; text content; text user_scope; text origin_type }
+    semantic_memory { text id PK; text subject; text predicate; text object; text domain; text user_scope }
+    procedural_memory { text id PK; text trigger; json steps; text user_scope; text origin_type }
+    reflective_memory { text id PK; text observation; text origin_type; text origin_actor }
+    memory_vec { text memory_id; float embedding }
+    procedural_vec { text memory_id; float embedding }
+    semantic_vec { text memory_id; float embedding }
+    reflective_vec { text memory_id; float embedding }
+    agent_users { text agent_id PK; text user_id PK; int interaction_count }
+    agents { text id PK; text name; text soul_md; text relevance_prompt; int created_at }
+```
+
+All main tables share: `embedding` (JSON), `created_at`, `last_accessed`, `agent_id`, `source`, `origin_type`, `origin_actor`, `origin_ref`. Vec tables (`vec0` virtual tables via sqlite-vec) store cosine-distance-indexed copies of embeddings for ANN search. Clean schema — no migrations, old DBs re-create.
+
+## Integration
+
+When used via `@ekai/openrouter`, memories are injected as:
+
+```
+<memory>
+What I know:
+- Sha prefers dark mode
+
+What I remember:
+- I discussed architecture with Sha on Monday
+
+How I do things:
+- When deploying: test -> build -> push
+
+My observations:
+- Sha responds better when I lead with the conclusion
+</memory>
+```
+
+## Notes
+
+- Supports Gemini, OpenAI, and OpenRouter providers for extraction/embedding
+- Provider config via constructor: `new Memory({ provider: 'openai', apiKey: '...' })`
+- Agents are first-class: `addAgent()` required before data ops (auto-created for `default`)
+- `user_scope` is opt-in — no `userId` = all memories returned
+- Vector search via sqlite-vec (cosine distance, vec0 virtual tables) — single-file embedded architecture

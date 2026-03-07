@@ -23,7 +23,8 @@ interface SemanticGraphProps {
   maxDepth?: number;
   maxNodes?: number;
   height?: number;
-  profile?: string;
+  agent?: string;
+  userId?: string | null;
 }
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
@@ -61,7 +62,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
   return { nodes: layoutedNodes, edges };
 };
 
-export function SemanticGraph({ entity, maxDepth = 2, maxNodes = 50, height = 500, profile }: SemanticGraphProps) {
+export function SemanticGraph({ entity, maxDepth = 2, maxNodes = 50, height = 500, agent, userId }: SemanticGraphProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +74,7 @@ export function SemanticGraph({ entity, maxDepth = 2, maxNodes = 50, height = 50
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.getGraphVisualization({ entity, maxDepth, maxNodes, profile });
+      const data = await apiService.getGraphVisualization({ entity, maxDepth, maxNodes, agent, userId: userId ?? undefined });
       
       const initialNodes: Node[] = data.nodes.map((n) => ({
         id: n.id,
@@ -134,7 +135,7 @@ export function SemanticGraph({ entity, maxDepth = 2, maxNodes = 50, height = 50
     } finally {
       setLoading(false);
     }
-  }, [entity, maxDepth, maxNodes, profile, setNodes, setEdges]);
+  }, [entity, maxDepth, maxNodes, agent, userId, setNodes, setEdges]);
 
   useEffect(() => {
     fetchGraphData();

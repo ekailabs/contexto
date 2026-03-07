@@ -6,7 +6,6 @@ interface ProfileStatsProps {
   episodicCount: number;
   proceduralCount: number;
   semanticCount: number;
-  affectiveCount: number;
   totalRetrievals: number;
 }
 
@@ -16,14 +15,12 @@ export default function ProfileStats({
   episodicCount,
   proceduralCount,
   semanticCount,
-  affectiveCount,
   totalRetrievals,
 }: ProfileStatsProps) {
   const sectorData = [
     { name: 'Episodic', count: episodicCount, color: 'from-violet-500 to-purple-600', bgColor: 'bg-violet-50', borderColor: 'border-violet-200', textColor: 'text-violet-700' },
     { name: 'Procedural', count: proceduralCount, color: 'from-blue-500 to-indigo-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', textColor: 'text-blue-700' },
     { name: 'Semantic', count: semanticCount, color: 'from-emerald-500 to-teal-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200', textColor: 'text-emerald-700' },
-    { name: 'Affective', count: affectiveCount, color: 'from-rose-500 to-pink-600', bgColor: 'bg-rose-50', borderColor: 'border-rose-200', textColor: 'text-rose-700' },
   ];
 
   return (
@@ -41,7 +38,7 @@ export default function ProfileStats({
       </div>
 
       {/* Sector Breakdown */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         {sectorData.map((sector) => (
           <div
             key={sector.name}
