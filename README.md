@@ -4,6 +4,9 @@
 [![GitHub stars](https://img.shields.io/github/stars/ekailabs/ekai-gateway.svg?style=social)](https://github.com/ekailabs/ekai-gateway)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.com/invite/5VsUUEfbJk)
 
+Archived Repo:
+For our latest work, check https://github.com/ekailabs/contexto
+
 OpenRouter proxy with embedded agent memory and a management dashboard. Drop it in front of any OpenAI-compatible client and your AI tools gain persistent memory across conversations.
 
 **Designed for self-hosted personal use** — run your own instance using your OpenRouter API key.
