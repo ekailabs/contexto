@@ -2,6 +2,19 @@ import { API_CONFIG } from './constants';
 
 export const MEMORY_BASE_URL = API_CONFIG.MEMORY_URL;
 
+async function fetchOrFail(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (err) {
+    if (err instanceof TypeError) {
+      throw new Error(
+        `Cannot connect to Contexto at ${MEMORY_BASE_URL} — is the service running?`
+      );
+    }
+    throw err;
+  }
+}
+
 export interface MemorySectorSummary {
   sector: 'episodic' | 'semantic' | 'procedural' | 'reflective';
   count: number;
@@ -40,7 +53,7 @@ export const apiService = {
     if (agent) params.append('agent', agent);
     if (userId) params.append('userId', userId);
 
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/summary?${params.toString()}`);
+    const response = await fetchOrFail(`${MEMORY_BASE_URL}/v1/summary?${params.toString()}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch memory summary: ${response.statusText}`);
     }
@@ -52,7 +65,7 @@ export const apiService = {
     if (userScope !== undefined) {
       body.userScope = userScope;
     }
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/memory/${encodeURIComponent(id)}`, {
+    const response = await fetchOrFail(`${MEMORY_BASE_URL}/v1/memory/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -77,7 +90,7 @@ export const apiService = {
     if (agent) params.append('agent', agent);
     const url = `${MEMORY_BASE_URL}/v1/memory/${encodeURIComponent(id)}${params.toString() ? `?${params.toString()}` : ''}`;
 
-    const response = await fetch(url, { method: 'DELETE' });
+    const response = await fetchOrFail(url, { method: 'DELETE' });
     if (!response.ok) {
       let errorMessage = `Failed to delete memory: ${response.statusText}`;
       try {
@@ -97,7 +110,7 @@ export const apiService = {
     if (agent) params.append('agent', agent);
     const url = `${MEMORY_BASE_URL}/v1/memory${params.toString() ? `?${params.toString()}` : ''}`;
 
-    const response = await fetch(url, { method: 'DELETE' });
+    const response = await fetchOrFail(url, { method: 'DELETE' });
     if (!response.ok) {
       throw new Error(`Failed to delete all memories: ${response.statusText}`);
     }
@@ -120,7 +133,7 @@ export const apiService = {
     if (params?.userId) searchParams.append('userId', params.userId);
 
     const url = `${MEMORY_BASE_URL}/v1/graph/visualization${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-    const response = await fetch(url);
+    const response = await fetchOrFail(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch graph visualization: ${response.statusText}`);
     }
@@ -146,7 +159,7 @@ export const apiService = {
     if (params.predicate) searchParams.append('predicate', params.predicate);
 
     const url = `${MEMORY_BASE_URL}/v1/graph/triples?${searchParams.toString()}`;
-    const response = await fetch(url);
+    const response = await fetchOrFail(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch graph triples: ${response.statusText}`);
     }
@@ -154,7 +167,7 @@ export const apiService = {
   },
 
   async getAgents(): Promise<{ agents: Array<{ id: string; name: string; createdAt: number; soulMd?: string; relevancePrompt?: string }> }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/agents`);
+    const response = await fetchOrFail(`${MEMORY_BASE_URL}/v1/agents`);
     if (!response.ok) {
       throw new Error(`Failed to fetch agents: ${response.statusText}`);
     }
@@ -162,7 +175,7 @@ export const apiService = {
   },
 
   async createAgent(id: string, opts?: { name?: string; soulMd?: string; relevancePrompt?: string }): Promise<{ id: string; name: string; createdAt: number }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/agents`, {
+    const response = await fetchOrFail(`${MEMORY_BASE_URL}/v1/agents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...opts }),
@@ -175,7 +188,7 @@ export const apiService = {
   },
 
   async updateAgent(id: string, opts: { name?: string; soulMd?: string; relevancePrompt?: string }): Promise<{ id: string; name: string }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/agents/${encodeURIComponent(id)}`, {
+    const response = await fetchOrFail(`${MEMORY_BASE_URL}/v1/agents/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(opts),
@@ -188,7 +201,7 @@ export const apiService = {
   },
 
   async getUsers(agent: string): Promise<{ users: Array<{ userId: string; firstSeen: number; lastSeen: number; interactionCount: number }>; agent: string }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/users?agent=${encodeURIComponent(agent)}`);
+    const response = await fetchOrFail(`${MEMORY_BASE_URL}/v1/users?agent=${encodeURIComponent(agent)}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch users: ${response.statusText}`);
     }
@@ -196,7 +209,7 @@ export const apiService = {
   },
 
   async deleteAgent(agent: string): Promise<{ deleted: number; agent: string }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/agents/${encodeURIComponent(agent)}`, {
+    const response = await fetchOrFail(`${MEMORY_BASE_URL}/v1/agents/${encodeURIComponent(agent)}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -214,7 +227,7 @@ export const apiService = {
   },
 
   async deleteGraphTriple(id: string): Promise<{ deleted: number }> {
-    const response = await fetch(`${MEMORY_BASE_URL}/v1/graph/triple/${encodeURIComponent(id)}`, {
+    const response = await fetchOrFail(`${MEMORY_BASE_URL}/v1/graph/triple/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
