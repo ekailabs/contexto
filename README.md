@@ -68,6 +68,9 @@ Add to your OpenClaw config:
 ```json
 {
   "plugins": {
+    "slots": {
+      "contextEngine": "@ekai/contexto"
+    },
     "allow": ["@ekai/contexto"],
     "entries": {
       "@ekai/contexto": {
