@@ -16,18 +16,22 @@ Your conversations stay on your machine — no data sent to third-party memory s
 Start with the **OpenClaw plugin**, the **OpenAI-compatible proxy**, or the **memory SDK**.
 
 ```bash
-# 1. Ensure your system has the required build tools for SQLite bindings
-sudo apt-get install python3 build-essential
-
-# 2. Install the plugin
 openclaw plugins install @ekai/contexto
+```
+
+```bash
+# Restart openclaw to activate plugin
+openclaw gateway restart
 ```
 
 **Installation Error?**
 If you see an error like `Could not locate the bindings file` for `better-sqlite3`, OpenClaw prevented the native compilation step for security. To fix:
 ```bash
-cd ~/.openclaw/extensions/contexto/
-npm rebuild better-sqlite3
+# 1. Ensure your system has the required build tools for SQLite bindings
+sudo apt-get install python3 build-essential
+# 2. Rebuild it
+cd ~/.openclaw/extensions/contexto/ && npm rebuild better-sqlite3
+# 2. Reinstall it
 openclaw plugins install @ekai/contexto
 openclaw gateway restart
 ```
