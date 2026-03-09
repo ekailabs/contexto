@@ -22,6 +22,9 @@ In your OpenClaw config:
 ```json5
 {
   plugins: {
+    slots: {
+      contextEngine: "@ekai/contexto"
+    },
     allow: ["@ekai/contexto"],
     entries: {
       "@ekai/contexto": {
@@ -59,7 +62,7 @@ When `provider` and `apiKey` are not explicitly configured, the plugin auto-dete
 
 ```bash
 openclaw plugins list       # should show @ekai/contexto
-openclaw hooks list         # should show plugin:@ekai/contexto:* hooks
+openclaw config get plugins.slots.contextEngine  # should show @ekai/contexto
 ```
 
 ## Bootstrap
@@ -74,15 +77,17 @@ Bootstrap scans `{stateDir}/agents/*/sessions/*.jsonl`, parses each session, and
 
 ## How It Works
 
-Two hooks and a slash command:
+ContextEngine lifecycle methods and a slash command:
 
-1. **`agent_end`** — Ingests new conversation turns into memory (ongoing). Normalizes messages (user + assistant only), redacts secrets, extracts semantic memories via `@ekai/memory`. Only processes the delta since the last ingestion.
+1. **`assemble()`** — Recalls relevant memories for the current query and injects them via `systemPromptAddition` (capped at 2000 chars).
 
-2. **`before_prompt_build`** — Recalls relevant memories for the current query and prepends them as context (capped at 2000 chars).
+2. **`afterTurn()`** — Ingests new conversation turns into memory. Normalizes messages (user + assistant only), redacts secrets, extracts semantic memories via `@ekai/memory`. Only processes the delta since the last ingestion.
 
 3. **`/memory-bootstrap`** — One-time backfill of all existing session transcripts. Scans the OpenClaw state directory for historical JSONL session files and ingests them into memory. Runs in the background with configurable delay between sessions. Idempotent — safe to re-run.
 
 Delta tracking is persisted to `{dbPath}.progress.json` using composite keys (`agentId:sessionId`) so only new messages are ingested, even across restarts. Both ongoing ingestion and bootstrap share the same progress file.
+
+> **Upgrade from 0.1.x:** This version requires OpenClaw v2026.3.7+ and the `plugins.slots.contextEngine` setting. The old hook-based approach (`agent_end` / `before_prompt_build`) is no longer used.
 
 ## Development
 

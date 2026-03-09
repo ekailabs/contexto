@@ -31,7 +31,7 @@ If you see an error like `Could not locate the bindings file` for `better-sqlite
 sudo apt-get install python3 build-essential
 # 2. Rebuild it
 cd ~/.openclaw/extensions/contexto/ && npm rebuild better-sqlite3
-# 2. Reinstall it
+# 3. Reinstall it
 openclaw plugins install @ekai/contexto
 openclaw gateway restart
 ```
@@ -81,6 +81,9 @@ Add to your OpenClaw config:
 ```json
 {
   "plugins": {
+    "slots": {
+      "contextEngine": "@ekai/contexto"
+    },
     "allow": ["@ekai/contexto"],
     "entries": {
       "@ekai/contexto": {
