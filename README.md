@@ -19,6 +19,23 @@ Start with the **OpenClaw plugin**, the **OpenAI-compatible proxy**, or the **me
 openclaw plugins install @ekai/contexto
 ```
 
+```bash
+# Restart openclaw to activate plugin
+openclaw gateway restart
+```
+
+**Installation Error?**
+If you see an error like `Could not locate the bindings file` for `better-sqlite3`, OpenClaw prevented the native compilation step for security. To fix:
+```bash
+# 1. Ensure your system has the required build tools for SQLite bindings
+sudo apt-get install python3 build-essential
+# 2. Rebuild it
+cd ~/.openclaw/extensions/contexto/ && npm rebuild better-sqlite3
+# 2. Reinstall it
+openclaw plugins install @ekai/contexto
+openclaw gateway restart
+```
+
 ## See the Difference
 
 **Without Contexto:**
@@ -58,10 +75,6 @@ Contexto's architecture is inspired by how human memory actually works — episo
 ### OpenClaw Plugin (recommended)
 
 The fastest way to add persistent context to any OpenClaw agent:
-
-```bash
-openclaw plugins install @ekai/contexto
-```
 
 Add to your OpenClaw config:
 
