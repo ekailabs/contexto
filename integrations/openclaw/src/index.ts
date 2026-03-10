@@ -225,15 +225,19 @@ export default {
 
         // 2. Fetch Memory Context
         if (knownAgents.has(agentId) && query) {
-          const results = await mem.agent(agentId).search(query, { userId: ctx?.userId });
-          if (results.length > 0) {
-            let block = results
-              .slice(0, 5)
-              .map((r: any) => `- ${r.content}`)
-              .join('\n');
+          try {
+            const results = await mem.agent(agentId).search(query, { userId: ctx?.userId });
+            if (results.length > 0) {
+              let block = results
+                .slice(0, 5)
+                .map((r: any) => `- ${r.content}`)
+                .join('\n');
 
-            if (block.length > MAX_PREPEND_CHARS) block = block.slice(0, MAX_PREPEND_CHARS) + '…';
-            prependContext += `## Relevant memories\n${block}\n\n`;
+              if (block.length > MAX_PREPEND_CHARS) block = block.slice(0, MAX_PREPEND_CHARS) + '…';
+              prependContext += `## Relevant memories\n${block}\n\n`;
+            }
+          } catch (err) {
+            api.logger.warn(`@ekai/contexto: memory search failed: ${String(err)}`);
           }
         }
 

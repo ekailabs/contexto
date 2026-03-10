@@ -232,17 +232,44 @@ ENABLE_DASHBOARD=false npm run dev      # proxy only
 ENABLE_OPENROUTER=false npm run dev     # dashboard only
 ```
 
-## Markdown Retrieval
+## Knowledge Base Retrieval
 
-The OpenClaw plugin supports retrieving context from local Markdown files. By configuring a `knowledgeFolder` in your plugin settings, your agent can instantly reference external documentation, code snippets, or any static information stored in that folder.
+The OpenClaw plugin supports retrieving context from local text and Markdown files. By configuring a `knowledgeFolder` in your plugin settings, your agent can instantly reference external documentation, code snippets, or any static text-based information stored in that directory. 
+
+Unlike previous versions, this recursively discovers **any text file** (`.txt`, `.md`, `.json`, `.csv`, etc.) meaning everything in your folder is passed as direct context to your agent.
+
+### Syncing with Obsidian 
+
+If you use Obsidian to take notes and run the OpenClaw gateway on a remote VPS, you can instantly sync your Obsidian vault directly to your agent's `knowledgeFolder` via `obsidian-headless`:
+
+1. **Install Obsidian Headless**
+   ```bash
+   npm install -g obsidian-headless
+   ```
+2. **Setup your Vault Folder**: On your VPS, create a folder for your remote vault and configure your `@ekai/contexto` plugin's `knowledgeFolder` settings to point there.
+   ```bash
+   mkdir -p ~/.openclaw/ekai/knowledge
+   cd ~/.openclaw/ekai/knowledge
+   ```
+3. **Login & Sync**
+   ```bash
+   ob login
+   ob sync-list-remote
+   ob sync-setup --vault "Your Vault Name"
+   ```
+4. **Run Sync**
+   - For a one-time sync: `ob sync`
+   - To keep running continuously: `ob sync --continuous`
+
+Whenever you update a note on your local Obsidian app, `ob sync` pulls it to your remote VPS, and Contexto instantly parses it for OpenClaw!
+
+### How Retrieval Works
 
 When a typical conversation request is processed, the standard knowledge flow is as follows:
 
-1. **Keyword Extraction:** The plugin extracts core keywords from the user's latest message (ignoring common stop words).
-2. **File Discovery:** It scans your configured `knowledgeFolder` for all `.md` files.
-3. **Scoring:** It assigns a relevance score to each document based on keyword overlap with the user's prompt.
-4. **Ranking & Formatting:** It ranks the results and injects the top contents into a `## Reference Knowledge` context block. This context block is prepended to the system prompt just before the final payload is sent to the LLM.
-5. **Memory Recall:** Finally, it performs the standard long-term episodic conversation memory recall and appends those to the context alongside the document knowledge.
+1. **File Discovery:** It recursively scans your configured `knowledgeFolder` for all text-based files, skipping hidden files and binary files.
+2. **Formatting:** It constructs a `## Reference Knowledge` context block, injecting the file contents and wrapping them in their respective extension types (e.g. ` ```md `, ` ```json `). This context block is prepended to the system prompt just before the final payload is sent to the LLM.
+3. **Memory Recall:** Finally, it performs the standard long-term episodic conversation memory recall and appends those to the context alongside the document knowledge.
 
 ## Enterprise
 
