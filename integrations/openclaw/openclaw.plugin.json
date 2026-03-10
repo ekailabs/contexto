@@ -4,10 +4,21 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "dbPath": { "type": "string" },
-      "provider": { "type": "string" },
-      "apiKey": { "type": "string" },
-      "bootstrapDelayMs": { "type": "number" }
+      "dbPath": {
+        "type": "string"
+      },
+      "provider": {
+        "type": "string"
+      },
+      "apiKey": {
+        "type": "string"
+      },
+      "bootstrapDelayMs": {
+        "type": "number"
+      },
+      "knowledgeFolder": {
+        "type": "string"
+      }
     }
   },
   "uiHints": {
@@ -27,6 +38,10 @@
       "label": "Bootstrap delay",
       "description": "ms between sessions during backfill (default: 1000)",
       "advanced": true
+    },
+    "knowledgeFolder": {
+      "label": "Knowledge Folder",
+      "description": "Path to the folder containing markdown files for context retrieval"
     }
   }
 }

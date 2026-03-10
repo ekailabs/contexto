@@ -4,6 +4,7 @@ import { writeFile, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import os from 'node:os';
 import { runBootstrap, type BootstrapProgress } from './bootstrap.js';
+import { fetchMarkdownContext } from './retrieval.js';
 
 // --- Inline helpers ---
 
@@ -127,6 +128,8 @@ export default {
       dbPath: { type: 'string' },
       provider: { type: 'string' },
       apiKey: { type: 'string' },
+      bootstrapDelayMs: { type: 'number' },
+      knowledgeFolder: { type: 'string' },
     },
   },
 
@@ -201,24 +204,44 @@ export default {
     api.on('before_prompt_build', async (event: any, ctx: any) => {
       try {
         const agentId = ctx?.agentId ?? 'main';
-        if (!knownAgents.has(agentId)) return;
 
+        let prependContext = '';
+
+        // 1. Fetch Markdown Context if configured
+        const knowledgeFolder = api.pluginConfig?.knowledgeFolder;
         const query = lastUserMessage(event?.messages ?? []);
-        if (!query) return;
 
-        const results = await mem.agent(agentId).search(query, { userId: ctx?.userId });
-        if (results.length === 0) return;
+        if (knowledgeFolder && query) {
+          try {
+            const resolvedFolder = api.resolvePath(knowledgeFolder);
+            const markdownContext = await fetchMarkdownContext(query, resolvedFolder);
+            if (markdownContext) {
+              prependContext += markdownContext + '\n\n';
+            }
+          } catch (err) {
+            api.logger.warn(`@ekai/contexto: markdown retrieval failed: ${String(err)}`);
+          }
+        }
 
-        let block = results
-          .slice(0, 5)
-          .map((r: any) => `- ${r.content}`)
-          .join('\n');
+        // 2. Fetch Memory Context
+        if (knownAgents.has(agentId) && query) {
+          const results = await mem.agent(agentId).search(query, { userId: ctx?.userId });
+          if (results.length > 0) {
+            let block = results
+              .slice(0, 5)
+              .map((r: any) => `- ${r.content}`)
+              .join('\n');
 
-        if (block.length > MAX_PREPEND_CHARS) block = block.slice(0, MAX_PREPEND_CHARS) + '…';
+            if (block.length > MAX_PREPEND_CHARS) block = block.slice(0, MAX_PREPEND_CHARS) + '…';
+            prependContext += `## Relevant memories\n${block}\n\n`;
+          }
+        }
 
-        return { prependContext: `## Relevant memories\n${block}` };
+        if (prependContext.trim()) {
+          return { prependContext: prependContext.trim() };
+        }
       } catch (err) {
-        api.logger.warn(`@ekai/contexto: recall failed: ${String(err)}`);
+        api.logger.warn(`@ekai/contexto: recall/hook failed: ${String(err)}`);
       }
     });
 

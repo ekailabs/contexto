@@ -236,6 +236,14 @@ function createApi(tmpDir: string) {
 describe('resolveMemoryProvider', () => {
   const logger = { info: vi.fn(), warn: vi.fn() };
 
+  // Keep a clean slate for env tests using stubEnv
+  beforeEach(() => {
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('GOOGLE_API_KEY', '');
+    vi.stubEnv('MEMORY_EMBED_PROVIDER', '');
+    vi.stubEnv('MEMORY_EXTRACT_PROVIDER', '');
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
@@ -302,6 +310,11 @@ describe('resolveMemoryProvider', () => {
 
 describe('plugin.register provider logging', () => {
   let tmpDir: string;
+
+  beforeEach(() => {
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('GOOGLE_API_KEY', '');
+  });
 
   afterEach(() => {
     vi.unstubAllEnvs();

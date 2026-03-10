@@ -232,6 +232,18 @@ ENABLE_DASHBOARD=false npm run dev      # proxy only
 ENABLE_OPENROUTER=false npm run dev     # dashboard only
 ```
 
+## Markdown Retrieval
+
+The OpenClaw plugin supports retrieving context from local Markdown files. By configuring a `knowledgeFolder` in your plugin settings, your agent can instantly reference external documentation, code snippets, or any static information stored in that folder.
+
+When a typical conversation request is processed, the standard knowledge flow is as follows:
+
+1. **Keyword Extraction:** The plugin extracts core keywords from the user's latest message (ignoring common stop words).
+2. **File Discovery:** It scans your configured `knowledgeFolder` for all `.md` files.
+3. **Scoring:** It assigns a relevance score to each document based on keyword overlap with the user's prompt.
+4. **Ranking & Formatting:** It ranks the results and injects the top contents into a `## Reference Knowledge` context block. This context block is prepended to the system prompt just before the final payload is sent to the LLM.
+5. **Memory Recall:** Finally, it performs the standard long-term episodic conversation memory recall and appends those to the context alongside the document knowledge.
+
 ## Enterprise
 
 Building AI agents for your team or product? We work with companies deploying agents at scale to ensure they always have the right context.
