@@ -11,7 +11,7 @@ export async function fetchMarkdownContext(
     const results = await store.search({
         query,
         limit,
-        rerank: true
+        rerank: false
     });
 
     if (!results || results.length === 0) {
