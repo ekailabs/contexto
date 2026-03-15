@@ -17,12 +17,8 @@ export function setupKnowledgeWatcher(
             if (watchTimeout) clearTimeout(watchTimeout);
 
             watchTimeout = setTimeout(() => {
-                logger.info(`@ekai/contexto: Changes in ${filename}, syncing...`);
                 store.update()
                     .then(() => store.embed())
-                    .then(() => {
-                        logger.info(`@ekai/contexto: Knowledge base synced.`);
-                    })
                     .catch((e) => {
                         logger.warn(`@ekai/contexto: Sync failed: ${String(e)}`);
                     });

@@ -237,8 +237,6 @@ export default {
         const query = lastUserMessage(event?.messages ?? []);
         if (!query) return;
 
-        api.logger.info(`@ekai/contexto: Hook 'before_prompt_build' triggered for query: "${query}"`);
-
         const qmdPromise = qmdStore ? fetchMarkdownContext(qmdStore, query) : Promise.resolve(undefined);
         const memPromise = knownAgents.has(agentId) ? mem.agent(agentId).search(query, { userId: ctx?.userId }) : Promise.resolve([]);
 
