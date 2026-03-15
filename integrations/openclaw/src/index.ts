@@ -5,6 +5,7 @@ import { dirname } from 'node:path';
 import os from 'node:os';
 import { runBootstrap, type BootstrapProgress } from './bootstrap.js';
 import { fetchMarkdownContext } from './retrieval.js';
+import { setupKnowledgeWatcher } from './watcher.js';
 
 // --- Inline helpers ---
 
@@ -128,7 +129,6 @@ export default {
       dbPath: { type: 'string' },
       provider: { type: 'string' },
       apiKey: { type: 'string' },
-      bootstrapDelayMs: { type: 'number' },
       knowledgeFolder: { type: 'string' },
     },
   },
@@ -153,6 +153,30 @@ export default {
     // Seed from existing agents in DB (survives restarts)
     for (const a of mem.getAgents()) knownAgents.add(a.id);
     ensureAgent('main');
+
+    // --- QMD Setup ---
+    let qmdStore: any = undefined;
+    const knowledgeFolder = api.pluginConfig?.knowledgeFolder;
+    if (knowledgeFolder) {
+      const resolvedFolder = api.resolvePath(knowledgeFolder);
+      const qmdDbPath = dbPath.replace(/\.db$/, '.qmd.sqlite');
+
+      import('@tobilu/qmd').then(({ createStore }) => {
+        createStore({
+          dbPath: qmdDbPath,
+          config: { collections: { knowledge: { path: resolvedFolder, pattern: '**/*.{md,txt,json,csv}' } } }
+        }).then(store => {
+          qmdStore = store;
+          setupKnowledgeWatcher(resolvedFolder, store as any, api.logger);
+          store.update().then(() => store.embed());
+          api.logger.info(`@ekai/contexto: QMD store initialized at ${resolvedFolder}`);
+        }).catch(err => {
+          api.logger.warn(`@ekai/contexto: QMD init failed: ${String(err)}`);
+        });
+      }).catch(err => {
+        api.logger.warn(`@ekai/contexto: Failed to load @tobilu/qmd: ${String(err)}`);
+      });
+    }
 
     // --- Delta tracking (persisted) ---
     const progressPath = dbPath.replace(/\.db$/, '') + '.progress.json';
@@ -181,6 +205,10 @@ export default {
       try {
         ensureAgent(agentId);
 
+        if (qmdStore) {
+          qmdStore.update().catch(() => { });
+        }
+
         const delta = event.messages.slice(startIdx);
         const turns = normalizeMessages(delta);
         if (turns.length === 0) {
@@ -204,48 +232,49 @@ export default {
     api.on('before_prompt_build', async (event: any, ctx: any) => {
       try {
         const agentId = ctx?.agentId ?? 'main';
+        if (!knownAgents.has(agentId)) return;
 
-        let prependContext = '';
-
-        // 1. Fetch Markdown Context if configured
-        const knowledgeFolder = api.pluginConfig?.knowledgeFolder;
         const query = lastUserMessage(event?.messages ?? []);
+        if (!query) return;
 
-        if (knowledgeFolder && query) {
-          try {
-            const resolvedFolder = api.resolvePath(knowledgeFolder);
-            const markdownContext = await fetchMarkdownContext(query, resolvedFolder);
-            if (markdownContext) {
-              prependContext += markdownContext + '\n\n';
-            }
-          } catch (err) {
-            api.logger.warn(`@ekai/contexto: markdown retrieval failed: ${String(err)}`);
-          }
+        api.logger.info(`@ekai/contexto: Hook 'before_prompt_build' triggered for query: "${query}"`);
+
+        const qmdPromise = qmdStore ? fetchMarkdownContext(qmdStore, query) : Promise.resolve(undefined);
+        const memPromise = knownAgents.has(agentId) ? mem.agent(agentId).search(query, { userId: ctx?.userId }) : Promise.resolve([]);
+
+        const [qmdResult, memResult] = await Promise.allSettled([qmdPromise, memPromise]);
+
+        const qmdContext = qmdResult.status === 'fulfilled' ? qmdResult.value : undefined;
+        if (qmdResult.status === 'rejected') {
+          api.logger.warn(`@ekai/contexto: QMD recall failed: ${String(qmdResult.reason)}`);
         }
 
-        // 2. Fetch Memory Context
-        if (knownAgents.has(agentId) && query) {
-          try {
-            const results = await mem.agent(agentId).search(query, { userId: ctx?.userId });
-            if (results.length > 0) {
-              let block = results
-                .slice(0, 5)
-                .map((r: any) => `- ${r.content}`)
-                .join('\n');
-
-              if (block.length > MAX_PREPEND_CHARS) block = block.slice(0, MAX_PREPEND_CHARS) + '…';
-              prependContext += `## Relevant memories\n${block}\n\n`;
-            }
-          } catch (err) {
-            api.logger.warn(`@ekai/contexto: memory search failed: ${String(err)}`);
-          }
+        const memResults = memResult.status === 'fulfilled' ? memResult.value : [];
+        if (memResult.status === 'rejected') {
+          api.logger.warn(`@ekai/contexto: Memory recall failed: ${String(memResult.reason)}`);
         }
 
-        if (prependContext.trim()) {
-          return { prependContext: prependContext.trim() };
+        let prepend = '';
+        if (qmdContext) {
+          prepend += qmdContext + '\n\n';
+        }
+
+        if (memResults && memResults.length > 0) {
+          let block = memResults
+            .slice(0, 5)
+            .map((r: any) => `- ${r.content}`)
+            .join('\n');
+
+          if (block.length > MAX_PREPEND_CHARS) block = block.slice(0, MAX_PREPEND_CHARS) + '…';
+          prepend += `## Relevant memories\n${block}\n\n`;
+        }
+
+        if (prepend.trim()) {
+          api.logger.info(`@ekai/contexto: Successfully prepended context to prompt.`);
+          return { prependContext: prepend.trim() };
         }
       } catch (err) {
-        api.logger.warn(`@ekai/contexto: recall/hook failed: ${String(err)}`);
+        api.logger.warn(`@ekai/contexto: recall failed: ${String(err)}`);
       }
     });
 

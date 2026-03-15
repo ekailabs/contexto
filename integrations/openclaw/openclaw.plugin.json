@@ -40,8 +40,8 @@
       "advanced": true
     },
     "knowledgeFolder": {
-      "label": "Knowledge Folder",
-      "description": "Path to the folder containing markdown files for context retrieval"
+      "label": "Knowledge Folder Path",
+      "description": "Path to your local markdown/knowledge vault (e.g. obsidian)"
     }
   }
 }
