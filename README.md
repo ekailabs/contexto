@@ -234,7 +234,11 @@ ENABLE_OPENROUTER=false npm run dev     # dashboard only
 
 ## Knowledge Base Retrieval
 
-The OpenClaw plugin supports retrieving context from local text and Markdown files. By configuring a `knowledgeFolder` in your plugin settings, your agent can instantly reference external documentation, code snippets, or any static text-based information stored in that directory. 
+Contexto is designed as a **single install solution for all your context needs in OpenClaw**. 
+
+Currently, the OpenClaw plugin supports retrieving context from local text and Markdown files (like Obsidian vaults) using QMD. By configuring a `knowledgeFolder` in your plugin settings, your agent can instantly reference external documentation, code snippets, or any static text-based information stored in that directory.
+
+*Note: In the near future, we plan to extend Contexto to natively support fetching relevant context from other sources, including an upcoming integration with **Google Drive**!*
 
 Unlike previous versions, this recursively discovers **any text file** (`.txt`, `.md`, `.json`, `.csv`, etc.) meaning everything in your folder is passed as direct context to your agent.
 
