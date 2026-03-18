@@ -81,7 +81,7 @@ export class Memory {
    */
   async add(
     messages: Array<{ role: string; content: string }>,
-    opts?: { userId?: string },
+    opts?: { userId?: string; deduplicate?: boolean },
   ): Promise<{ stored: number; ids: string[]; filtered?: boolean; reason?: string }> {
     const agent = this.requireAgent();
 
@@ -106,6 +106,7 @@ export class Memory {
     const rows = await this.store.ingest(components, agent, {
       origin: { originType: 'conversation' },
       userId: opts?.userId,
+      deduplicate: opts?.deduplicate,
     });
 
     return { stored: rows.length, ids: rows.map((r) => r.id) };
