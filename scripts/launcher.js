@@ -20,21 +20,29 @@ try {
 // Resolve ports from env (each service owns its own port var)
 const dashboardPort = process.env.DASHBOARD_PORT || "3000";
 const openrouterPort = process.env.OPENROUTER_PORT || "4010";
+const apiPort = process.env.API_PORT || "4010";
 
 const SERVICES = {
   dashboard: {
-    dev: `npx -w ui/dashboard next dev -p ${dashboardPort}`,
-    start: `npx -w ui/dashboard next start -p ${dashboardPort} -H 0.0.0.0`,
+    dev: `pnpm --filter @ekai/dashboard run dev -p ${dashboardPort}`,
+    start: `pnpm --filter @ekai/dashboard run start -p ${dashboardPort} -H 0.0.0.0`,
     label: "dashboard",
     color: "magenta",
     port: dashboardPort,
   },
   openrouter: {
-    dev: `OPENROUTER_PORT=${openrouterPort} npm run dev -w @ekai/openrouter`,
-    start: `OPENROUTER_PORT=${openrouterPort} npm run start -w @ekai/openrouter`,
+    dev: `OPENROUTER_PORT=${openrouterPort} pnpm --filter @ekai/openrouter run dev`,
+    start: `OPENROUTER_PORT=${openrouterPort} pnpm --filter @ekai/openrouter run start`,
     label: "openrouter",
     color: "yellow",
     port: openrouterPort,
+  },
+  api: {
+    dev: `API_PORT=${apiPort} pnpm --filter @ekai/api run dev`,
+    start: `API_PORT=${apiPort} pnpm --filter @ekai/api run start`,
+    label: "api",
+    color: "cyan",
+    port: apiPort,
   },
 };
 

@@ -1,14 +1,15 @@
 {
-  "name": "dashboard",
+  "name": "@ekai/dashboard",
   "version": "0.1.0-beta.1",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "npm install && next build --turbopack",
+    "build": "next build --turbopack",
     "build:embedded": "NEXT_BUILD_MODE=embedded NEXT_PUBLIC_EMBEDDED_MODE=true next build",
     "type-check": "tsc --noEmit",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "clean": "rm -rf .next"
   },
   "dependencies": {
     "@types/dagre": "^0.7.53",

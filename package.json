@@ -1,29 +1,29 @@
 {
-  "name": "ekai-gateway",
+  "name": "ekai-contexto",
   "version": "0.1.0-beta.1",
-  "description": "Ekai Gateway - AI proxy with memory and dashboard",
+  "description": "Contexto - Local-First Context Engine for AI Agents",
   "private": true,
-  "workspaces": ["ui/dashboard", "memory", "integrations/openrouter", "integrations/openclaw", "api"],
+  "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "dev": "node scripts/launcher.js --mode dev",
-    "start": "node scripts/launcher.js --mode start",
-    "build": "npm install --workspaces && npm run build --workspaces --if-present",
-    "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
-    "test": "npm run test --workspace=@ekai/openrouter",
-    "dev:ui": "npm run dev --workspace=ui/dashboard",
-    "dev:openrouter": "npm run dev --workspace=@ekai/openrouter",
-    "start:ui": "npx --workspace=ui/dashboard next start -p 3000 -H 0.0.0.0"
+    "dev": "pnpm -r run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "clean": "pnpm -r run clean && rm -rf node_modules",
+    "dev:api": "pnpm --filter @ekai/api run dev",
+    "dev:memory": "pnpm --filter @ekai/memory run dev",
+    "dev:openrouter": "pnpm --filter @ekai/openrouter run dev",
+    "dev:dashboard": "pnpm --filter @ekai/dashboard run dev",
+    "dev:openclaw": "pnpm --filter @ekai/contexto run dev"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "typescript": "^5.3.2"
   },
   "keywords": [
     "ai",
-    "proxy",
-    "gateway",
-    "dashboard",
-    "openai",
-    "openrouter"
+    "memory",
+    "context",
+    "openclaw",
+    "agent"
   ],
   "author": "Ekai Labs"
 }

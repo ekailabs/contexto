@@ -18,9 +18,8 @@
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "prepublishOnly": "npm run build",
-    "prestart": "npm run build",
-    "start": "node dist/server.js"
+    "clean": "rm -rf dist",
+    "dev": "tsx watch src/server.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.2.0",

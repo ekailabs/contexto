@@ -32,7 +32,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ekai/memory": "^0.0.1"
+    "@ekai/memory": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.2",

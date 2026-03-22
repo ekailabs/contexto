@@ -1,13 +1,14 @@
 services:
   fullstack:
-    build: .
+    build:
+      context: .
+      target: ekai-gateway-runtime
     image: ghcr.io/ekailabs/ekai-gateway:latest
     environment:
       UI_PORT: ${UI_PORT:-3000}
       OPENROUTER_PORT: ${OPENROUTER_PORT:-4010}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4010}
-      NEXT_PUBLIC_MEMORY_PORT: ${OPENROUTER_PORT:-4010}
-      MEMORY_DB_PATH: /app/memory/data/memory.db
+      MEMORY_DB_PATH: /app/packages/memory/data/memory.db
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       ENABLE_DASHBOARD: ${ENABLE_DASHBOARD:-true}
       ENABLE_OPENROUTER: ${ENABLE_OPENROUTER:-true}
@@ -15,25 +16,42 @@ services:
       - "3000:3000"
       - "4010:4010"
     volumes:
-      - memory_db:/app/memory/data
+      - memory_db:/app/packages/memory/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: api-runtime
+    image: ghcr.io/ekailabs/ekai-api:latest
+    environment:
+      PORT: ${API_PORT:-4010}
+      DATABASE_URL: ${DATABASE_URL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    ports:
+      - "4010:4010"
+    volumes:
+      - api_data:/app/packages/api/data
     restart: unless-stopped
 
   openrouter-standalone:
     build:
       context: .
-      target: openrouter-cloudrun
+      target: openrouter-runtime
     image: ghcr.io/ekailabs/ekai-openrouter:latest
-    profiles: [cloudrun]
     environment:
       PORT: ${OPENROUTER_PORT:-4010}
-      MEMORY_DB_PATH: /app/memory/data/memory.db
+      MEMORY_DB_PATH: /app/packages/memory/data/memory.db
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      DASHBOARD_STATIC_DIR: /app/dashboard-static
+      DASHBOARD_STATIC_DIR: /app/packages/ui/dashboard/.next
     ports:
       - "4010:4010"
     volumes:
-      - memory_db:/app/memory/data
+      - memory_db:/app/packages/memory/data
     restart: unless-stopped
 
 volumes:
   memory_db:
+  api_data:

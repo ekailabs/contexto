@@ -11,7 +11,8 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@ekai/memory": "workspace:*",
