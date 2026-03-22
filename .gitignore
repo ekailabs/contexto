@@ -5,7 +5,6 @@ gateway/costs/generated/
 node_modules/
 
 # pnpm
-pnpm-lock.yaml
 .pnpm-debug.log*
 
 # Environment variables
