@@ -1,0 +1,37 @@
+{
+  "name": "@ekai/contexto-claw",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin — sends all events to a webhook API",
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "src/index.ts",
+  "files": [
+    "src/",
+    "openclaw.plugin.json"
+  ],
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "webhook",
+    "events"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ekailabs/contexto",
+    "directory": "integrations/contexto-claw"
+  },
+  "author": "Ekai Labs",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2"
+  },
+  "openclaw": {
+    "extensions": ["./src/index.ts"]
+  }
+}
