@@ -55,8 +55,8 @@ function buildPayload(
 }
 
 const webhookPlugin = {
-  id: '@ekai/contexto-claw',
-  name: 'Contexto Claw',
+  id: '@ekai/mindmap',
+  name: 'Mind Map',
   description: 'Sends OpenClaw context engine events to a webhook API',
 
   configSchema: {
