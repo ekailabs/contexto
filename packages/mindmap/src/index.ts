@@ -19,7 +19,7 @@ interface WebhookPayload {
 
 async function sendWebhook(config: WebhookConfig, payload: WebhookPayload, logger: any): Promise<void> {
   try {
-    const response = await fetch(`${WEBHOOK_URL_BASE}/v1/webhook/events`, {
+    const response = await fetch(`${WEBHOOK_URL_BASE}/v1/webhooks/events`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
