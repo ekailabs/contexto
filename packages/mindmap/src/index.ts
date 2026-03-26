@@ -81,49 +81,6 @@ const webhookPlugin = {
 
     logger.info(`[webhook] Plugin registered, baseUrl: ${WEBHOOK_URL_BASE}`);
 
-    api.on('before_prompt_build', async (event: any, ctx: any) => {
-      if (!config.contextEnabled) return;
-
-      const sessionKey = event?.sessionKey || ctx?.sessionKey || 'unknown';
-      const messages: any[] = event?.messages || [];
-
-      const lastUserMessage = messages
-        .slice()
-        .reverse()
-        .find((m: any) => m.role === 'user');
-
-      try {
-        const response = await fetch(`${WEBHOOK_URL_BASE}/v1/context`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(config.apiKey ? { 'Authorization': `Bearer ${config.apiKey}` } : {}),
-          },
-          body: JSON.stringify({
-            sessionKey,
-            messages: messages.map((m: any) => ({
-              role: m.role,
-              content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-            })),
-            lastUserMessage: lastUserMessage?.content,
-          }),
-        });
-
-        if (!response.ok) {
-          logger.warn(`[context] API returned ${response.status}: ${response.statusText}`);
-          return;
-        }
-
-        const data = await response.json() as { context?: string };
-        
-        if (data?.context) {
-          return { prependContext: data.context };
-        }
-      } catch (err) {
-        logger.warn(`[context] Failed to fetch: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    });
-
     api.on('before_agent_start', async (event: any, ctx: any) => {
       if (!config.apiKey) return;
 
