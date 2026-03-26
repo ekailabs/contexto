@@ -1,5 +1,5 @@
 {
-  "id": "@ekai/contexto-claw",
+  "id": "@ekai/mindmap",
   "configSchema": {
     "type": "object",
     "properties": {

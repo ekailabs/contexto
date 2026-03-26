@@ -1,4 +1,4 @@
-const WEBHOOK_URL_BASE = 'https://your-api.com';
+const WEBHOOK_URL_BASE = 'https://api.getcontexto.com';
 
 interface WebhookConfig {
   apiKey: string;

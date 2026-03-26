@@ -1,5 +1,5 @@
 {
-  "name": "@ekai/contexto-claw",
+  "name": "@ekai/mindmap",
   "version": "0.1.0",
   "description": "OpenClaw plugin — sends all events to a webhook API",
   "type": "module",
@@ -21,7 +21,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/ekailabs/contexto",
-    "directory": "integrations/contexto-claw"
+    "directory": "integrations/mindmap"
   },
   "author": "Ekai Labs",
   "scripts": {
