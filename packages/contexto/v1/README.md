@@ -1,4 +1,4 @@
-# @ekai/contexto (v1)
+# @ekai/contexto
 
 OpenClaw plugin — Context graph engine that prevents context rot by visualizing and organizing conversation context.
 
@@ -10,12 +10,6 @@ Mind Map is an improved **context engine** for OpenClaw that solves **context ro
 - Maps relationships between messages, concepts, and session states
 - Provides structured context retrieval to combat context rot
 - Enables the agent to understand conversation topology
-
-## Installation
-
-```bash
-npm install @ekai/contexto
-```
 
 ## OpenClaw Setup
 

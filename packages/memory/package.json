@@ -16,7 +16,6 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "type-check": "tsc --noEmit",
     "test": "vitest run",
     "prepublishOnly": "pnpm run build",
     "prestart": "pnpm run build",
