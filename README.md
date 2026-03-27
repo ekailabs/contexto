@@ -70,6 +70,17 @@ Contexto's architecture is inspired by how human memory actually works — episo
 | 📚 **Document Knowledge** | Semantic knowledge from your documents, surfaced at the right time. No more re-uploading files. | 🚧 Coming soon |
 | 🔧 **Tool Execution Memory** | Procedural memory from tool calls — what succeeded, what failed, what was retried. Agents get smarter with every execution. | 📋 Roadmap |
 
+## Mind Map Plugin
+
+Context engine that prevents **context rot** — the degradation of agent responses as conversation history grows. Uses **semantic clustering** to group related messages and concepts:
+
+```bash
+openclaw plugins install @ekai/mindmap
+openclaw gateway restart
+```
+
+See [`packages/mindmap/README.md`](packages/mindmap/README.md) for full setup instructions.
+
 ## Quick Start
 
 ### OpenClaw Plugin (recommended)
@@ -191,6 +202,8 @@ contexto/
 ├── integrations/
 │   ├── openrouter/       # Drop-in proxy with embedded memory
 │   └── openclaw/         # OpenClaw lifecycle plugin (@ekai/contexto)
+├── packages/
+│   └── mindmap/          # Mind map visualization plugin (@ekai/mindmap)
 ├── memory/               # Core memory library (@ekai/memory)
 ├── ui/dashboard/         # Memory dashboard (Next.js)
 ├── scripts/

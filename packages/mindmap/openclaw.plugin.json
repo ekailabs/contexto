@@ -1,0 +1,12 @@
+{
+  "id": "@ekai/mindmap",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "apiKey": {
+        "type": "string",
+        "description": "API key for Bearer authentication"
+      }
+    }
+  }
+}
