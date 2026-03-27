@@ -32,6 +32,7 @@ Mind Map is an improved **context engine** for OpenClaw that solves **context ro
 
 ```bash
 openclaw plugins install @ekai/contexto
+openclaw plugins enable contexto
 ```
 
 ### 2. Enable and configure the plugin
@@ -39,7 +40,7 @@ openclaw plugins install @ekai/contexto
 Set your API key via CLI:
 
 ```bash
-openclaw plugins config @ekai/contexto apiKey your-api-key-here
+openclaw config set plugins.entries.contexto.config.apiKey your-api-key-here
 ```
 
 ### 3. Restart OpenClaw
