@@ -1,5 +1,5 @@
 {
-  "id": "@ekai/contexto",
+  "id": "contexto",
   "configSchema": {
     "type": "object",
     "properties": {
