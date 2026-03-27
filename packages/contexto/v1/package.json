@@ -1,6 +1,6 @@
 {
   "name": "@ekai/contexto",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "OpenClaw plugin — sends all events to a webhook API",
   "type": "module",
   "license": "MIT",

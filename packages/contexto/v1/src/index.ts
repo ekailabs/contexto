@@ -58,7 +58,7 @@ function buildPayload(
 }
 
 const webhookPlugin = {
-  id: '@ekai/contexto',
+  id: 'contexto',
   name: 'Mind Map',
   description: 'Sends OpenClaw conversation events to a webhook API',
 
