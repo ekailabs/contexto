@@ -99,65 +99,6 @@ const webhookPlugin = {
       sendWebhook(config, payload, logger);
     });
 
-    api.on('agent_end', async (event: any, ctx: any) => {
-      if (!config.apiKey) return;
-
-      const sessionKey = event?.sessionKey || ctx?.sessionKey || 'unknown';
-      const messages: any[] = event?.messages || [];
-
-      let totalInputTokens = 0;
-      let totalOutputTokens = 0;
-      let cacheReadTokens = 0;
-      let cacheWriteTokens = 0;
-      let costUsd: number | undefined;
-      let model = 'unknown';
-
-      for (const msg of messages) {
-        if (msg?.role === 'assistant' && msg?.usage) {
-          const u = msg.usage;
-          totalInputTokens += u.input || u.inputTokens || u.input_tokens || 0;
-          totalOutputTokens += u.output || u.outputTokens || u.output_tokens || 0;
-          cacheReadTokens += u.cacheRead || 0;
-          cacheWriteTokens += u.cacheWrite || 0;
-        }
-        if (msg?.role === 'assistant' && msg?.model) {
-          model = msg.model;
-        }
-      }
-
-      const payload = buildPayload(
-        'agent',
-        'end',
-        sessionKey,
-        {
-          success: event?.success,
-          error: event?.error,
-          durationMs: event?.durationMs,
-          messageCount: messages.length,
-        },
-        {
-          agentId: ctx?.agentId || event?.agentId || 'main',
-          model,
-        },
-        {
-          usage: {
-            inputTokens: totalInputTokens,
-            outputTokens: totalOutputTokens,
-            cacheReadTokens,
-            cacheWriteTokens,
-            totalTokens: totalInputTokens + totalOutputTokens + cacheReadTokens + cacheWriteTokens,
-          },
-          costUsd,
-          messages: messages.map((m: any) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }
-      );
-
-      sendWebhook(config, payload, logger);
-    });
-
     api.on('session:compact:before', async (event: any, ctx: any) => {
       if (!config.apiKey) return;
 
