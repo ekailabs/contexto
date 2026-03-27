@@ -1,4 +1,4 @@
-# @ekai/mindmap
+# @ekai/contexto (v1)
 
 OpenClaw plugin — Context graph engine that prevents context rot by visualizing and organizing conversation context.
 
@@ -14,7 +14,7 @@ Mind Map is an improved **context engine** for OpenClaw that solves **context ro
 ## Installation
 
 ```bash
-npm install @ekai/mindmap
+npm install @ekai/contexto
 ```
 
 ## OpenClaw Setup
@@ -22,7 +22,7 @@ npm install @ekai/mindmap
 ### 1. Install the plugin in OpenClaw
 
 ```bash
-openclaw plugins install @ekai/mindmap
+openclaw plugins install @ekai/contexto
 ```
 
 ### 2. Enable and configure the plugin
@@ -30,7 +30,7 @@ openclaw plugins install @ekai/mindmap
 Set your API key via CLI:
 
 ```bash
-openclaw plugins config @ekai/mindmap apiKey your-api-key-here
+openclaw plugins config @ekai/contexto apiKey your-api-key-here
 ```
 
 Or add to your OpenClaw config:
@@ -39,11 +39,11 @@ Or add to your OpenClaw config:
 {
   "plugins": {
     "slots": {
-      "mindMap": "@ekai/mindmap"
+      "contextEngine": "@ekai/contexto"
     },
-    "allow": ["@ekai/mindmap"],
+    "allow": ["@ekai/contexto"],
     "entries": {
-      "@ekai/mindmap": {
+      "@ekai/contexto": {
         "enabled": true,
         "config": {
           "apiKey": "your-api-key-here"
@@ -65,6 +65,10 @@ openclaw gateway restart
 | Property | Type | Required | Description |
 | --- | --- | --- | --- |
 | `apiKey` | string | Yes | Your Contexto API key |
+
+## Version
+
+This is **v1** of @ekai/contexto. For the legacy version (v0), see [`../v0`](../v0).
 
 ## License
 

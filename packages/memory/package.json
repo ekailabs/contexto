@@ -18,8 +18,8 @@
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "prepublishOnly": "npm run build",
-    "prestart": "npm run build",
+    "prepublishOnly": "pnpm run build",
+    "prestart": "pnpm run build",
     "start": "node dist/server.js"
   },
   "dependencies": {

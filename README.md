@@ -70,16 +70,16 @@ Contexto's architecture is inspired by how human memory actually works — episo
 | 📚 **Document Knowledge** | Semantic knowledge from your documents, surfaced at the right time. No more re-uploading files. | 🚧 Coming soon |
 | 🔧 **Tool Execution Memory** | Procedural memory from tool calls — what succeeded, what failed, what was retried. Agents get smarter with every execution. | 📋 Roadmap |
 
-## Mind Map Plugin
+## Mind Map Plugin (v1)
 
 Context engine that prevents **context rot** — the degradation of agent responses as conversation history grows. Uses **semantic clustering** to group related messages and concepts:
 
 ```bash
-openclaw plugins install @ekai/mindmap
+openclaw plugins install @ekai/contexto
 openclaw gateway restart
 ```
 
-See [`packages/mindmap/README.md`](packages/mindmap/README.md) for full setup instructions.
+See [`packages/contexto/v1/README.md`](packages/contexto/v1/README.md) for full setup instructions.
 
 ## Quick Start
 
@@ -199,15 +199,15 @@ Browse, search, and manage everything your agent remembers. Inspect the memories
 
 ```
 contexto/
-├── integrations/
-│   ├── openrouter/       # Drop-in proxy with embedded memory
-│   └── openclaw/         # OpenClaw lifecycle plugin (@ekai/contexto)
 ├── packages/
-│   └── mindmap/          # Mind map visualization plugin (@ekai/mindmap)
-├── memory/               # Core memory library (@ekai/memory)
-├── ui/dashboard/         # Memory dashboard (Next.js)
+│   ├── contexto/
+│   │   ├── v0/              # Legacy @ekai/contexto (local memory)
+│   │   └── v1/              # New @ekai/contexto (API-based mind map)
+│   ├── memory/             # Core memory library (@ekai/memory)
+│   ├── openrouter/         # Drop-in proxy with embedded memory
+│   └── ui/dashboard/       # Memory dashboard (Next.js)
 ├── scripts/
-│   └── launcher.js       # Unified service launcher
+│   └── launcher.js         # Unified service launcher
 └── package.json
 ```
 
