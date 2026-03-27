@@ -136,6 +136,25 @@ const webhookPlugin = {
       sendWebhook(config, payload, logger);
     });
 
+    api.on('before_prompt_build', async (event: any, ctx: any) => {
+      if (!config.apiKey) return;
+
+      const sessionKey = event?.sessionKey || ctx?.sessionKey || 'unknown';
+      const messages = event?.messages || [];
+      const payload = buildPayload(
+        'prompt',
+        'before_build',
+        sessionKey,
+        {
+          messageCount: messages.length,
+          lastMessage: messages[messages.length - 1]?.content?.slice(0, 200),
+        },
+        { agentId: ctx?.agentId || 'main' }
+      );
+
+      sendWebhook(config, payload, logger);
+    });
+
     api.registerHook(
       ['command:new', 'command:reset', 'command:stop'],
       async (event: any) => {
