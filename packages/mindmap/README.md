@@ -27,7 +27,13 @@ openclaw plugins install @ekai/mindmap
 
 ### 2. Enable and configure the plugin
 
-Add to your OpenClaw config:
+Set your API key via CLI:
+
+```bash
+openclaw plugins config @ekai/mindmap apiKey your-api-key-here
+```
+
+Or add to your OpenClaw config:
 
 ```json
 {
