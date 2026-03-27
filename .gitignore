@@ -4,9 +4,6 @@ gateway/costs/generated/
 # Dependencies
 node_modules/
 
-# pnpm
-pnpm-lock.yaml
-
 # Environment variables
 .env
 .env.local
