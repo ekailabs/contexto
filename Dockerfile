@@ -3,54 +3,54 @@ FROM node:20 AS build-base
 WORKDIR /app
 
 # Copy root manifests
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml ./
 
-# Copy per-workspace manifests (lock files may not exist for all)
-COPY ui/dashboard/package.json ui/dashboard/package-lock.json* ./ui/dashboard/
-COPY memory/package.json memory/package-lock.json ./memory/
-COPY integrations/openrouter/package.json integrations/openrouter/package-lock.json ./integrations/openrouter/
+# Copy per-workspace manifests
+COPY packages/ui/dashboard/package.json packages/ui/dashboard/pnpm-lock.yaml* ./packages/ui/dashboard/
+COPY packages/memory/package.json packages/memory/pnpm-lock.yaml ./packages/memory/
+COPY packages/openrouter/package.json packages/openrouter/pnpm-lock.yaml ./packages/openrouter/
 
 # Install all workspace deps from root
-RUN npm install --workspaces --include-workspace-root
+RUN corepack enable && pnpm install --frozen-lockfile --workspaces
 
 # Copy the rest of the source
 COPY . .
 
 # ---------- dashboard build ----------
 FROM build-base AS dashboard-build
-WORKDIR /app/ui/dashboard
+WORKDIR /app/packages/ui/dashboard
 ARG NEXT_PUBLIC_API_BASE_URL=__API_URL_PLACEHOLDER__
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
-RUN npm run build
+RUN pnpm run build
 
 # ---------- memory build ----------
 FROM build-base AS memory-build
-WORKDIR /app/memory
-RUN npm run build
+WORKDIR /app/packages/memory
+RUN pnpm run build
 
 # ---------- openrouter build (depends on memory being built first) ----------
 FROM build-base AS openrouter-build
-WORKDIR /app/memory
-RUN npm run build
-WORKDIR /app/integrations/openrouter
-RUN npm run build
+WORKDIR /app/packages/memory
+RUN pnpm run build
+WORKDIR /app/packages/openrouter
+RUN pnpm run build
 
 # ---------- dashboard embedded build (static export for single-container) ----------
 FROM build-base AS dashboard-embedded-build
-WORKDIR /app/ui/dashboard
+WORKDIR /app/packages/ui/dashboard
 ENV NEXT_BUILD_MODE=embedded
 ENV NEXT_PUBLIC_EMBEDDED_MODE=true
-RUN npm run build:embedded
+RUN pnpm run build:embedded
 
 # ---------- dashboard runtime ----------
 FROM node:20-alpine AS dashboard-runtime
-WORKDIR /app/ui/dashboard
+WORKDIR /app/packages/ui/dashboard
 ENV NODE_ENV=production
-COPY ui/dashboard/package.json ./
-RUN npm install --omit=dev
-COPY --from=dashboard-build /app/ui/dashboard/.next ./.next
-COPY --from=dashboard-build /app/ui/dashboard/public ./public
-COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./next.config.mjs
+COPY packages/ui/dashboard/package.json ./
+RUN corepack enable && pnpm install --frozen-lockfile --omit=dev
+COPY --from=dashboard-build /app/packages/ui/dashboard/.next ./.next
+COPY --from=dashboard-build /app/packages/ui/dashboard/public ./public
+COPY --from=dashboard-build /app/packages/ui/dashboard/next.config.mjs ./next.config.mjs
 EXPOSE 3000
 CMD ["node_modules/.bin/next", "start", "-p", "3000"]
 
@@ -60,19 +60,19 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Memory package (workspace dependency of openrouter)
-COPY memory/package.json memory/package-lock.json ./memory/
-RUN cd memory && npm ci --omit=dev
-COPY --from=memory-build /app/memory/dist ./memory/dist
+COPY packages/memory/package.json packages/memory/pnpm-lock.yaml ./packages/memory/
+RUN cd packages/memory && pnpm install --frozen-lockfile --omit=dev
+COPY --from=memory-build /app/packages/memory/dist ./packages/memory/dist
 
 # OpenRouter — rewrite workspace ref to local file path before install
-COPY integrations/openrouter/package.json integrations/openrouter/package-lock.json ./integrations/openrouter/
-RUN cd integrations/openrouter && \
+COPY packages/openrouter/package.json packages/openrouter/pnpm-lock.yaml ./packages/openrouter/
+RUN cd packages/openrouter && \
     sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
-    npm ci --omit=dev
-COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
+    pnpm install --frozen-lockfile --omit=dev
+COPY --from=openrouter-build /app/packages/openrouter/dist ./packages/openrouter/dist
 
-RUN mkdir -p /app/memory/data
-WORKDIR /app/integrations/openrouter
+RUN mkdir -p /app/packages/memory/data
+WORKDIR /app/packages/openrouter
 EXPOSE 4010
 CMD ["node", "dist/server.js"]
 
@@ -83,24 +83,24 @@ WORKDIR /app
 RUN apk add --no-cache bash
 
 # Dashboard
-COPY ui/dashboard/package.json ./ui/dashboard/
-RUN cd ui/dashboard && npm install --omit=dev
-COPY --from=dashboard-build /app/ui/dashboard/.next ./ui/dashboard/.next
-COPY --from=dashboard-build /app/ui/dashboard/public ./ui/dashboard/public
-COPY --from=dashboard-build /app/ui/dashboard/next.config.mjs ./ui/dashboard/next.config.mjs
+COPY packages/ui/dashboard/package.json ./packages/ui/dashboard/
+RUN cd packages/ui/dashboard && pnpm install --frozen-lockfile --omit=dev
+COPY --from=dashboard-build /app/packages/ui/dashboard/.next ./packages/ui/dashboard/.next
+COPY --from=dashboard-build /app/packages/ui/dashboard/public ./packages/ui/dashboard/public
+COPY --from=dashboard-build /app/packages/ui/dashboard/next.config.mjs ./packages/ui/dashboard/next.config.mjs
 
 # Memory (workspace dependency of openrouter)
-COPY memory/package.json memory/package-lock.json ./memory/
-RUN cd memory && npm ci --omit=dev
-COPY --from=memory-build /app/memory/dist ./memory/dist
-RUN mkdir -p /app/memory/data
+COPY packages/memory/package.json packages/memory/pnpm-lock.yaml ./packages/memory/
+RUN cd packages/memory && pnpm install --frozen-lockfile --omit=dev
+COPY --from=memory-build /app/packages/memory/dist ./packages/memory/dist
+RUN mkdir -p /app/packages/memory/data
 
 # OpenRouter — rewrite workspace ref to local file path before install
-COPY integrations/openrouter/package.json integrations/openrouter/package-lock.json ./integrations/openrouter/
-RUN cd integrations/openrouter && \
+COPY packages/openrouter/package.json packages/openrouter/pnpm-lock.yaml ./packages/openrouter/
+RUN cd packages/openrouter && \
     sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
-    npm ci --omit=dev
-COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
+    pnpm install --frozen-lockfile --omit=dev
+COPY --from=openrouter-build /app/packages/openrouter/dist ./packages/openrouter/dist
 
 # Entrypoint
 COPY scripts/start-docker-fullstack.sh /app/start-docker-fullstack.sh
@@ -109,7 +109,7 @@ RUN chmod +x /app/start-docker-fullstack.sh
 ENV NODE_ENV=production
 
 EXPOSE 3000 4010
-VOLUME ["/app/memory/data"]
+VOLUME ["/app/packages/memory/data"]
 CMD ["/app/start-docker-fullstack.sh"]
 
 # ---------- openrouter + dashboard Cloud Run runtime (single container) ----------
@@ -118,22 +118,22 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Memory package (workspace dependency of openrouter)
-COPY memory/package.json memory/package-lock.json ./memory/
-RUN cd memory && npm ci --omit=dev
-COPY --from=memory-build /app/memory/dist ./memory/dist
+COPY packages/memory/package.json packages/memory/pnpm-lock.yaml ./packages/memory/
+RUN cd packages/memory && pnpm install --frozen-lockfile --omit=dev
+COPY --from=memory-build /app/packages/memory/dist ./packages/memory/dist
 
 # OpenRouter — rewrite workspace ref to local file path before install
-COPY integrations/openrouter/package.json integrations/openrouter/package-lock.json ./integrations/openrouter/
-RUN cd integrations/openrouter && \
+COPY packages/openrouter/package.json packages/openrouter/pnpm-lock.yaml ./packages/openrouter/
+RUN cd packages/openrouter && \
     sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
-    npm ci --omit=dev
-COPY --from=openrouter-build /app/integrations/openrouter/dist ./integrations/openrouter/dist
+    pnpm install --frozen-lockfile --omit=dev
+COPY --from=openrouter-build /app/packages/openrouter/dist ./packages/openrouter/dist
 
 # Dashboard static export
-COPY --from=dashboard-embedded-build /app/ui/dashboard/out ./dashboard-static
+COPY --from=dashboard-embedded-build /app/packages/ui/dashboard/out ./dashboard-static
 
-RUN mkdir -p /app/memory/data
-WORKDIR /app/integrations/openrouter
+RUN mkdir -p /app/packages/memory/data
+WORKDIR /app/packages/openrouter
 ENV DASHBOARD_STATIC_DIR=/app/dashboard-static
 EXPOSE 4010
 CMD ["node", "dist/server.js"]

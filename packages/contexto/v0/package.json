@@ -1,7 +1,7 @@
 {
-  "name": "@ekai/mindmap",
-  "version": "0.1.0",
-  "description": "OpenClaw plugin — sends all events to a webhook API",
+  "name": "@ekai/contexto",
+  "version": "0.1.1",
+  "description": "OpenClaw plugin — local-first memory for context recall and ingest",
   "type": "module",
   "license": "MIT",
   "publishConfig": {
@@ -15,21 +15,28 @@
   "keywords": [
     "openclaw",
     "openclaw-plugin",
-    "webhook",
-    "events"
+    "ai",
+    "context",
+    "memory",
+    "recall",
+    "ingest"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/ekailabs/contexto",
-    "directory": "integrations/mindmap"
+    "directory": "packages/contexto/v0"
   },
   "author": "Ekai Labs",
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ekai/memory": "^0.0.1"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "typescript": "^5.3.2"
+    "typescript": "^5.3.2",
+    "vitest": "^3.0.0"
   },
   "openclaw": {
     "extensions": ["./src/index.ts"]

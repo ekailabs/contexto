@@ -4,10 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "integrations/openrouter/**"
-      - "memory/**"
-      - "ui/dashboard/**"
+      - "packages/openrouter/**"
+      - "packages/memory/**"
+      - "packages/ui/dashboard/**"
       - "Dockerfile"
+      - "pnpm-workspace.yaml"
       - ".github/workflows/deploy-cloudrun.yml"
 
 env:

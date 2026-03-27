@@ -15,26 +15,44 @@ Your conversations stay on your machine — no data sent to third-party memory s
 
 Start with the **OpenClaw plugin**, the **OpenAI-compatible proxy**, or the **memory SDK**.
 
+OpenClaw plugin — Context graph engine that prevents context rot by visualizing and organizing conversation context.
+
+## Purpose
+
+Mind Map is an improved **context engine** for OpenClaw that solves **context rot** — the gradual degradation of agent responses as conversation history grows. It builds a contextual representation of your conversations that allows the agent to maintain relevance and coherence over extended sessions.
+
+- Uses **semantic clustering** to group related messages and concepts
+- Maps relationships between messages, concepts, and session states
+- Provides structured context retrieval to combat context rot
+- Enables the agent to understand conversation topology
+
+## OpenClaw Setup
+
+### 1. Install the plugin in OpenClaw
+
 ```bash
 openclaw plugins install @ekai/contexto
 ```
 
+### 2. Enable and configure the plugin
+
+Set your API key via CLI:
+
 ```bash
-# Restart openclaw to activate plugin
+openclaw plugins config @ekai/contexto apiKey your-api-key-here
+```
+
+### 3. Restart OpenClaw
+
+```bash
 openclaw gateway restart
 ```
 
-**Installation Error?**
-If you see an error like `Could not locate the bindings file` for `better-sqlite3`, OpenClaw prevented the native compilation step for security. To fix:
-```bash
-# 1. Ensure your system has the required build tools for SQLite bindings
-sudo apt-get install python3 build-essential
-# 2. Rebuild it
-cd ~/.openclaw/extensions/contexto/ && npm rebuild better-sqlite3
-# 3. Reinstall it
-openclaw plugins install @ekai/contexto
-openclaw gateway restart
-```
+## Configuration
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `apiKey` | string | Yes | Your Contexto API key |
 
 ## See the Difference
 
@@ -69,17 +87,6 @@ Contexto's architecture is inspired by how human memory actually works — episo
 | 🧠 **Conversation Memory** | Episodic recall from past conversations. Your agent remembers what happened last Tuesday. | ✅ Live |
 | 📚 **Document Knowledge** | Semantic knowledge from your documents, surfaced at the right time. No more re-uploading files. | 🚧 Coming soon |
 | 🔧 **Tool Execution Memory** | Procedural memory from tool calls — what succeeded, what failed, what was retried. Agents get smarter with every execution. | 📋 Roadmap |
-
-## Mind Map Plugin
-
-Context engine that prevents **context rot** — the degradation of agent responses as conversation history grows. Uses **semantic clustering** to group related messages and concepts:
-
-```bash
-openclaw plugins install @ekai/mindmap
-openclaw gateway restart
-```
-
-See [`packages/mindmap/README.md`](packages/mindmap/README.md) for full setup instructions.
 
 ## Quick Start
 
@@ -199,15 +206,15 @@ Browse, search, and manage everything your agent remembers. Inspect the memories
 
 ```
 contexto/
-├── integrations/
-│   ├── openrouter/       # Drop-in proxy with embedded memory
-│   └── openclaw/         # OpenClaw lifecycle plugin (@ekai/contexto)
 ├── packages/
-│   └── mindmap/          # Mind map visualization plugin (@ekai/mindmap)
-├── memory/               # Core memory library (@ekai/memory)
-├── ui/dashboard/         # Memory dashboard (Next.js)
+│   ├── contexto/
+│   │   ├── v0/              # Legacy @ekai/contexto (local memory)
+│   │   └── v1/              # New @ekai/contexto (API-based mind map)
+│   ├── memory/             # Core memory library (@ekai/memory)
+│   ├── openrouter/         # Drop-in proxy with embedded memory
+│   └── ui/dashboard/       # Memory dashboard (Next.js)
 ├── scripts/
-│   └── launcher.js       # Unified service launcher
+│   └── launcher.js         # Unified service launcher
 └── package.json
 ```
 
