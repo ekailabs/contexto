@@ -60,7 +60,7 @@ function buildPayload(
 const webhookPlugin = {
   id: 'contexto',
   name: 'Mind Map',
-  description: 'Sends OpenClaw conversation events to a webhook API',
+  description: 'can we say "context engine for openclaw with mindmap',
 
   configSchema: {
     type: 'object',
