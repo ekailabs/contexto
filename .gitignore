@@ -67,6 +67,7 @@ Thumbs.db
 # AI configurations
 CLAUDE.md
 AGENTS.md
+.claude 
 
 # ROFL build artifacts
 *.orc

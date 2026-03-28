@@ -1,0 +1,41 @@
+{
+  "name": "@ekai/mindmap",
+  "version": "0.1.5",
+  "description": "Semantic clustering mindmap for AI agent context management",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ml-hclust": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.3.2",
+    "vitest": "^3.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "author": "Ekai Labs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ekailabs/contexto",
+    "directory": "packages/mindmap"
+  }
+}
