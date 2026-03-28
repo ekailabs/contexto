@@ -6,6 +6,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "lib": ["ES2022"],
+    "types": ["node"],
     "strict": false,
     "skipLibCheck": true,
     "noEmitOnError": false,
