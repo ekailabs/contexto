@@ -55,6 +55,25 @@ export interface LLMConfig {
   model?: string;
 }
 
+export interface ScoredItem {
+  item: ConversationItem;
+  score: number;
+  estimatedTokens: number;
+}
+
+export interface ScoredQueryResult {
+  items: ScoredItem[];
+  paths: string[][];
+  totalCandidates: number;
+  totalEstimatedTokens: number;
+}
+
+export interface SearchOptions {
+  maxResults?: number;
+  maxTokens?: number;
+  beamWidth?: number;
+}
+
 export const DEFAULT_CONFIG: MindmapConfig = {
   similarityThreshold: 0.65,
   maxDepth: 4,
