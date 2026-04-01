@@ -1,6 +1,6 @@
 {
   "name": "@ekai/mindmap",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Semantic clustering mindmap for AI agent context management",
   "type": "module",
   "main": "dist/index.js",
