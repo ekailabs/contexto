@@ -210,10 +210,12 @@ export default {
 
       async ingest() {
         // No-op — ingestion handled by hooks above to preserve raw event data
+        logger.info('[contexto] ingest() called');
         return { ingested: true };
       },
 
       async assemble({ sessionId, messages, tokenBudget }: any) {
+        logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}`);
         if (!config.apiKey || !config.contextEnabled) {
           return { messages, estimatedTokens: 0 };
         }
