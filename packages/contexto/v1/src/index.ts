@@ -103,20 +103,21 @@ async function fetchContext(
   let result: any = null;
   try {
     logger.info(`[contexto] Fetching context for query: "${query.slice(0, 100)}"`);
-    const response = await fetch(`${WEBHOOK_URL_BASE}/v1/mindmap/query`, {
+    const response = await fetch(`${WEBHOOK_URL_BASE}/v1/mindmap/search`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ query, sessionKey, maxResults: 5 }),
+      body: JSON.stringify({ query, sessionKey, maxResults: 10 }),
     });
     if (response.ok) {
       result = await response.json();
-      logger.info(`[contexto] Mindmap returned ${result?.items?.length ?? 0} items, path: ${JSON.stringify(result?.path)}`);
+      const itemSummary = (result?.items ?? []).map((r: any, i: number) => `[${i}] ${r.item?.content?.length ?? 0} chars`).join(', ');
+      logger.info(`[contexto] Mindmap returned ${result?.items?.length ?? 0} items (${itemSummary}), paths: ${JSON.stringify(result?.paths)}`);
     } else {
       const body = await response.text().catch(() => '');
-      logger.warn(`[contexto] /v1/mindmap/query HTTP ${response.status}: ${body.slice(0, 200)}`);
+      logger.warn(`[contexto] /v1/mindmap/search HTTP ${response.status}: ${body.slice(0, 200)}`);
     }
   } catch (err) {
-    logger.warn(`[contexto] /v1/mindmap/query failed: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(`[contexto] /v1/mindmap/search failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   let context = '';
@@ -124,8 +125,7 @@ async function fetchContext(
   // Format query results (QueryResult shape: { items: [{ content, role }], path: string[] })
   if (result?.items?.length) {
     const block = result.items
-      .slice(0, 5)
-      .map((item: any) => `- ${item.content}`)
+      .map((r: any) => `- ${r.item?.content ?? r.content}`)
       .join('\n');
     context += `## Relevant Context\n${block}\n\n`;
   }
