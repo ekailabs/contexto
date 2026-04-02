@@ -200,22 +200,36 @@ export default {
       sendWebhook(config, payload, logger);
     });
 
-    // --- Retrieval via context engine ---
-    api.registerContextEngine('contexto', () => ({
+    // --- Context engine (retrieval via assemble, ingestion delegated to hooks) ---
+
+    const engine = {
       info: {
         id: 'contexto',
         name: 'Contexto',
         ownsCompaction: false,
       },
 
-      async ingest() {
-        // No-op — ingestion handled by hooks above to preserve raw event data
-        logger.info('[contexto] ingest() called');
-        return { ingested: true };
+      async bootstrap(_params: { sessionId: string; sessionFile: string }) {
+        return { bootstrapped: false, importedMessages: 0, reason: 'not applicable' };
       },
 
-      async assemble({ sessionId, messages, tokenBudget }: any) {
+      async ingest(_params: { sessionId: string; message: any; isHeartbeat?: boolean }) {
+        // No-op — ingestion handled by hooks above to preserve raw event data
+        return { ingested: false };
+      },
+
+      async ingestBatch(_params: { sessionId: string; messages: any[]; isHeartbeat?: boolean }) {
+        return { ingestedCount: 0 };
+      },
+
+      async afterTurn(_params: { sessionId: string; sessionFile: string }) {
+        // No-op
+      },
+
+      async assemble(params: { sessionId: string; messages: any[]; tokenBudget?: number }) {
+        const { sessionId, messages, tokenBudget } = params;
         logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}`);
+
         if (!config.apiKey || !config.contextEnabled) {
           return { messages, estimatedTokens: 0 };
         }
@@ -229,22 +243,45 @@ export default {
           ? Math.floor(tokenBudget * 0.1 * 4)
           : (config.maxContextChars ?? DEFAULT_MAX_CONTEXT_CHARS);
         const context = await fetchContext(config, query, sessionId, logger, maxChars);
-        if (context) {
-          logger.info(`[contexto] Injecting ${context.length} chars of context`);
+
+        if (!context) {
+          return { messages, estimatedTokens: 0 };
         }
 
-        logger.info('[contexto] Context assembled successfully')
-        return {
-          messages,
-          estimatedTokens: 0,
-          ...(context ? { systemPromptAddition: context } : {}),
-        };
+        logger.info(`[contexto] Injecting ${context.length} chars of context`);
+
+        // Prepend recalled context as conversation history, same pattern as rlm-claw
+        const assembled = [
+          { role: 'user', content: '[Recalled context from previous conversations]' },
+          { role: 'assistant', content: context },
+          ...messages,
+        ];
+
+        return { messages: assembled, estimatedTokens: Math.ceil(context.length / 4) };
       },
 
-      async compact() {
-        return { ok: true, compacted: false };
+      async compact(_params: { sessionId: string; sessionFile: string; force?: boolean }) {
+        // Delegate to runtime (we don't own compaction)
+        return { ok: true, compacted: false, reason: 'delegated to runtime' };
       },
-    }));
+
+      async prepareSubagentSpawn(_params: { parentSessionKey: string; childSessionKey: string; ttlMs?: number }) {
+        return undefined;
+      },
+
+      async onSubagentEnded(_params: { childSessionKey: string; reason: string }) {
+        // No-op
+      },
+
+      async dispose() {
+        // No-op
+      },
+    };
+
+    // registerContextEngine is available in OpenClaw >=2026.3.8
+    (api as unknown as {
+      registerContextEngine: (id: string, factory: () => typeof engine) => void;
+    }).registerContextEngine('contexto', () => engine);
 
     logger.info(`[contexto] Plugin registered (contextEnabled: ${config.contextEnabled})`);
   },
