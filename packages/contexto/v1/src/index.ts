@@ -63,7 +63,15 @@ function lastUserMessage(messages: any[]): string | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     if (m?.role === 'user') {
-      const text = typeof m.content === 'string' ? m.content : '';
+      let text = '';
+      if (typeof m.content === 'string') {
+        text = m.content;
+      } else if (Array.isArray(m.content)) {
+        text = m.content
+          .filter((p: any) => p.type === 'text')
+          .map((p: any) => p.text)
+          .join(' ');
+      }
       if (text.trim()) return text;
     }
   }
@@ -231,7 +239,9 @@ export default {
 
       async assemble(params: { sessionId: string; messages: any[]; tokenBudget?: number }) {
         const { sessionId, messages, tokenBudget } = params;
+        const lastMsg = messages?.[messages.length - 1];
         logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}, contextEnabled: ${config.contextEnabled}, hasApiKey: ${!!config.apiKey}`);
+        logger.debug(`[contexto] last message — role: ${lastMsg?.role}, content type: ${typeof lastMsg?.content}, isArray: ${Array.isArray(lastMsg?.content)}, sample: ${JSON.stringify(lastMsg?.content)?.slice(0, 200)}`);
 
         if (!config.apiKey || !config.contextEnabled) {
           logger.info(`[contexto] assemble() skipping — apiKey: ${!!config.apiKey}, contextEnabled: ${config.contextEnabled}`);
@@ -255,9 +265,10 @@ export default {
         logger.info(`[contexto] Injecting ${context.length} chars of context`);
 
         // Prepend recalled context as conversation history, same pattern as rlm-claw
+        // Use array-format content to match the gateway's message format
         const assembled = [
-          { role: 'user', content: '[Recalled context from previous conversations]' },
-          { role: 'assistant', content: context },
+          { role: 'user', content: [{ type: 'text', text: '[Recalled context from previous conversations]' }] },
+          { role: 'assistant', content: [{ type: 'text', text: context }] },
           ...messages,
         ];
 
