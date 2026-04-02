@@ -83,6 +83,7 @@ async function fetchContext(
 
   let result: any = null;
   try {
+    logger.info(`[contexto] Fetching context for query: "${query.slice(0, 100)}"`);
     const response = await fetch(`${WEBHOOK_URL_BASE}/v1/mindmap/query`, {
       method: 'POST',
       headers,
@@ -90,8 +91,10 @@ async function fetchContext(
     });
     if (response.ok) {
       result = await response.json();
+      logger.info(`[contexto] Mindmap returned ${result?.items?.length ?? 0} items, path: ${JSON.stringify(result?.path)}`);
     } else {
-      logger.warn(`[contexto] /v1/mindmap/query HTTP ${response.status}`);
+      const body = await response.text().catch(() => '');
+      logger.warn(`[contexto] /v1/mindmap/query HTTP ${response.status}: ${body.slice(0, 200)}`);
     }
   } catch (err) {
     logger.warn(`[contexto] /v1/mindmap/query failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -228,9 +231,10 @@ export default {
 
       async assemble(params: { sessionId: string; messages: any[]; tokenBudget?: number }) {
         const { sessionId, messages, tokenBudget } = params;
-        logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}`);
+        logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}, contextEnabled: ${config.contextEnabled}, hasApiKey: ${!!config.apiKey}`);
 
         if (!config.apiKey || !config.contextEnabled) {
+          logger.info(`[contexto] assemble() skipping — apiKey: ${!!config.apiKey}, contextEnabled: ${config.contextEnabled}`);
           return { messages, estimatedTokens: 0 };
         }
 

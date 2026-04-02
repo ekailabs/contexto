@@ -6,6 +6,15 @@
       "apiKey": {
         "type": "string",
         "description": "API key for Bearer authentication"
+      },
+      "contextEnabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable context retrieval from mindmap during assemble()"
+      },
+      "maxContextChars": {
+        "type": "number",
+        "description": "Maximum characters of context to inject (default: 2000)"
       }
     }
   }
