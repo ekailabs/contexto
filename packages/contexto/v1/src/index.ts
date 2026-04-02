@@ -59,6 +59,16 @@ function buildPayload(
   };
 }
 
+/**
+ * Strip OpenClaw metadata envelope from user message text.
+ * Messages arrive as: "Sender (untrusted metadata):\n```json\n{...}\n```\n\nActual user text"
+ */
+function stripMetadataEnvelope(text: string): string {
+  // Remove leading "Sender (untrusted metadata):\n```json\n...\n```" block
+  const stripped = text.replace(/^Sender\s*\(untrusted metadata\)\s*:\s*```json\s*[\s\S]*?```\s*/i, '');
+  return stripped.trim();
+}
+
 function lastUserMessage(messages: any[]): string | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
@@ -72,6 +82,7 @@ function lastUserMessage(messages: any[]): string | undefined {
           .map((p: any) => p.text)
           .join(' ');
       }
+      text = stripMetadataEnvelope(text);
       if (text.trim()) return text;
     }
   }
