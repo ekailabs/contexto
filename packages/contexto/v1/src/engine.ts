@@ -5,13 +5,68 @@ import { buildPayload } from './hooks.js';
 const DEFAULT_MAX_CONTEXT_CHARS = 2000;
 const DEFAULT_MAX_RESULTS = 10;
 
+/** Estimate token count from messages using ~4 chars per token heuristic. */
+function estimateTokens(messages: any[]): number {
+  let chars = 0;
+  for (const m of messages) {
+    if (typeof m.content === 'string') {
+      chars += m.content.length;
+    } else if (Array.isArray(m.content)) {
+      for (const block of m.content) {
+        if (block.type === 'text' && typeof block.text === 'string') {
+          chars += block.text.length;
+        }
+      }
+    }
+  }
+  return Math.ceil(chars / 4);
+}
+
 /** Create the OpenClaw context engine that retrieves relevant past conversations via the backend. */
 export function createContextEngine(config: PluginConfig, backend: ContextoBackend, logger: Logger) {
+  let bufferedMessages: any[] = [];
+  let lastSessionId: string = '';
+  let lastSessionKey: string = '';
+  let cachedTokenBudget: number | undefined;
+
+  /** Ingest a set of messages to the backend and clear them from the buffer. */
+  function ingestMessages(
+    messages: any[],
+    sessionId: string,
+    sessionKey: string,
+    fireAndForget: boolean,
+  ): Promise<void> | undefined {
+    if (messages.length === 0) return;
+
+    const userMessages = messages.filter((m: any) => m.role === 'user');
+    const assistantMessages = messages.filter((m: any) => m.role === 'assistant');
+    const toolMessages = messages.filter((m: any) => m.role === 'tool');
+
+    const payload = buildPayload('episode', 'combined', sessionKey, {
+      sessionId,
+    }, undefined, {
+      userMessage: userMessages[0] ?? null,
+      assistantMessages,
+      toolMessages,
+    });
+
+    const promise = backend.ingest(payload);
+
+    if (fireAndForget) {
+      promise.catch((err: unknown) => {
+        logger.warn(`[contexto] ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+      return;
+    }
+
+    return promise;
+  }
+
   return {
     info: {
       id: 'contexto',
       name: 'Contexto',
-      ownsCompaction: false,
+      ownsCompaction: true,
     },
 
     async bootstrap(_params: { sessionId: string; sessionFile: string; sessionKey?: string }) {
@@ -40,31 +95,20 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
       const newMessages = params.messages.slice(params.prePromptMessageCount);
       if (newMessages.length === 0) return;
 
-      const userMessage = newMessages.find((m: any) => m.role === 'user') ?? null;
-      const assistantMessages = newMessages.filter((m: any) => m.role === 'assistant');
-      const toolMessages = newMessages.filter((m: any) => m.role === 'tool');
+      lastSessionId = params.sessionId;
+      lastSessionKey = params.sessionKey || params.sessionId;
 
-      if (!userMessage && assistantMessages.length === 0) return;
-
-      const sessionKey = params.sessionKey || params.sessionId;
-      const lastAssistant = assistantMessages[assistantMessages.length - 1];
-      const payload = buildPayload('episode', 'combined', sessionKey, {
-        sessionId: params.sessionId,
-        model: params.runtimeContext?.model,
-        provider: params.runtimeContext?.provider,
-        stopReason: lastAssistant?.stopReason,
-      }, undefined, {
-        userMessage,
-        assistantMessages,
-        toolMessages,
-      });
-
-      logger.info(`[contexto] afterTurn: ingesting episode — user: ${!!userMessage}, assistant: ${assistantMessages.length}, tool: ${toolMessages.length}`);
-      backend.ingest(payload);
+      // Buffer new messages — ingestion happens on compact() (threshold-based) or dispose()
+      bufferedMessages.push(...newMessages);
+      logger.info(`[contexto] afterTurn: buffered ${newMessages.length} messages (total: ${bufferedMessages.length})`);
     },
 
     async assemble(params: { sessionId: string; sessionKey?: string; messages: any[]; tokenBudget?: number }) {
       const { messages, tokenBudget } = params;
+
+      // Cache tokenBudget for threshold evaluation in compact()
+      if (tokenBudget != null) cachedTokenBudget = tokenBudget;
+
       const lastMsg = messages?.[messages.length - 1];
       logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}, contextEnabled: ${config.contextEnabled}, hasApiKey: ${!!config.apiKey}`);
       logger.debug(`[contexto] last message — role: ${lastMsg?.role}, content type: ${typeof lastMsg?.content}, isArray: ${Array.isArray(lastMsg?.content)}, sample: ${JSON.stringify(lastMsg?.content)?.slice(0, 200)}`);
@@ -142,7 +186,7 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
       return { messages: assembled, estimatedTokens: Math.ceil(context.length / 4) };
     },
 
-    async compact(_params: {
+    async compact(params: {
       sessionId: string;
       sessionKey?: string;
       sessionFile: string;
@@ -154,7 +198,65 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
       legacyParams?: Record<string, unknown>;
       force?: boolean;
     }) {
-      return { ok: true, compacted: false, reason: 'delegated to runtime' };
+      // Cache tokenBudget for future reference
+      if (params.tokenBudget != null) cachedTokenBudget = params.tokenBudget;
+
+      const tokenBudget = params.tokenBudget ?? cachedTokenBudget;
+      if (!config.apiKey || !tokenBudget || bufferedMessages.length === 0) {
+        return { ok: true, compacted: false, reason: 'nothing to compact' };
+      }
+
+      // Evaluate threshold: trigger compaction when context usage exceeds contextThreshold
+      const thresholdPct = config.contextThreshold ?? 0.75;
+      const threshold = Math.floor(thresholdPct * tokenBudget);
+      const currentTokens = params.currentTokenCount ?? estimateTokens(bufferedMessages);
+
+      if (currentTokens <= threshold && !params.force) {
+        return { ok: true, compacted: false, reason: 'below threshold' };
+      }
+
+      // Calculate how many tokens to free: bring usage down to compactionTarget
+      const targetPct = config.compactionTarget ?? 0.50;
+      const target = Math.floor(targetPct * tokenBudget);
+      const tokensToFree = currentTokens - target;
+
+      // Evict oldest messages until we've freed enough tokens
+      let freedTokens = 0;
+      let evictCount = 0;
+      for (let i = 0; i < bufferedMessages.length && freedTokens < tokensToFree; i++) {
+        freedTokens += estimateTokens([bufferedMessages[i]]);
+        evictCount++;
+      }
+
+      const evicted = bufferedMessages.slice(0, evictCount);
+      const kept = bufferedMessages.slice(evictCount);
+
+      // Determine firstKeptEntryId from the first kept message (if available)
+      const firstKept = kept.length > 0 ? kept[0] : null;
+      const firstKeptEntryId = firstKept?.id ?? firstKept?.entryId ?? undefined;
+
+      const sessionKey = params.sessionKey || params.sessionId;
+      logger.info(
+        `[contexto] compact: evicting ${evictCount} messages (${freedTokens} tokens), ` +
+        `keeping ${kept.length}, threshold: ${threshold}, current: ${currentTokens}, target: ${target}`,
+      );
+
+      // Ingest evicted messages to mindmap
+      await ingestMessages(evicted, params.sessionId, sessionKey, false);
+
+      // Update buffer to only kept messages
+      bufferedMessages = kept;
+
+      return {
+        ok: true,
+        compacted: true,
+        reason: 'threshold',
+        result: {
+          firstKeptEntryId,
+          tokensBefore: currentTokens,
+          tokensAfter: currentTokens - freedTokens,
+        },
+      };
     },
 
     async prepareSubagentSpawn(_params: { parentSessionKey: string; childSessionKey: string; ttlMs?: number }) {
@@ -163,6 +265,12 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
 
     async onSubagentEnded(_params: { childSessionKey: string; reason: string }) {},
 
-    async dispose() {},
+    async dispose() {
+      if (!config.apiKey || bufferedMessages.length === 0) return;
+
+      logger.info(`[contexto] dispose: ingesting ${bufferedMessages.length} remaining buffered messages`);
+      await ingestMessages(bufferedMessages, lastSessionId, lastSessionKey, false);
+      bufferedMessages = [];
+    },
   };
 }

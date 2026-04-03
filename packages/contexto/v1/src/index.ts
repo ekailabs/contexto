@@ -18,6 +18,8 @@ export default {
       apiKey: { type: 'string' },
       contextEnabled: { type: 'boolean', default: false },
       maxContextChars: { type: 'number' },
+      contextThreshold: { type: 'number', default: 0.75 },
+      compactionTarget: { type: 'number', default: 0.50 },
     },
   },
 
@@ -26,6 +28,8 @@ export default {
       apiKey: api.pluginConfig?.apiKey,
       contextEnabled: api.pluginConfig?.contextEnabled ?? false,
       maxContextChars: api.pluginConfig?.maxContextChars,
+      contextThreshold: api.pluginConfig?.contextThreshold ?? 0.75,
+      compactionTarget: api.pluginConfig?.compactionTarget ?? 0.50,
     };
 
     const logger = api.logger;

@@ -3,6 +3,8 @@ export interface PluginConfig {
   contextEnabled: boolean;
   maxContextChars?: number;
   filter?: Record<string, unknown>;
+  contextThreshold?: number;    // trigger compaction at this % of budget (default: 0.75)
+  compactionTarget?: number;    // compact down to this % of budget (default: 0.50)
 }
 
 export interface WebhookPayload {
