@@ -132,10 +132,16 @@ export function queryMindmapMultiBranch(
     }
   }
 
-  const totalCandidates = allItems.length;
+  // Apply source filter if configured
+  const sourceFilter = options?.sourceFilter;
+  const filtered = sourceFilter
+    ? allItems.filter((item) => item.metadata?.source === sourceFilter)
+    : allItems;
+
+  const totalCandidates = filtered.length;
 
   // Score and sort
-  const scored = allItems
+  const scored = filtered
     .map((item) => ({
       item,
       score: cosineSimilarity(queryEmbedding, item.embedding),

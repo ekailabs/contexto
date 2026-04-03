@@ -1,7 +1,7 @@
 import type { ContextoBackend, Logger, WebhookPayload } from './types.js';
 
 /** Construct a webhook payload with a timestamp. */
-function buildPayload(
+export function buildPayload(
   type: string,
   action: string,
   sessionKey: string,

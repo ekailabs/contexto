@@ -72,6 +72,7 @@ export interface SearchOptions {
   maxResults?: number;
   maxTokens?: number;
   beamWidth?: number;
+  sourceFilter?: string;
 }
 
 export const DEFAULT_CONFIG: MindmapConfig = {

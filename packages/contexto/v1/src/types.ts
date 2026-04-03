@@ -2,6 +2,7 @@ export interface PluginConfig {
   apiKey: string;
   contextEnabled: boolean;
   maxContextChars?: number;
+  sourceFilter?: string;
 }
 
 export interface WebhookPayload {
@@ -30,7 +31,7 @@ export interface ContextoBackend {
   /** Store a conversation event (user message or LLM output). */
   ingest(payload: WebhookPayload): Promise<void>;
   /** Search the mindmap for context relevant to the query. */
-  search(query: string, sessionKey: string, maxResults: number): Promise<SearchResult | null>;
+  search(query: string, sessionKey: string, maxResults: number, sourceFilter?: string): Promise<SearchResult | null>;
 }
 
 export interface Logger {

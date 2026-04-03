@@ -34,12 +34,12 @@ export class RemoteBackend implements ContextoBackend {
   }
 
   /** Query the mindmap search API (multi-branch beam search). */
-  async search(query: string, sessionKey: string, maxResults: number): Promise<SearchResult | null> {
+  async search(query: string, sessionKey: string, maxResults: number, sourceFilter?: string): Promise<SearchResult | null> {
     try {
       const response = await fetch(`${API_BASE}/v1/mindmap/search`, {
         method: 'POST',
         headers: this.headers,
-        body: JSON.stringify({ query, sessionKey, maxResults }),
+        body: JSON.stringify({ query, sessionKey, maxResults, sourceFilter }),
       });
 
       if (response.ok) {
