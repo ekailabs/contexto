@@ -33,6 +33,7 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
       messages: any[];
       prePromptMessageCount: number;
       isHeartbeat?: boolean;
+      runtimeContext?: Record<string, unknown>;
     }) {
       if (!config.apiKey) return;
 
@@ -46,7 +47,13 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
       if (!userMessage && assistantMessages.length === 0) return;
 
       const sessionKey = params.sessionKey || params.sessionId;
-      const payload = buildPayload('episode', 'combined', sessionKey, {}, undefined, {
+      const lastAssistant = assistantMessages[assistantMessages.length - 1];
+      const payload = buildPayload('episode', 'combined', sessionKey, {
+        sessionId: params.sessionId,
+        model: params.runtimeContext?.model,
+        provider: params.runtimeContext?.provider,
+        stopReason: lastAssistant?.stopReason,
+      }, undefined, {
         userMessage,
         assistantMessages,
         toolMessages,
