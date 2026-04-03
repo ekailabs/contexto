@@ -85,7 +85,8 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
 
       logger.info(`[contexto] Fetching context for query: "${query.slice(0, 100)}"`);
       const searchKey = params.sessionKey || params.sessionId;
-      const result = await backend.search(query, searchKey, DEFAULT_MAX_RESULTS, config.filter);
+      const filter = { source: 'summary', ...config.filter };
+      const result = await backend.search(query, searchKey, DEFAULT_MAX_RESULTS, filter);
 
       if (!result?.items?.length) {
         return { messages, estimatedTokens: 0 };
@@ -95,9 +96,36 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
       logger.info(`[contexto] Mindmap returned ${result.items.length} items (${itemSummary}), paths: ${JSON.stringify(result.paths)}`);
 
       let context = result.items
-        .map((r: any) => `- ${r.item?.content ?? r.content}`)
-        .join('\n');
-      context = `## Relevant Context\n${context}`;
+        .map((r: any) => {
+          const item = r.item ?? r;
+          const meta = item.metadata ?? {};
+
+          if (meta.source !== 'summary') {
+            return `- ${item.content}`;
+          }
+
+          // content already has: "summary\n\nKey findings:\n- finding1\n- finding2"
+          const parts: string[] = [item.content];
+
+          if (Array.isArray(meta.evidence_refs) && meta.evidence_refs.length > 0) {
+            const refs = meta.evidence_refs
+              .map((ref: any) => `${ref.type}:${ref.value}`)
+              .join(', ');
+            parts.push(`Refs: ${refs}`);
+          }
+
+          if (meta.trace_ref) {
+            parts.push(`Trace: ${meta.trace_ref}`);
+          }
+
+          const header = [meta.status, meta.confidence != null ? `confidence: ${meta.confidence}` : null]
+            .filter(Boolean).join(' | ');
+
+          const body = parts.join('\n');
+          return header ? `### [${header}]\n${body}` : body;
+        })
+        .join('\n\n');
+      context = `## Relevant Context\n\n${context}`;
 
       if (context.length > maxChars) {
         context = context.slice(0, maxChars) + '…';
