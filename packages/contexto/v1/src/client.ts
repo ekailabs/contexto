@@ -39,7 +39,7 @@ export class RemoteBackend implements ContextoBackend {
       const response = await fetch(`${API_BASE}/v1/mindmap/search`, {
         method: 'POST',
         headers: this.headers,
-        body: JSON.stringify({ query, sessionKey, maxResults, filter }),
+        body: JSON.stringify({ query, maxResults, filter }),
       });
 
       if (response.ok) {
