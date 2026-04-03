@@ -1,6 +1,6 @@
 export interface ConversationItem {
   id: string;
-  role: 'user' | 'assistant';
+  role: string;
   content: string;
   embedding: number[];
   timestamp?: string;
@@ -72,7 +72,9 @@ export interface SearchOptions {
   maxResults?: number;
   maxTokens?: number;
   beamWidth?: number;
-  sourceFilter?: string;
+  filter?: Record<string, unknown>;
+  /** Minimum cosine similarity score (0-1). Items below this are excluded. */
+  minScore?: number;
 }
 
 export const DEFAULT_CONFIG: MindmapConfig = {

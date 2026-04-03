@@ -132,10 +132,12 @@ export function queryMindmapMultiBranch(
     }
   }
 
-  // Apply source filter if configured
-  const sourceFilter = options?.sourceFilter;
-  const filtered = sourceFilter
-    ? allItems.filter((item) => item.metadata?.source === sourceFilter)
+  // Apply metadata filter if configured
+  const filter = options?.filter;
+  const filtered = filter
+    ? allItems.filter((item) =>
+        Object.entries(filter).every(([key, value]) => item.metadata?.[key] === value),
+      )
     : allItems;
 
   const totalCandidates = filtered.length;
@@ -149,8 +151,14 @@ export function queryMindmapMultiBranch(
     }))
     .sort((a, b) => b.score - a.score);
 
+  // Apply minScore filter
+  const minScore = options?.minScore;
+  const thresholded = minScore != null
+    ? scored.filter((r) => r.score >= minScore)
+    : scored;
+
   // Apply maxResults
-  let results = scored.slice(0, maxResults);
+  let results = thresholded.slice(0, maxResults);
 
   // Apply maxTokens budget
   if (maxTokens != null) {

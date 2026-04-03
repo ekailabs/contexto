@@ -1,6 +1,6 @@
 {
   "name": "@ekai/contexto",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Openclaw plugin for smart context management",
   "type": "module",
   "license": "MIT",

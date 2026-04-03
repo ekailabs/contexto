@@ -1,6 +1,5 @@
 import type { PluginConfig } from './types.js';
 import { RemoteBackend } from './client.js';
-import { registerHooks } from './hooks.js';
 import { createContextEngine } from './engine.js';
 
 // Public API — use ContextoBackend to implement a custom (e.g. local) backend
@@ -37,8 +36,6 @@ export default {
     }
 
     const backend = new RemoteBackend(config, logger);
-
-    registerHooks(api, backend, logger);
 
     const engine = createContextEngine(config, backend, logger);
 

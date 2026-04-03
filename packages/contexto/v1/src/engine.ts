@@ -78,7 +78,7 @@ export function createContextEngine(config: PluginConfig, backend: ContextoBacke
 
       logger.info(`[contexto] Fetching context for query: "${query.slice(0, 100)}"`);
       const searchKey = params.sessionKey || params.sessionId;
-      const result = await backend.search(query, searchKey, DEFAULT_MAX_RESULTS, config.sourceFilter);
+      const result = await backend.search(query, searchKey, DEFAULT_MAX_RESULTS, config.filter);
 
       if (!result?.items?.length) {
         return { messages, estimatedTokens: 0 };
