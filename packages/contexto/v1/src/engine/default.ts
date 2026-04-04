@@ -1,6 +1,6 @@
 import type { AfterTurnParams, CompactParams, CompactResult } from './types.js';
 import { AbstractContextEngine } from './base.js';
-import { buildMessagePayloads } from './utils.js';
+import { buildEpisodePayload } from './utils.js';
 
 /**
  * Default engine — buffers messages and ingests them to the backend on
@@ -17,8 +17,10 @@ export class DefaultContextEngine extends AbstractContextEngine {
     this.state.lastSessionId = params.sessionId;
     this.state.lastSessionKey = params.sessionKey || params.sessionId;
 
-    this.state.bufferedMessages.push(...newMessages);
-    this.logger.info(`[contexto] afterTurn: buffered ${newMessages.length} messages (total: ${this.state.bufferedMessages.length})`);
+    const sessionKey = params.sessionKey || params.sessionId;
+    const episode = buildEpisodePayload(newMessages, params.sessionId, sessionKey, params.runtimeContext);
+    this.state.bufferedMessages.push(episode);
+    this.logger.info(`[contexto] afterTurn: buffered 1 episode (${newMessages.length} messages, total episodes: ${this.state.bufferedMessages.length})`);
   }
 
   async compact(params: CompactParams): Promise<CompactResult> {
@@ -28,11 +30,8 @@ export class DefaultContextEngine extends AbstractContextEngine {
       return { ok: true, compacted: false, reason: 'nothing to compact' };
     }
 
-    const sessionKey = params.sessionKey || params.sessionId;
-    const payloads = buildMessagePayloads(this.state.bufferedMessages, params.sessionId, sessionKey);
-
-    this.logger.info(`[contexto] compact: ingesting ${this.state.bufferedMessages.length} buffered messages`);
-    await this.backend.ingest(payloads);
+    this.logger.info(`[contexto] compact: ingesting ${this.state.bufferedMessages.length} buffered episodes`);
+    await this.backend.ingest(this.state.bufferedMessages);
     this.state.bufferedMessages = [];
 
     return { ok: true, compacted: false, reason: 'delegated to runtime' };
@@ -41,9 +40,8 @@ export class DefaultContextEngine extends AbstractContextEngine {
   async dispose(): Promise<void> {
     if (!this.config.apiKey || this.state.bufferedMessages.length === 0) return;
 
-    const payloads = buildMessagePayloads(this.state.bufferedMessages, this.state.lastSessionId, this.state.lastSessionKey);
-    this.logger.info(`[contexto] dispose: ingesting ${this.state.bufferedMessages.length} remaining buffered messages`);
-    await this.backend.ingest(payloads);
+    this.logger.info(`[contexto] dispose: ingesting ${this.state.bufferedMessages.length} remaining buffered episodes`);
+    await this.backend.ingest(this.state.bufferedMessages);
     this.state.bufferedMessages = [];
   }
 }

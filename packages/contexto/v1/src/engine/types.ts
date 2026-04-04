@@ -1,5 +1,7 @@
+import type { WebhookPayload } from '../types.js';
+
 export interface CompactionState {
-  bufferedMessages: any[];
+  bufferedMessages: WebhookPayload[];
   lastSessionId: string;
   lastSessionKey: string;
   cachedTokenBudget: number | undefined;

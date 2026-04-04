@@ -1,7 +1,7 @@
 import type { SlidingWindowConfig, ContextoBackend, Logger } from '../types.js';
 import type { CompactionState, CompactParams, CompactResult, AfterTurnParams } from './types.js';
 import { AbstractContextEngine } from './base.js';
-import { estimateTokens, buildMessagePayloads, selectMessagesToEvict, getFirstKeptEntryId } from './utils.js';
+import { estimatePayloadTokens, buildEpisodePayload, selectMessagesToEvict, getFirstKeptEntryId } from './utils.js';
 
 /**
  * Sliding-window engine — owns compaction and controls which messages
@@ -26,8 +26,10 @@ export class SlidingWindowEngine extends AbstractContextEngine {
     this.state.lastSessionId = params.sessionId;
     this.state.lastSessionKey = params.sessionKey || params.sessionId;
 
-    this.state.bufferedMessages.push(...newMessages);
-    this.logger.info(`[contexto] afterTurn: buffered ${newMessages.length} messages (total: ${this.state.bufferedMessages.length})`);
+    const sessionKey = params.sessionKey || params.sessionId;
+    const episode = buildEpisodePayload(newMessages, params.sessionId, sessionKey, params.runtimeContext);
+    this.state.bufferedMessages.push(episode);
+    this.logger.info(`[contexto] afterTurn: buffered 1 episode (${newMessages.length} messages, total episodes: ${this.state.bufferedMessages.length})`);
   }
 
   async compact(params: CompactParams): Promise<CompactResult> {
@@ -57,16 +59,12 @@ export class SlidingWindowEngine extends AbstractContextEngine {
 
     const firstKeptEntryId = getFirstKeptEntryId(kept);
 
-    // Ingest evicted messages to backend
-    const sessionKey = this.state.lastSessionKey || params.sessionKey || params.sessionId;
-    const payloads = buildMessagePayloads(toEvict, params.sessionId, sessionKey);
-
     this.logger.info(
-      `[contexto] compact: ingesting and evicting ${toEvict.length} messages ` +
+      `[contexto] compact: ingesting and evicting ${toEvict.length} episodes ` +
       `(current: ${currentTokens}, threshold: ${compactAt}, firstKeptEntryId: ${firstKeptEntryId})`,
     );
 
-    await this.backend.ingest(payloads);
+    await this.backend.ingest(toEvict);
     this.state.bufferedMessages = kept;
 
     return {
@@ -76,7 +74,7 @@ export class SlidingWindowEngine extends AbstractContextEngine {
       result: {
         firstKeptEntryId,
         tokensBefore: currentTokens,
-        tokensAfter: currentTokens - estimateTokens(toEvict),
+        tokensAfter: currentTokens - estimatePayloadTokens(toEvict),
       },
     };
   }
@@ -84,9 +82,8 @@ export class SlidingWindowEngine extends AbstractContextEngine {
   async dispose(): Promise<void> {
     if (!this.config.apiKey || this.state.bufferedMessages.length === 0) return;
 
-    const payloads = buildMessagePayloads(this.state.bufferedMessages, this.state.lastSessionId, this.state.lastSessionKey);
-    this.logger.info(`[contexto] dispose: ingesting ${this.state.bufferedMessages.length} remaining buffered messages`);
-    await this.backend.ingest(payloads);
+    this.logger.info(`[contexto] dispose: ingesting ${this.state.bufferedMessages.length} remaining buffered episodes`);
+    await this.backend.ingest(this.state.bufferedMessages);
     this.state.bufferedMessages = [];
   }
 }
