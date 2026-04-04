@@ -19,12 +19,12 @@ export default {
       contextEnabled: { type: 'boolean', default: true },
       maxContextChars: { type: 'number' },
       compactThreshold: { type: 'number', default: 0.50 },
-      compactionStrategy: { type: 'string', default: 'sliding-window' },
+      compactionStrategy: { type: 'string', default: 'default' },
     },
   },
 
   register(api: any) {
-    const strategy = api.pluginConfig?.compactionStrategy ?? 'sliding-window';
+    const strategy = api.pluginConfig?.compactionStrategy ?? 'default';
     const base = {
       apiKey: api.pluginConfig?.apiKey,
       contextEnabled: api.pluginConfig?.contextEnabled ?? true,

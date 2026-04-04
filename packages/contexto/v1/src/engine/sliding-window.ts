@@ -63,7 +63,7 @@ export class SlidingWindowEngine extends AbstractContextEngine {
 
     this.logger.info(
       `[contexto] compact: ingesting and evicting ${toEvict.length} messages ` +
-      `(current: ${currentTokens}, threshold: ${compactAt})`,
+      `(current: ${currentTokens}, threshold: ${compactAt}, firstKeptEntryId: ${firstKeptEntryId})`,
     );
 
     await this.backend.ingest(payloads);

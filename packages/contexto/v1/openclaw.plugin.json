@@ -7,10 +7,10 @@
         "type": "string",
         "description": "API key for Bearer authentication"
       },
-      "contextEnabled": {
-        "type": "boolean",
-        "default": true,
-        "description": "Enable context retrieval from mindmap during assemble()"
+      "compactionStrategy": {
+        "type": "string",
+        "default": "default",
+        "description": "Compaction Strategy in the context engine"
       },
       "maxContextChars": {
         "type": "number",
