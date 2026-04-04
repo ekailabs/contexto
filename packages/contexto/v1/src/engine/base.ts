@@ -13,6 +13,7 @@ import type {
 
 const DEFAULT_MAX_CONTEXT_CHARS = 2000;
 const DEFAULT_MAX_RESULTS = 10;
+const DEFAULT_MIN_SCORE = 0.5;
 
 /**
  * Abstract base class for context engine implementations.
@@ -82,7 +83,8 @@ export abstract class AbstractContextEngine {
 
     this.logger.info(`[contexto] Fetching context for query: "${query.slice(0, 100)}"`);
     const filter = { source: 'summary', ...this.config.filter };
-    const result = await this.backend.search(query, DEFAULT_MAX_RESULTS, filter);
+    const minScore = this.config.minScore ?? DEFAULT_MIN_SCORE;
+    const result = await this.backend.search(query, DEFAULT_MAX_RESULTS, filter, minScore);
 
     if (!result?.items?.length) {
       return { messages, estimatedTokens: 0 };

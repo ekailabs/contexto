@@ -2,6 +2,7 @@ export interface BaseConfig {
   apiKey: string;
   contextEnabled: boolean;
   maxContextChars?: number;
+  minScore?: number;
   filter?: Record<string, unknown>;
 }
 
@@ -42,7 +43,7 @@ export interface ContextoBackend {
   /** Store one or more conversation events. */
   ingest(payload: WebhookPayload | WebhookPayload[]): Promise<void>;
   /** Search the mindmap for context relevant to the query. */
-  search(query: string, maxResults: number, filter?: Record<string, unknown>): Promise<SearchResult | null>;
+  search(query: string, maxResults: number, filter?: Record<string, unknown>, minScore?: number): Promise<SearchResult | null>;
 }
 
 export interface Logger {
