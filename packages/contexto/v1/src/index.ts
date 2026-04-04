@@ -1,6 +1,6 @@
 import type { PluginConfig } from './types.js';
 import { RemoteBackend } from './client.js';
-import { createContextEngine } from './engine.js';
+import { createContextEngine } from './engine/index.js';
 
 // Public API — use ContextoBackend to implement a custom (e.g. local) backend
 export type { ContextoBackend, SearchResult, WebhookPayload, Logger } from './types.js';
@@ -16,21 +16,28 @@ export default {
     type: 'object',
     properties: {
       apiKey: { type: 'string' },
-      contextEnabled: { type: 'boolean', default: false },
+      contextEnabled: { type: 'boolean', default: true },
       maxContextChars: { type: 'number' },
-      contextThreshold: { type: 'number', default: 0.75 },
-      compactionTarget: { type: 'number', default: 0.50 },
+      compactThreshold: { type: 'number', default: 0.50 },
+      compactionStrategy: { type: 'string', default: 'sliding-window' },
     },
   },
 
   register(api: any) {
-    const config: PluginConfig = {
+    const strategy = api.pluginConfig?.compactionStrategy ?? 'sliding-window';
+    const base = {
       apiKey: api.pluginConfig?.apiKey,
-      contextEnabled: api.pluginConfig?.contextEnabled ?? false,
+      contextEnabled: api.pluginConfig?.contextEnabled ?? true,
       maxContextChars: api.pluginConfig?.maxContextChars,
-      contextThreshold: api.pluginConfig?.contextThreshold ?? 0.75,
-      compactionTarget: api.pluginConfig?.compactionTarget ?? 0.50,
     };
+
+    const config: PluginConfig = strategy === 'default'
+      ? { ...base, compactionStrategy: 'default' as const }
+      : {
+          ...base,
+          compactionStrategy: 'sliding-window' as const,
+          compactThreshold: api.pluginConfig?.compactThreshold ?? 0.50,
+        };
 
     const logger = api.logger;
 

@@ -1,11 +1,20 @@
-export interface PluginConfig {
+export interface BaseConfig {
   apiKey: string;
   contextEnabled: boolean;
   maxContextChars?: number;
   filter?: Record<string, unknown>;
-  contextThreshold?: number;    // trigger compaction at this % of budget (default: 0.75)
-  compactionTarget?: number;    // compact down to this % of budget (default: 0.50)
 }
+
+export interface DefaultConfig extends BaseConfig {
+  compactionStrategy: 'default';
+}
+
+export interface SlidingWindowConfig extends BaseConfig {
+  compactionStrategy?: 'sliding-window';  // default
+  compactThreshold?: number;  // ingest + evict at this % of budget (default: 0.50)
+}
+
+export type PluginConfig = DefaultConfig | SlidingWindowConfig;
 
 export interface WebhookPayload {
   event: {
@@ -30,10 +39,10 @@ export interface SearchResult {
  * Implement this to swap between remote (api.getcontexto.com) and local backends.
  */
 export interface ContextoBackend {
-  /** Store a conversation event (user message or LLM output). */
-  ingest(payload: WebhookPayload): Promise<void>;
+  /** Store one or more conversation events. */
+  ingest(payload: WebhookPayload | WebhookPayload[]): Promise<void>;
   /** Search the mindmap for context relevant to the query. */
-  search(query: string, sessionKey: string, maxResults: number, filter?: Record<string, unknown>): Promise<SearchResult | null>;
+  search(query: string, maxResults: number, filter?: Record<string, unknown>): Promise<SearchResult | null>;
 }
 
 export interface Logger {

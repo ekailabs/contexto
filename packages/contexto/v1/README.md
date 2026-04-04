@@ -33,6 +33,9 @@ Or add to your OpenClaw config:
 ```json
 {
   "plugins": {
+    "slots": {
+      "contextEngine": "contexto"
+    },
     "allow": ["contexto"],
     "entries": {
       "contexto": {

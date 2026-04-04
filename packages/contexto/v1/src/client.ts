@@ -13,20 +13,23 @@ export class RemoteBackend implements ContextoBackend {
     };
   }
 
-  /** Send a conversation event to the webhooks API for storage. */
-  async ingest(payload: WebhookPayload): Promise<void> {
+  /** Send one or more conversation events to the webhooks API. */
+  async ingest(payload: WebhookPayload | WebhookPayload[]): Promise<void> {
+    const payloads = Array.isArray(payload) ? payload : [payload];
+    if (payloads.length === 0) return;
+
     try {
       const response = await fetch(`${API_BASE}/v1/webhooks/events`, {
         method: 'POST',
         headers: this.headers,
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payloads),
       });
 
       if (!response.ok) {
         const body = await response.text().catch(() => '(no body)');
         this.logger.warn(`[contexto] webhook HTTP ${response.status}: ${response.statusText} — body: ${body}`);
       } else {
-        this.logger.info(`[contexto] webhook OK ${response.status} for ${payload.event.type}:${payload.event.action}`);
+        this.logger.info(`[contexto] webhook OK ${response.status} for ${payloads.length} events`);
       }
     } catch (err) {
       this.logger.warn(`[contexto] webhook failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -34,7 +37,7 @@ export class RemoteBackend implements ContextoBackend {
   }
 
   /** Query the mindmap search API (multi-branch beam search). */
-  async search(query: string, sessionKey: string, maxResults: number, filter?: Record<string, unknown>): Promise<SearchResult | null> {
+  async search(query: string, maxResults: number, filter?: Record<string, unknown>): Promise<SearchResult | null> {
     try {
       const response = await fetch(`${API_BASE}/v1/mindmap/search`, {
         method: 'POST',
