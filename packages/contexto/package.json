@@ -1,7 +1,7 @@
 {
   "name": "@ekai/contexto",
-  "version": "0.1.1",
-  "description": "OpenClaw plugin — local-first memory for context recall and ingest",
+  "version": "0.1.8",
+  "description": "Openclaw plugin for smart context management",
   "type": "module",
   "license": "MIT",
   "publishConfig": {
@@ -15,28 +15,24 @@
   "keywords": [
     "openclaw",
     "openclaw-plugin",
-    "ai",
-    "context",
-    "memory",
-    "recall",
-    "ingest"
+    "webhook",
+    "events"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/ekailabs/contexto",
-    "directory": "packages/contexto/v0"
+    "directory": "packages/contexto"
   },
   "author": "Ekai Labs",
   "scripts": {
-    "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "type-check": "tsc --noEmit"
   },
-  "dependencies": {
-    "@ekai/memory": "^0.0.1"
+  "peerDependencies": {
+    "openclaw": "*"
   },
   "devDependencies": {
-    "typescript": "^5.3.2",
-    "vitest": "^3.0.0"
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2"
   },
   "openclaw": {
     "extensions": ["./src/index.ts"]

@@ -1,3 +1,4 @@
+import type { ContextEngine, ContextEngineInfo } from 'openclaw/plugin-sdk';
 import type { ContextoBackend, Logger, BaseConfig } from '../types.js';
 import { lastUserMessage } from '../messages.js';
 import { formatSearchResults, assembleContextMessages } from '../helpers.js';
@@ -20,7 +21,7 @@ const DEFAULT_MIN_SCORE = 0.5;
  * Provides default implementations for shared lifecycle methods (assemble, bootstrap, no-ops).
  * Concrete engines extend this and override strategy-specific methods (afterTurn, compact, dispose).
  */
-export abstract class AbstractContextEngine {
+export abstract class AbstractContextEngine implements ContextEngine {
   protected state: CompactionState;
   protected config: BaseConfig;
   protected backend: ContextoBackend;
@@ -28,7 +29,7 @@ export abstract class AbstractContextEngine {
 
   abstract readonly ownsCompaction: boolean;
 
-  get info() {
+  get info(): ContextEngineInfo {
     return {
       id: 'contexto',
       name: 'Contexto',
@@ -112,7 +113,7 @@ export abstract class AbstractContextEngine {
 
   // --- Template method with apiKey guard ---
 
-  afterTurn(params: AfterTurnParams): void {
+  async afterTurn(params: AfterTurnParams): Promise<void> {
     if (!this.config.apiKey) return;
     this.handleAfterTurn(params);
   }

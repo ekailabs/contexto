@@ -50,9 +50,7 @@ export default {
 
     const engine = createContextEngine(config, backend, logger);
 
-    (api as unknown as {
-      registerContextEngine: (id: string, factory: () => typeof engine) => void;
-    }).registerContextEngine('contexto', () => engine);
+    api.registerContextEngine('contexto', () => engine);
 
     logger.info(`[contexto] Plugin registered (contextEnabled: ${config.contextEnabled})`);
   },
