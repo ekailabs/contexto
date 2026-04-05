@@ -81,6 +81,7 @@ export class SlidingWindowEngine extends AbstractContextEngine {
 
   async dispose(): Promise<void> {
     if (!this.config.apiKey || this.state.bufferedMessages.length === 0) return;
+    if (this.state.bufferedMessages[0].sessionKey === this.state.lastSessionKey) return;
 
     this.logger.info(`[contexto] dispose: ingesting ${this.state.bufferedMessages.length} remaining buffered episodes`);
     await this.backend.ingest(this.state.bufferedMessages);

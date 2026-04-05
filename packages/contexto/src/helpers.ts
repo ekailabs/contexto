@@ -1,3 +1,5 @@
+import { WebhookPayload } from "./types.js";
+
 /** Format mindmap search result items into a context string with metadata. */
 export function formatSearchResults(items: any[]): string {
   const formatted = items
@@ -45,4 +47,23 @@ export function assembleContextMessages(
   ];
 
   return { messages: assembled, estimatedTokens: Math.ceil(context.length / 4) };
+}
+
+/** Construct a webhook payload with a timestamp. */
+export function buildPayload(
+  type: string,
+  action: string,
+  sessionKey: string,
+  context: Record<string, unknown>,
+  agent?: Record<string, unknown>,
+  data?: Record<string, unknown>,
+): WebhookPayload {
+  return {
+    event: { type, action },
+    sessionKey,
+    timestamp: new Date().toISOString(),
+    context,
+    agent,
+    data,
+  };
 }
