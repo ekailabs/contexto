@@ -1,5 +1,5 @@
 import type { WebhookPayload } from '../types.js';
-import { buildPayload } from '../hooks.js';
+import { buildPayload } from '../helpers.js';
 
 /** Estimate token count from raw messages using ~4 chars per token heuristic. */
 function estimateMessageTokens(messages: any[]): number {
