@@ -59,6 +59,7 @@ export interface AssembleParams {
   sessionKey?: string;
   messages: any[];
   tokenBudget?: number;
+  prompt?: string;
 }
 
 export interface AssembleResult {
