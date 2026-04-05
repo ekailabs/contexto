@@ -33,6 +33,7 @@ export class DefaultContextEngine extends AbstractContextEngine {
     this.logger.info(`[contexto] compact: ingesting ${this.state.bufferedMessages.length} buffered episodes`);
     await this.backend.ingest(this.state.bufferedMessages);
     this.state.bufferedMessages = [];
+    this.state.injectedItemIds.clear();
 
     return { ok: true, compacted: false, reason: 'delegated to runtime' };
   }
@@ -44,5 +45,6 @@ export class DefaultContextEngine extends AbstractContextEngine {
     this.logger.info(`[contexto] dispose: ingesting ${this.state.bufferedMessages.length} remaining buffered episodes`);
     await this.backend.ingest(this.state.bufferedMessages);
     this.state.bufferedMessages = [];
+    this.state.injectedItemIds.clear();
   }
 }

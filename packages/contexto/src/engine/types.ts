@@ -5,6 +5,7 @@ export interface CompactionState {
   lastSessionId: string;
   lastSessionKey: string;
   cachedTokenBudget: number | undefined;
+  injectedItemIds: Set<string>;
 }
 
 export function createCompactionState(): CompactionState {
@@ -13,6 +14,7 @@ export function createCompactionState(): CompactionState {
     lastSessionId: '',
     lastSessionKey: '',
     cachedTokenBudget: undefined,
+    injectedItemIds: new Set(),
   };
 }
 

@@ -94,7 +94,27 @@ export abstract class AbstractContextEngine implements ContextEngine {
     const itemSummary = result.items.map((r: any, i: number) => `[${i}] ${r.item?.content?.length ?? 0} chars`).join(', ');
     this.logger.info(`[contexto] Mindmap returned ${result.items.length} items (${itemSummary}), paths: ${JSON.stringify(result.paths)}`);
 
-    let context = formatSearchResults(result.items);
+    // Deduplicate: filter out items already injected in this session
+    const filtered = result.items.filter((r: any) => {
+      const id = (r.item ?? r).id;
+      return !id || !this.state.injectedItemIds.has(id);
+    });
+
+    if (filtered.length < result.items.length) {
+      this.logger.info(`[contexto] Dedup: ${result.items.length} results -> ${filtered.length} after dedup (${result.items.length - filtered.length} suppressed)`);
+    }
+
+    if (!filtered.length) {
+      return { messages, estimatedTokens: 0 };
+    }
+
+    // Record injected item IDs
+    for (const r of filtered) {
+      const id = (r.item ?? r).id;
+      if (id) this.state.injectedItemIds.add(id);
+    }
+
+    let context = formatSearchResults(filtered);
 
     if (context.length > maxChars) {
       context = context.slice(0, maxChars) + '…';

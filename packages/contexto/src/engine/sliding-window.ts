@@ -66,6 +66,7 @@ export class SlidingWindowEngine extends AbstractContextEngine {
 
     await this.backend.ingest(toEvict);
     this.state.bufferedMessages = kept;
+    this.state.injectedItemIds.clear();
 
     return {
       ok: true,
@@ -86,5 +87,6 @@ export class SlidingWindowEngine extends AbstractContextEngine {
     this.logger.info(`[contexto] dispose: ingesting ${this.state.bufferedMessages.length} remaining buffered episodes`);
     await this.backend.ingest(this.state.bufferedMessages);
     this.state.bufferedMessages = [];
+    this.state.injectedItemIds.clear();
   }
 }
