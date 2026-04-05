@@ -1,5 +1,13 @@
 import { WebhookPayload } from "./types.js";
 
+// OpenClaw wraps user messages as: "Sender (untrusted metadata):\n```json\n{...}\n```\n\nActual text"
+const METADATA_ENVELOPE_RE = /^Sender\s*\(untrusted metadata\)\s*:\s*```json\s*[\s\S]*?```\s*/i;
+
+/** Strip the OpenClaw metadata envelope prefix, returning just the user's text. */
+export function stripMetadataEnvelope(text: string): string {
+  return text.replace(METADATA_ENVELOPE_RE, '').trim();
+}
+
 /** Format mindmap search result items into a context string with metadata. */
 export function formatSearchResults(items: any[]): string {
   const formatted = items

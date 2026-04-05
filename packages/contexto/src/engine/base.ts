@@ -1,7 +1,6 @@
 import type { ContextEngine, ContextEngineInfo } from 'openclaw/plugin-sdk';
 import type { ContextoBackend, Logger, BaseConfig } from '../types.js';
-import { lastUserMessage, stripMetadataEnvelope } from '../messages.js';
-import { formatSearchResults, assembleContextMessages } from '../helpers.js';
+import { stripMetadataEnvelope, formatSearchResults, assembleContextMessages } from '../helpers.js';
 import type {
   CompactionState,
   BootstrapParams, BootstrapResult,
@@ -13,8 +12,8 @@ import type {
 } from './types.js';
 
 const DEFAULT_MAX_CONTEXT_CHARS = 2000;
-const DEFAULT_MAX_RESULTS = 10;
-const DEFAULT_MIN_SCORE = 0.5;
+const DEFAULT_MAX_RESULTS = 7;
+const DEFAULT_MIN_SCORE = 0.45;
 
 /**
  * Abstract base class for context engine implementations.
@@ -73,8 +72,7 @@ export abstract class AbstractContextEngine implements ContextEngine {
       return { messages, estimatedTokens: 0 };
     }
 
-    const rawPrompt = params.prompt ? stripMetadataEnvelope(params.prompt) : undefined;
-    const query = rawPrompt || lastUserMessage(messages);
+    const query = params.prompt ? stripMetadataEnvelope(params.prompt) : undefined;
     if (!query) {
       return { messages, estimatedTokens: 0 };
     }
