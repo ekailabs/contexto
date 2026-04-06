@@ -35,7 +35,13 @@ openclaw plugins install @ekai/contexto
 openclaw plugins enable contexto
 ```
 
-### 2. Enable and configure the plugin
+### 2. Set Contexto as the context engine
+
+```bash
+openclaw config set plugins.slots.contextEngine contexto
+```
+
+### 3. Configure your API key
 
 Set your API key via CLI:
 
@@ -43,7 +49,7 @@ Set your API key via CLI:
 openclaw config set plugins.entries.contexto.config.apiKey your-api-key-here
 ```
 
-### 3. Restart OpenClaw
+### 4. Restart OpenClaw
 
 ```bash
 openclaw gateway restart
