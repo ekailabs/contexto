@@ -1,5 +1,22 @@
+import type { ContextEngine } from 'openclaw/plugin-sdk';
 import type { WebhookPayload } from '../types.js';
 
+// Derive param types from the ContextEngine interface
+type MethodParams<M extends keyof ContextEngine> =
+  ContextEngine[M] extends ((...args: infer P) => any) | undefined
+    ? P[0]
+    : never;
+
+export type BootstrapParams = MethodParams<'bootstrap'>;
+export type IngestParams = MethodParams<'ingest'>;
+export type IngestBatchParams = MethodParams<'ingestBatch'>;
+export type AfterTurnParams = MethodParams<'afterTurn'>;
+export type AssembleParams = MethodParams<'assemble'>;
+export type CompactParams = MethodParams<'compact'>;
+export type SubagentSpawnParams = MethodParams<'prepareSubagentSpawn'>;
+export type SubagentEndedParams = MethodParams<'onSubagentEnded'>;
+
+// Internal state — not part of the SDK contract
 export interface CompactionState {
   bufferedMessages: WebhookPayload[];
   lastSessionId: string;
@@ -16,88 +33,4 @@ export function createCompactionState(): CompactionState {
     cachedTokenBudget: undefined,
     injectedItemIds: new Set(),
   };
-}
-
-export interface BootstrapParams {
-  sessionId: string;
-  sessionFile: string;
-  sessionKey?: string;
-}
-
-export interface BootstrapResult {
-  bootstrapped: boolean;
-  importedMessages: number;
-  reason: string;
-}
-
-export interface IngestParams {
-  sessionId: string;
-  sessionKey?: string;
-  message: any;
-  isHeartbeat?: boolean;
-}
-
-export interface IngestBatchParams {
-  sessionId: string;
-  sessionKey?: string;
-  messages: any[];
-  isHeartbeat?: boolean;
-}
-
-export interface AfterTurnParams {
-  sessionId: string;
-  sessionKey?: string;
-  sessionFile: string;
-  messages: any[];
-  prePromptMessageCount: number;
-  isHeartbeat?: boolean;
-  runtimeContext?: Record<string, unknown>;
-}
-
-export interface AssembleParams {
-  sessionId: string;
-  sessionKey?: string;
-  messages: any[];
-  tokenBudget?: number;
-  prompt?: string;
-}
-
-export interface AssembleResult {
-  messages: any[];
-  estimatedTokens: number;
-}
-
-export interface CompactParams {
-  sessionId: string;
-  sessionKey?: string;
-  sessionFile: string;
-  tokenBudget?: number;
-  currentTokenCount?: number;
-  compactionTarget?: 'budget' | 'threshold';
-  customInstructions?: string;
-  runtimeContext?: Record<string, unknown>;
-  legacyParams?: Record<string, unknown>;
-  force?: boolean;
-}
-
-export interface CompactResult {
-  ok: boolean;
-  compacted: boolean;
-  reason: string;
-  result?: {
-    firstKeptEntryId?: string;
-    tokensBefore: number;
-    tokensAfter?: number;
-  };
-}
-
-export interface SubagentSpawnParams {
-  parentSessionKey: string;
-  childSessionKey: string;
-  ttlMs?: number;
-}
-
-export interface SubagentEndedParams {
-  childSessionKey: string;
-  reason: string;
 }

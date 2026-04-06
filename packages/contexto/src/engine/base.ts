@@ -1,14 +1,15 @@
-import type { ContextEngine, ContextEngineInfo } from 'openclaw/plugin-sdk';
+import type {
+  ContextEngine, ContextEngineInfo,
+  AssembleResult, BootstrapResult, CompactResult,
+  IngestResult, IngestBatchResult, SubagentSpawnPreparation,
+} from 'openclaw/plugin-sdk';
 import type { ContextoBackend, Logger, BaseConfig } from '../types.js';
 import { stripMetadataEnvelope, formatSearchResults, assembleContextMessages } from '../helpers.js';
 import type {
   CompactionState,
-  BootstrapParams, BootstrapResult,
-  IngestParams, IngestBatchParams,
-  AfterTurnParams,
-  AssembleParams, AssembleResult,
-  CompactParams, CompactResult,
-  SubagentSpawnParams, SubagentEndedParams,
+  BootstrapParams, IngestParams, IngestBatchParams,
+  AfterTurnParams, AssembleParams,
+  CompactParams, SubagentSpawnParams, SubagentEndedParams,
 } from './types.js';
 
 const DEFAULT_MAX_CONTEXT_CHARS = 2000;
@@ -49,11 +50,11 @@ export abstract class AbstractContextEngine implements ContextEngine {
     return { bootstrapped: false, importedMessages: 0, reason: 'not applicable' };
   }
 
-  async ingest(_params: IngestParams): Promise<{ ingested: boolean }> {
+  async ingest(_params: IngestParams): Promise<IngestResult> {
     return { ingested: false };
   }
 
-  async ingestBatch(_params: IngestBatchParams): Promise<{ ingestedCount: number }> {
+  async ingestBatch(_params: IngestBatchParams): Promise<IngestBatchResult> {
     return { ingestedCount: 0 };
   }
 
@@ -65,7 +66,8 @@ export abstract class AbstractContextEngine implements ContextEngine {
 
     const lastMsg = messages?.[messages.length - 1];
     this.logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}, contextEnabled: ${this.config.contextEnabled}, hasApiKey: ${!!this.config.apiKey}`);
-    this.logger.debug(`[contexto] last message — role: ${lastMsg?.role}, content type: ${typeof lastMsg?.content}, isArray: ${Array.isArray(lastMsg?.content)}, sample: ${JSON.stringify(lastMsg?.content)?.slice(0, 200)}`);
+    const lastMsgContent = lastMsg && 'content' in lastMsg ? lastMsg.content : undefined;
+    this.logger.debug(`[contexto] last message — role: ${lastMsg?.role}, content type: ${typeof lastMsgContent}, isArray: ${Array.isArray(lastMsgContent)}, sample: ${JSON.stringify(lastMsgContent)?.slice(0, 200)}`);
 
     if (!this.config.apiKey || !this.config.contextEnabled) {
       this.logger.info(`[contexto] assemble() skipping — apiKey: ${!!this.config.apiKey}, contextEnabled: ${this.config.contextEnabled}`);
@@ -124,7 +126,7 @@ export abstract class AbstractContextEngine implements ContextEngine {
     return assembleContextMessages(context, messages);
   }
 
-  async prepareSubagentSpawn(_params: SubagentSpawnParams): Promise<undefined> {
+  async prepareSubagentSpawn(_params: SubagentSpawnParams): Promise<SubagentSpawnPreparation | undefined> {
     return undefined;
   }
 
