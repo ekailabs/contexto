@@ -1,4 +1,4 @@
-import type { ClusterNode, MindmapState, QueryResult } from './types.js';
+import type { ClusterNode, MindmapState, QueryResult, ScoredQueryResult, SearchOptions } from './types.js';
 import { cosineSimilarity } from './similarity.js';
 
 function collectAllItems(node: ClusterNode) {
@@ -49,4 +49,117 @@ export function queryMindmap(state: MindmapState, queryEmbedding: number[], maxR
     items: scored.slice(0, maxResults).map((s) => s.item),
     path,
   };
+}
+
+interface BeamEntry {
+  node: ClusterNode;
+  path: string[];
+}
+
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+export function queryMindmapMultiBranch(
+  state: MindmapState,
+  queryEmbedding: number[],
+  options?: SearchOptions,
+): ScoredQueryResult {
+  const { root, config } = state;
+  const maxResults = options?.maxResults ?? 10;
+  const maxTokens = options?.maxTokens;
+  const beamWidth = options?.beamWidth ?? 3;
+
+  // Initialize beam with root's children scored above threshold
+  let beam: BeamEntry[] = [];
+  const terminals: BeamEntry[] = [];
+
+  const rootCandidates = root.children
+    .map((child) => ({ child, sim: cosineSimilarity(queryEmbedding, child.centroid) }))
+    .filter((c) => c.sim >= config.similarityThreshold)
+    .sort((a, b) => b.sim - a.sim)
+    .slice(0, beamWidth);
+
+  if (rootCandidates.length === 0) {
+    // No children pass threshold — collect from root
+    beam = [];
+    terminals.push({ node: root, path: [] });
+  } else {
+    beam = rootCandidates.map((c) => ({ node: c.child, path: [c.child.label] }));
+  }
+
+  // Expand beam level by level
+  while (beam.length > 0) {
+    const nextCandidates: { entry: BeamEntry; sim: number }[] = [];
+
+    for (const entry of beam) {
+      if (entry.node.children.length === 0) {
+        terminals.push(entry);
+        continue;
+      }
+
+      const childScores = entry.node.children
+        .map((child) => ({ child, sim: cosineSimilarity(queryEmbedding, child.centroid) }))
+        .filter((c) => c.sim >= config.similarityThreshold);
+
+      if (childScores.length === 0) {
+        // No children pass threshold — this node is terminal
+        terminals.push(entry);
+      } else {
+        for (const cs of childScores) {
+          nextCandidates.push({
+            entry: { node: cs.child, path: [...entry.path, cs.child.label] },
+            sim: cs.sim,
+          });
+        }
+      }
+    }
+
+    // Keep top beamWidth candidates for next level
+    nextCandidates.sort((a, b) => b.sim - a.sim);
+    beam = nextCandidates.slice(0, beamWidth).map((c) => c.entry);
+  }
+
+  // Collect and deduplicate items from all terminal nodes
+  const seen = new Set<string>();
+  const allItems = [];
+  for (const terminal of terminals) {
+    for (const item of collectAllItems(terminal.node)) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        allItems.push(item);
+      }
+    }
+  }
+
+  const totalCandidates = allItems.length;
+
+  // Score and sort
+  const scored = allItems
+    .map((item) => ({
+      item,
+      score: cosineSimilarity(queryEmbedding, item.embedding),
+      estimatedTokens: estimateTokens(item.content),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  // Apply maxResults
+  let results = scored.slice(0, maxResults);
+
+  // Apply maxTokens budget
+  if (maxTokens != null) {
+    let tokenSum = 0;
+    const budgeted = [];
+    for (const r of results) {
+      if (tokenSum + r.estimatedTokens > maxTokens) break;
+      tokenSum += r.estimatedTokens;
+      budgeted.push(r);
+    }
+    results = budgeted;
+  }
+
+  const totalEstimatedTokens = results.reduce((sum, r) => sum + r.estimatedTokens, 0);
+  const paths = terminals.map((t) => t.path);
+
+  return { items: results, paths, totalCandidates, totalEstimatedTokens };
 }

@@ -1,7 +1,7 @@
-import type { ConversationItem, MindmapConfig, MindmapState, QueryResult, EmbedFn, LLMConfig, TreeNode } from './types.js';
+import type { ConversationItem, MindmapConfig, MindmapState, QueryResult, ScoredQueryResult, SearchOptions, EmbedFn, LLMConfig, TreeNode } from './types.js';
 import { DEFAULT_CONFIG } from './types.js';
 import { buildMindmap, addToMindmap } from './clustering.js';
-import { queryMindmap } from './retrieval.js';
+import { queryMindmap, queryMindmapMultiBranch } from './retrieval.js';
 import { createEmbedFn } from './embed.js';
 import type { MindmapStorage } from './storage.js';
 import { memoryStorage } from './storage.js';
@@ -89,6 +89,12 @@ export class Mindmap {
     const state = await this.ensureLoaded();
     const queryEmbedding = await this.embedFn(text);
     return queryMindmap(state, queryEmbedding, maxResults);
+  }
+
+  async search(text: string, options?: SearchOptions): Promise<ScoredQueryResult> {
+    const state = await this.ensureLoaded();
+    const queryEmbedding = await this.embedFn(text);
+    return queryMindmapMultiBranch(state, queryEmbedding, options);
   }
 
   async getState(): Promise<MindmapState> {

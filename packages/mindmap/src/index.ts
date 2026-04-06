@@ -12,7 +12,7 @@ export type { MindmapStorage } from './storage.js';
 
 // Low-level API (for direct use without Mindmap class)
 export { buildMindmap, addToMindmap } from './clustering.js';
-export { queryMindmap } from './retrieval.js';
+export { queryMindmap, queryMindmapMultiBranch } from './retrieval.js';
 export { extractFromWebhook } from './extractor.js';
 export { cosineSimilarity, cosineDistance } from './similarity.js';
 export { generateLabel } from './labeler.js';
@@ -25,6 +25,9 @@ export type {
   MindmapConfig,
   MindmapState,
   QueryResult,
+  ScoredItem,
+  ScoredQueryResult,
+  SearchOptions,
   EmbedFn,
   TreeNode,
 } from './types.js';
