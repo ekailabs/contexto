@@ -1,0 +1,21 @@
+{
+  "id": "contexto",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "apiKey": {
+        "type": "string",
+        "description": "API key for Bearer authentication"
+      },
+      "compactionStrategy": {
+        "type": "string",
+        "default": "default",
+        "description": "Compaction Strategy in the context engine"
+      },
+      "maxContextChars": {
+        "type": "number",
+        "description": "Maximum characters of context to inject (default: 2000)"
+      }
+    }
+  }
+}

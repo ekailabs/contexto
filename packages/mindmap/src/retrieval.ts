@@ -132,10 +132,18 @@ export function queryMindmapMultiBranch(
     }
   }
 
-  const totalCandidates = allItems.length;
+  // Apply metadata filter if configured
+  const filter = options?.filter;
+  const filtered = filter
+    ? allItems.filter((item) =>
+        Object.entries(filter).every(([key, value]) => item.metadata?.[key] === value),
+      )
+    : allItems;
+
+  const totalCandidates = filtered.length;
 
   // Score and sort
-  const scored = allItems
+  const scored = filtered
     .map((item) => ({
       item,
       score: cosineSimilarity(queryEmbedding, item.embedding),
@@ -143,8 +151,14 @@ export function queryMindmapMultiBranch(
     }))
     .sort((a, b) => b.score - a.score);
 
+  // Apply minScore filter
+  const minScore = options?.minScore;
+  const thresholded = minScore != null
+    ? scored.filter((r) => r.score >= minScore)
+    : scored;
+
   // Apply maxResults
-  let results = scored.slice(0, maxResults);
+  let results = thresholded.slice(0, maxResults);
 
   // Apply maxTokens budget
   if (maxTokens != null) {
