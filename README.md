@@ -9,17 +9,9 @@
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.com/invite/5VsUUEfbJk)
 
 
-Persistent conversation memory today. Document knowledge and tool execution memory next.
+AI agents face a fundamental problem: **context windows are finite, but conversations are not.** Most runtimes handle this by summarizing older messages to free space. This works for short conversations, but over time summaries compound into summaries-of-summaries, blending unrelated topics and losing specific details.
 
-Your conversations stay on your machine — no data sent to third-party memory services. Bring your own keys, run your own instance.
-
-Start with the **OpenClaw plugin**, the **OpenAI-compatible proxy**, or the **memory SDK**.
-
-OpenClaw plugin — Context graph engine that prevents context rot by visualizing and organizing conversation context.
-
-## Purpose
-
-Mind Map is an improved **context engine** for OpenClaw that solves **context rot** — the gradual degradation of agent responses as conversation history grows. It builds a contextual representation of your conversations that allows the agent to maintain relevance and coherence over extended sessions.
+Contexto takes a different approach: instead of compressing history, it **organizes** it.
 
 - Uses **semantic clustering** to group related messages and concepts
 - Maps relationships between messages, concepts, and session states
@@ -81,27 +73,13 @@ Retrieved context:
   → user is building a RAG pipeline with LangChain
 
 User: How should I chunk my documents?
-Assistant: For your LangChain RAG pipeline — use RecursiveCharacterTextSplitter, 512 tokens,
+Assistant: For your LangChain RAG pipeline: use RecursiveCharacterTextSplitter, 512 tokens,
          50-token overlap. It handles nested markdown and code blocks well.
 ```
 
-## Three Pillars
-
-Contexto's architecture is inspired by how human memory actually works — episodic memory (what happened), semantic memory (what you know), and procedural memory (how to do things). Instead of treating context as a flat key-value store, Contexto models these as distinct systems that work together.
-
-| Pillar | What it does | Status |
-| --- | --- | --- |
-| 🧠 **Conversation Memory** | Episodic recall from past conversations. Your agent remembers what happened last Tuesday. | ✅ Live |
-| 📚 **Document Knowledge** | Semantic knowledge from your documents, surfaced at the right time. No more re-uploading files. | 🚧 Coming soon |
-| 🔧 **Tool Execution Memory** | Procedural memory from tool calls — what succeeded, what failed, what was retried. Agents get smarter with every execution. | 📋 Roadmap |
-
 ## Quick Start
 
-### OpenClaw Plugin (recommended)
-
-The fastest way to add persistent context to any OpenClaw agent:
-
-Add to your OpenClaw config:
+### OpenClaw Plugin
 
 ```json
 {
@@ -114,9 +92,7 @@ Add to your OpenClaw config:
       "@ekai/contexto": {
         "enabled": true,
         "config": {
-          "dbPath": "~/.openclaw/ekai/memory.db",
-          "provider": "openai",
-          "apiKey": "sk-..."
+          "apiKey": "your-api-key"
         }
       }
     }
@@ -124,189 +100,151 @@ Add to your OpenClaw config:
 }
 ```
 
-That's it. Your agent now remembers across conversations. Memory stays on your machine in a local SQLite DB — nothing leaves your device.
-
-### Drop-in Proxy
-
-Contexto speaks the OpenAI API format and routes through OpenRouter by default. Drop it in front of any compatible client — memory recall and injection happen automatically. (Automatic persistence currently requires the OpenClaw plugin or the memory SDK; proxy-side ingest is paused pending deduplication.)
+Or via CLI:
 
 ```bash
-npm install
-cp .env.example .env       # add your OPENROUTER_API_KEY
-npm run build && npm start
+openclaw plugins install @ekai/contexto
+openclaw plugins enable contexto
+openclaw config set plugins.slots.contextEngine contexto
+openclaw config set plugins.entries.contexto.config.apiKey your-api-key
+openclaw gateway restart
 ```
-
-```bash
-curl -X POST http://localhost:4010/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "anthropic/claude-sonnet-4-5", "messages": [{"role": "user", "content": "Hello"}]}'
-```
-
-No code changes. No SDK. Just point your client at `localhost:4010`.
-
-### Memory SDK
-
-Use `@ekai/memory` directly in your own agent code. See [`memory/README.md`](memory/README.md) for the full API.
-
-```ts
-import { Memory } from '@ekai/memory';
-
-const mem = new Memory({ provider: 'openai', apiKey: 'sk-...' });
-mem.addAgent('my-bot', { name: 'My Bot' });
-
-const bot = mem.agent('my-bot');
-await bot.add(messages, { userId: 'alice' });
-const memories = await bot.retrieve('What does Alice like?', { userId: 'alice' });
-```
-
-### Docker
-
-```bash
-cp .env.example .env       # add your OPENROUTER_API_KEY
-docker compose up -d
-```
-
-**Default ports:** Proxy + memory APIs on `4010` · Dashboard on `3000`
-
-## Memory Dashboard
-
-Browse, search, and manage everything your agent remembers. Inspect the memories available for recall.
-
-**→ `http://localhost:3000`**
-
-
-## Why Contexto?
-
-| | Typical alternatives | Contexto |
-| --- | --- | --- |
-| Where data lives | Cloud-hosted or server-based | Local SQLite — your machine, your file |
-| Architecture | Flat key-value memory | Neuroscience-inspired (episodic, semantic, procedural) |
-| Scope | Conversation memory only | Conversations today; documents + tool execution next |
-| Integration | SDK required | Drop-in proxy, OpenClaw plugin, or memory SDK |
-| Data sent to third parties | Often required | No third-party memory service — only your configured model provider |
 
 ## How It Works
 
+### Episodes and the Sliding Window
+
+The unit of storage is an **episode**: a full conversation turn containing the user message, assistant response, and any tool outputs. The sliding-window engine buffers episodes in memory. When token usage hits the compact threshold (default 50% of the token budget), the oldest episodes are ingested to the backend and evicted from the context window.
+
+### Hierarchical Clustering (AGNES)
+
+Contexto organizes episodes using [AGNES (Agglomerative Nesting)](https://onlinelibrary.wiley.com/doi/book/10.1002/9780470316801), a bottom-up hierarchical clustering algorithm paired with [average linkage (UPGMA)](https://www.semanticscholar.org/paper/A-statistical-method-for-evaluating-systematic-Sokal-Michener/0db093335bc3b9445fa5a1a5526d634921d7b59a) via [`ml-hclust`](https://github.com/mljs/hclust).
+
 ```
-                    ┌──────────────────────────────┐
-                    │          Your Agent           │
-                    │  (OpenClaw, Claude Code,      │
-                    │   LangChain, custom, ...)     │
-                    └──────────────┬───────────────┘
-                                   │
-                                   ▼
-                    ┌──────────────────────────────┐
-                    │           Contexto            │
-                    │                              │
-                    │  ┌────────┐ ┌─────┐ ┌──────┐ │
-                    │  │Conver- │ │Doc  │ │Tool  │ │
-                    │  │sation  │ │Know-│ │Exec  │ │
-                    │  │Memory  │ │ledge│ │Memory│ │
-                    │  └───┬────┘ └──┬──┘ └──┬───┘ │
-                    │      └────┬────┘───────┘     │
-                    │           ▼                  │
-                    │   Unified Context Layer       │
-                    └──────────────────────────────┘
+Episode turns (with embeddings)
+  -> Pairwise cosine distance matrix
+  -> AGNES with average linkage
+  -> Dendrogram
+  -> Cut at similarity threshold (0.65)
+  -> ClusterNode tree (max depth 4)
 ```
 
-## Project Structure
+Unlike summary-based compaction, the hierarchy preserves full episodes and gives you:
+
+- **Semantic organization**: related episodes land in the same branch, even if they happened weeks apart
+- **Multi-resolution retrieval**: match a top-level branch (all travel episodes) or drill into a sub-cluster (visa documents only)
+- **No pre-defined categories**: topics emerge from embeddings, no taxonomy required
+- **No information loss**: full episodes are stored and retrievable, never compressed
+
+For the full technical deep dive, see [Why We Chose Hierarchical Clustering](docs/why-agnes.md).
+
+### Multi-Branch Beam Search
+
+Retrieval uses beam search (width 3) to explore multiple promising branches simultaneously. Instead of returning the top-k most similar items, beam search descends into the most relevant topic branches and greedily fills the token budget. When a query spans multiple topics, it surfaces episodes from several branches in a single pass with full path tracing for explainability (e.g., `travel -> Japan trip -> visa documents`).
+
+### Hybrid Rebuild Strategy
+
+Full AGNES is O(n^2) and only runs periodically: when items are below 100 or after 50 incremental inserts. Between rebuilds, new episodes insert in O(log N) by walking the tree and slotting into the best-matching branch.
+
+## Why Not Just Summarize?
+
+| | Summary-Based Compaction | Contexto (Hierarchical Clustering) |
+|---|---|---|
+| **What happens at compaction** | Oldest messages summarized into a shorter block | Episodes ingested into a semantic tree, originals evicted |
+| **Information loss** | Compounds over time (summaries of summaries) | None. Full episodes stored and retrievable |
+| **Cross-topic handling** | Unrelated episodes blended into one summary | Related episodes cluster together, unrelated stay separate |
+| **Retrieval** | Whatever the summary retained | Beam search across relevant topic branches |
+| **Token budget** | Summary must fit alongside new messages | Retrieval fills budget with the most relevant episodes |
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                   Your Agent                    │
+│  (OpenClaw, Claude Code, LangChain, custom, ...)│
+└──────────────────────┬──────────────────────────┘
+                       │
+                       v
+┌─────────────────────────────────────────────────┐
+│              @ekai/contexto                     │
+│         Sliding Window + Compaction             │
+│                                                 │
+│   Episodes buffered -> compact at threshold     │
+│   -> evict oldest -> ingest to backend          │
+└──────────────────────┬──────────────────────────┘
+                       │  ContextoBackend interface
+                       v
+┌─────────────────────────────────────────────────┐
+│         Remote API  or  Custom Backend          │
+│         (api.getcontexto.com)                   │
+└──────────────────────┬──────────────────────────┘
+                       │
+                       v
+┌─────────────────────────────────────────────────┐
+│              @ekai/mindmap                      │
+│   AGNES Clustering + Beam Search Retrieval      │
+│                                                 │
+│   Episodes -> semantic tree -> query via beam   │
+│   search -> token-budget-aware results          │
+└─────────────────────────────────────────────────┘
+```
+
+## Pluggable Backend
+
+The context engine communicates with backends through the `ContextoBackend` interface:
+
+```ts
+interface ContextoBackend {
+  /** Store one or more conversation events. */
+  ingest(payload: WebhookPayload | WebhookPayload[]): Promise<void>;
+  /** Search the mindmap for context relevant to the query. */
+  search(query: string, maxResults: number, filter?: Record<string, unknown>, minScore?: number): Promise<SearchResult | null>;
+}
+```
+
+The default `RemoteBackend` calls the hosted API at `api.getcontexto.com`. Implement the `ContextoBackend` interface to plug in your own storage and retrieval backend.
+
+## Packages
 
 ```
 contexto/
 ├── packages/
-│   ├── contexto/
-│   │   ├── v0/              # Legacy @ekai/contexto (local memory)
-│   │   └── v1/              # New @ekai/contexto (API-based mind map)
-│   ├── memory/             # Core memory library (@ekai/memory)
-│   ├── openrouter/         # Drop-in proxy with embedded memory
-│   └── ui/dashboard/       # Memory dashboard (Next.js)
-├── scripts/
-│   └── launcher.js         # Unified service launcher
+│   ├── contexto/         # @ekai/contexto — OpenClaw plugin, context engine
+│   ├── mindmap/          # @ekai/mindmap — AGNES clustering + beam search
+│   ├── memory/           # @ekai/memory — SQLite-backed memory kernel
+│   ├── openrouter/       # @ekai/openrouter — OpenAI-compatible proxy
+│   └── ui/dashboard/     # @ekai/ui-dashboard — Next.js monitoring dashboard
+├── docs/                 # Technical documentation
+├── CONTRIBUTING.md
 └── package.json
 ```
 
-## Roadmap
-
-- [x] Persistent conversation memory
-- [x] OpenClaw plugin (`@ekai/contexto`)
-- [x] Drop-in OpenAI-compatible proxy
-- [x] Memory dashboard
-- [ ] **Document knowledge** — ingestion, chunking, retrieval
-- [ ] **Claude Code integration**
-- [ ] **Tool execution memory** — learn from tool call successes and failures
-- [ ] MCP server for universal agent integration
-- [ ] Benchmarks on LOCOMO and agent task completion
-
 ## Configuration
 
-| Variable | Description | Default |
-| --- | --- | --- |
-| `OPENROUTER_API_KEY` | Your OpenRouter API key | Required |
-| `ENABLE_DASHBOARD` | Enable memory dashboard | `true` |
-| `ENABLE_OPENROUTER` | Enable proxy + memory APIs | `true` |
-| `OPENROUTER_PORT` | Proxy port | `4010` |
-| `DASHBOARD_PORT` | Dashboard port | `3000` |
+| Property | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `apiKey` | string | Yes | | Your Contexto API key |
+| `compactionStrategy` | `'sliding-window'` \| `'default'` | No | `'sliding-window'` | Compaction strategy |
+| `compactThreshold` | number (0-1) | No | `0.50` | Ingest + evict at this % of token budget |
+| `contextEnabled` | boolean | No | `true` | Enable/disable context injection |
+| `maxContextChars` | number | No | | Max characters for injected context |
+| `minScore` | number | No | | Minimum similarity score for retrieved results |
 
-```bash
-# Development (hot-reload)
-npm run dev
+## Roadmap
 
-# Production
-npm start
-
-# Individual services
-ENABLE_DASHBOARD=false npm run dev      # proxy only
-ENABLE_OPENROUTER=false npm run dev     # dashboard only
-```
-
-## Knowledge Base Retrieval
-
-Contexto is designed as a **single install solution for all your context needs in OpenClaw**. 
-
-Currently, the OpenClaw plugin supports retrieving context from local text and Markdown files (like Obsidian vaults) using QMD. By configuring a `knowledgeFolder` in your plugin settings, your agent can instantly reference external documentation, code snippets, or any static text-based information stored in that directory.
-
-*Note: In the near future, we plan to extend Contexto to natively support fetching relevant context from other sources, including an upcoming integration with **Google Drive**!*
-
-Unlike previous versions, this recursively discovers **any text file** (`.txt`, `.md`, `.json`, `.csv`, etc.) meaning everything in your folder is passed as direct context to your agent.
-
-### Syncing with Obsidian 
-
-If you use Obsidian to take notes and run the OpenClaw gateway on a remote VPS, you can instantly sync your Obsidian vault directly to your agent's `knowledgeFolder` via `obsidian-headless`:
-
-1. **Install Obsidian Headless**
-   ```bash
-   npm install -g obsidian-headless
-   ```
-2. **Setup your Vault Folder**: On your VPS, create a folder for your remote vault and configure your `@ekai/contexto` plugin's `knowledgeFolder` settings to point there.
-   ```bash
-   mkdir -p ~/.openclaw/ekai/knowledge
-   cd ~/.openclaw/ekai/knowledge
-   ```
-3. **Login & Sync**
-   ```bash
-   ob login
-   ob sync-list-remote
-   ob sync-setup --vault "Your Vault Name"
-   ```
-4. **Run Sync**
-   - For a one-time sync: `ob sync`
-   - To keep running continuously: `ob sync --continuous`
-
-Whenever you update a note on your local Obsidian app, `ob sync` pulls it to your remote VPS, and Contexto instantly parses it for OpenClaw!
-
-### How Retrieval Works
-
-When a typical conversation request is processed, the standard knowledge flow is as follows:
-
-1. **File Discovery:** It recursively scans your configured `knowledgeFolder` for all text-based files, skipping hidden files and binary files.
-2. **Formatting:** It constructs a `## Reference Knowledge` context block, injecting the file contents and wrapping them in their respective extension types (e.g. ` ```md `, ` ```json `). This context block is prepended to the system prompt just before the final payload is sent to the LLM.
-3. **Memory Recall:** Finally, it performs the standard long-term episodic conversation memory recall and appends those to the context alongside the document knowledge.
+- [x] OpenClaw plugin (`@ekai/contexto`)
+- [x] Hierarchical clustering with AGNES (`@ekai/mindmap`)
+- [x] Multi-branch beam search retrieval
+- [ ] RLM Plugin
+- [ ] **Document knowledge** — ingestion, chunking, retrieval
+- [ ] **Claude Code integration**
+- [ ] Benchmarks
 
 ## Enterprise
 
 Building AI agents for your team or product? We work with companies deploying agents at scale to ensure they always have the right context.
 
-**→ [Talk to us](mailto:s@ekailabs.xyz)**
+**[Talk to us](mailto:s@ekailabs.xyz)**
 
 ## Contributing
 
