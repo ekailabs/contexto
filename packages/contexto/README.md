@@ -1,19 +1,13 @@
-<h1 align="center">Contexto</h1>
-<h2 align="center">Keep long-running OpenClaw agents reliable after the context window fills.</h2>
-<p align="center">A drop-in OpenClaw context engine that retrieves old constraints instead of losing them to summaries.</p>
+# Contexto
 
-<p align="center">
-  <a href="#quick-start">Quick Start</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <a href="#why-contexto">Why Contexto</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <a href="#how-it-works">How It Works</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <a href="https://getcontexto.com/">Website</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-  <a href="https://discord.gg/4QTRS5ew">Discord</a>
-</p>
+**Keep long-running OpenClaw agents reliable after the context window fills.**
 
-<p align="center">
-  OpenClaw works well until long sessions start compacting away the exact instruction that mattered.<br />
-  Contexto is the context engine built for that failure mode.
-</p>
+A drop-in OpenClaw context engine that retrieves old constraints instead of losing them to summaries.
+
+[Quick Start](#quick-start) · [Why Contexto](#why-contexto) · [How It Works](#how-it-works) · [Website](https://getcontexto.com/) · [Discord](https://discord.gg/4QTRS5ew)
+
+OpenClaw works well until long sessions start compacting away the exact instruction that mattered.
+Contexto is the context engine built for that failure mode.
 
 ## The Problem in 15 Seconds
 
@@ -26,19 +20,12 @@ Do NOT delete anything."
 tools, retries, compaction ...]
 ```
 
-<table>
-<tr>
-<td width="50%">
-
 **Without Contexto**
 
 ```text
 Turn 35: Agent deletes 12 flagged emails.
 The constraint was lost in compaction.
 ```
-
-</td>
-<td width="50%">
 
 **With Contexto**
 
@@ -50,10 +37,6 @@ Retrieved context:
 
 The instruction survives compaction.
 ```
-
-</td>
-</tr>
-</table>
 
 ## Why Contexto
 
@@ -109,10 +92,6 @@ If you are deciding whether this is worth installing, this is the short version.
 | **Can you explain what was retrieved?** | No | Yes, full path tracing (`travel -> Japan -> visa docs`) |
 | **Setup time** | Built-in | One plugin install, one config key |
 
-<p align="center">
-  <img src="docs/images/before-after-contexto.png" width="900" alt="Before and after Contexto: without Contexto the full session is pushed directly to the model, with Contexto the runtime sends scoped context through Contexto before it reaches the LLM." />
-</p>
-
 ## How It Works
 
 Contexto turns aging conversation history into a searchable context tree instead of a lossy summary blob.
@@ -139,51 +118,18 @@ For the deeper technical reasoning:
 
 ## Configuration
 
-| Property | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `apiKey` | string | Yes | — | Your Contexto API key |
-| `contextEnabled` | boolean | No | `true` | Enable or disable context injection |
-| `maxContextChars` | number | No | — | Max characters for injected context |
-| `compactThreshold` | number (0-1) | No | `0.50` | Ingest and evict at this share of token budget |
-| `compactionStrategy` | `'sliding-window' \| 'default'` | No | `'default'` | Compaction strategy |
-
-## Custom Backends
-
-The engine talks to storage through `ContextoBackend`. The default remote backend calls `api.getcontexto.com`, but you can implement your own.
-
-```ts
-interface ContextoBackend {
-  ingest(payload: WebhookPayload | WebhookPayload[]): Promise<void>;
-  search(
-    query: string,
-    maxResults: number,
-    filter?: Record<string, unknown>,
-    minScore?: number
-  ): Promise<SearchResult | null>;
-}
-```
-
-## Roadmap
-
-- [ ] Horizontal scaling with sub-agent context delegation
-- [ ] Scoped context with access boundaries
-- [ ] Knowledge from external documents
-- [ ] Local backend
-- [ ] Context sharing across agents
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `apiKey` | string | Yes | Your Contexto API key |
 
 ## Community
 
 - [Discord](https://discord.gg/4QTRS5ew)
 - [Discussions](https://github.com/ekailabs/contexto/discussions)
 - [Issues](https://github.com/ekailabs/contexto/issues)
-- [Contributing guide](CONTRIBUTING.md)
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE).
+Apache 2.0
 
 ---
-
-<p align="center">
-  If long-session reliability matters to you, star the repo and help other OpenClaw users discover it.
-</p>
