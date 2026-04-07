@@ -15,10 +15,21 @@
     "test": "pnpm run test --workspace=@ekai/openrouter",
     "dev:ui": "pnpm run dev --workspace=@ekai/ui-dashboard",
     "dev:openrouter": "pnpm run dev --workspace=@ekai/openrouter",
-    "start:ui": "pnpm --filter @ekai/ui-dashboard next start -p 3000 -H 0.0.0.0"
+    "start:ui": "pnpm --filter @ekai/ui-dashboard next start -p 3000 -H 0.0.0.0",
+    "release": "multi-semantic-release",
+    "release:dry": "multi-semantic-release --dry-run"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.6",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "concurrently": "^8.2.2",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
+    "multi-semantic-release": "^3.1.0",
+    "semantic-release": "^25.0.3"
   },
   "keywords": [
     "ai",

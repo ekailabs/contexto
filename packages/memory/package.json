@@ -1,6 +1,7 @@
 {
   "name": "@ekai/memory",
   "version": "0.0.1",
+  "private": true,
   "description": "Neuroscience-inspired cognitive memory kernel",
   "type": "module",
   "main": "dist/index.js",
