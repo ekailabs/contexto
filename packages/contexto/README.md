@@ -122,22 +122,6 @@ For the deeper technical reasoning:
 | --- | --- | --- | --- |
 | `apiKey` | string | Yes | Your Contexto API key |
 
-## Custom Backends
-
-The engine talks to storage through `ContextoBackend`. The default remote backend calls `api.getcontexto.com`, but you can implement your own.
-
-```ts
-interface ContextoBackend {
-  ingest(payload: WebhookPayload | WebhookPayload[]): Promise<void>;
-  search(
-    query: string,
-    maxResults: number,
-    filter?: Record<string, unknown>,
-    minScore?: number
-  ): Promise<SearchResult | null>;
-}
-```
-
 ## Community
 
 - [Discord](https://discord.gg/4QTRS5ew)
@@ -149,5 +133,3 @@ interface ContextoBackend {
 Apache 2.0
 
 ---
-
-If long-session reliability matters to you, star the repo and help other OpenClaw users discover it.
