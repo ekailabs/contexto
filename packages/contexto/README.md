@@ -142,24 +142,15 @@ interface ContextoBackend {
 }
 ```
 
-## Roadmap
-
-- [ ] Horizontal scaling with sub-agent context delegation
-- [ ] Scoped context with access boundaries
-- [ ] Knowledge from external documents
-- [ ] Local backend
-- [ ] Context sharing across agents
-
 ## Community
 
 - [Discord](https://discord.gg/4QTRS5ew)
 - [Discussions](https://github.com/ekailabs/contexto/discussions)
 - [Issues](https://github.com/ekailabs/contexto/issues)
-- [Contributing guide](CONTRIBUTING.md)
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE).
+Apache 2.0
 
 ---
 
