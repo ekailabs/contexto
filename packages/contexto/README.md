@@ -1,76 +1,48 @@
 # @ekai/contexto
 
-OpenClaw plugin — Context graph engine that prevents context rot by visualizing and organizing conversation context.
+Stop long-running OpenClaw agents from forgetting what matters.
 
-## Purpose
+`@ekai/contexto` is the OpenClaw plugin for Contexto, an episode-based context engine that preserves full conversation turns and retrieves the right past context when sessions get long.
 
-Mind Map is an improved **context engine** for OpenClaw that solves **context rot** — the gradual degradation of agent responses as conversation history grows. It builds a contextual representation of your conversations that allows the agent to maintain relevance and coherence over extended sessions.
+## Why Use It
 
-- Uses **semantic clustering** to group related messages and concepts
-- Maps relationships between messages, concepts, and session states
-- Provides structured context retrieval to combat context rot
-- Enables the agent to understand conversation topology
+- Prevents context rot from repeated summarization
+- Keeps earlier constraints and decisions retrievable
+- Separates topics with semantic clustering
+- Installs in OpenClaw with one plugin and one API key
 
-## OpenClaw Setup
-
-### 1. Install the plugin in OpenClaw
+## Install
 
 ```bash
 openclaw plugins install @ekai/contexto
 openclaw plugins enable contexto
-```
-
-### 2. Set Contexto as the context engine
-
-```bash
 openclaw config set plugins.slots.contextEngine contexto
-```
-
-### 3. Configure your API key
-
-Set your API key via CLI:
-
-```bash
-openclaw config set plugins.entries.contexto.config.apiKey your-api-key-here
-```
-
-Or add to your OpenClaw config:
-
-```json
-{
-  "plugins": {
-    "slots": {
-      "contextEngine": "contexto"
-    },
-    "allow": ["contexto"],
-    "entries": {
-      "contexto": {
-        "enabled": true,
-        "config": {
-          "apiKey": "your-api-key-here"
-        }
-      }
-    }
-  }
-}
-```
-
-### 4. Restart OpenClaw
-
-```bash
+openclaw config set plugins.entries.contexto.config.apiKey YOUR_KEY
 openclaw gateway restart
 ```
 
+Get an API key at [getcontexto.com](https://getcontexto.com/).
+
 ## Configuration
 
-| Property | Type | Required | Description |
-| --- | --- | --- | --- |
-| `apiKey` | string | Yes | Your Contexto API key |
+| Property | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `apiKey` | string | Yes | — | Your Contexto API key |
+| `contextEnabled` | boolean | No | `true` | Enable or disable context injection |
+| `maxContextChars` | number | No | — | Max characters for injected context |
+| `compactThreshold` | number (0-1) | No | `0.50` | Ingest and evict at this share of token budget |
+| `compactionStrategy` | `'sliding-window' \| 'default'` | No | `'default'` | Compaction strategy |
 
-## Version
+## How It Works
 
-This is **v1** of @ekai/contexto. For the legacy version (v0), see [`../v0`](../v0).
+1. OpenClaw buffers full conversation episodes.
+2. When the prompt budget fills up, the oldest episodes are ingested instead of being reduced to lossy summaries.
+3. Episodes are clustered by semantic similarity.
+4. Retrieval pulls back the most relevant episodes for the current prompt.
 
-## License
+## Learn More
 
-MIT
+- [Repository README](https://github.com/ekailabs/contexto)
+- [Website](https://getcontexto.com/)
+- [Blog](https://getcontexto.com/blogs)
+- [Discord](https://discord.com/invite/5VsUUEfbJk)

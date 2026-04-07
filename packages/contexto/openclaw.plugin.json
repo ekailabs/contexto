@@ -7,10 +7,20 @@
         "type": "string",
         "description": "API key for Bearer authentication"
       },
+      "contextEnabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable or disable context injection"
+      },
       "compactionStrategy": {
         "type": "string",
         "default": "default",
         "description": "Compaction Strategy in the context engine"
+      },
+      "compactThreshold": {
+        "type": "number",
+        "default": 0.5,
+        "description": "Ingest and evict at this share of the token budget"
       },
       "maxContextChars": {
         "type": "number",
