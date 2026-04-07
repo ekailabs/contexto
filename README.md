@@ -146,13 +146,9 @@ For the deeper technical reasoning:
 
 ## Configuration
 
-| Property | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `apiKey` | string | Yes | — | Your Contexto API key |
-| `contextEnabled` | boolean | No | `true` | Enable or disable context injection |
-| `maxContextChars` | number | No | — | Max characters for injected context |
-| `compactThreshold` | number (0-1) | No | `0.50` | Ingest and evict at this share of token budget |
-| `compactionStrategy` | `'sliding-window' \| 'default'` | No | `'default'` | Compaction strategy |
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `apiKey` | string | Yes | Your Contexto API key |
 
 ## Custom Backends
 
