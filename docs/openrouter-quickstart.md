@@ -7,32 +7,22 @@ docker run -d --name ekai \
   -e OPENROUTER_API_KEY=sk-or-... \
   -e MEMORY_EMBED_PROVIDER=openrouter \
   -e MEMORY_EXTRACT_PROVIDER=openrouter \
+  -p 3000:3000 \
   -p 4010:4010 \
-  ghcr.io/ekailabs/ekai-cloudrun:latest
+  ghcr.io/ekailabs/ekai-gateway:latest
 ```
 
 ## Build from Source
 
 ```sh
-docker build --target ekai-cloudrun -t ekai-cloudrun .
+docker build -t ekai-gateway .
 docker run -d --name ekai \
   -e OPENROUTER_API_KEY=sk-or-... \
   -e MEMORY_EMBED_PROVIDER=openrouter \
   -e MEMORY_EXTRACT_PROVIDER=openrouter \
+  -p 3000:3000 \
   -p 4010:4010 \
-  ekai-cloudrun
-```
-
-## Deploy to Cloud Run
-
-```sh
-gcloud run deploy ekai-cloudrun \
-  --image ghcr.io/ekailabs/ekai-cloudrun:latest \
-  --region us-central1 \
-  --set-env-vars OPENROUTER_API_KEY=sk-or-... \
-  --set-env-vars MEMORY_EMBED_PROVIDER=openrouter \
-  --set-env-vars MEMORY_EXTRACT_PROVIDER=openrouter \
-  --allow-unauthenticated
+  ekai-gateway
 ```
 
 ### Environment
@@ -69,4 +59,4 @@ Expected: summary shows counts > 0 in episodic and/or semantic sectors.
 
 ## Dashboard
 
-Open http://localhost:4010/memory to browse the Memory Vault UI.
+Open http://localhost:3000 to browse the Memory Vault UI.
