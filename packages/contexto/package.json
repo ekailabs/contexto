@@ -3,7 +3,7 @@
   "version": "0.1.11",
   "description": "Openclaw plugin for smart context management",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
   },
