@@ -1,5 +1,5 @@
 <h1 align="center">Contexto</h1>
-<p align="center"><strong>Keep long-running OpenClaw agents reliable after the context window fills.</strong></p>
+<h2 align="center">Keep long-running OpenClaw agents reliable after the context window fills.</h2>
 <p align="center">A drop-in OpenClaw context engine that retrieves old constraints instead of losing them to summaries.</p>
 
 <p align="center">
@@ -18,7 +18,8 @@
 </p>
 
 <p align="center">
-  OpenClaw works well until long sessions start compacting away the exact instruction that mattered. Contexto is the context engine built for that failure mode.
+  OpenClaw works well until long sessions start compacting away the exact instruction that mattered.<br />
+  Contexto is the context engine built for that failure mode.
 </p>
 
 ## The Problem in 15 Seconds
@@ -30,7 +31,9 @@
 **Without Contexto**
 
 ```text
-Turn 2: "Flag suspicious emails but do NOT delete anything."
+Turn 2:
+"Flag suspicious emails.
+Do NOT delete anything."
 
 [... 30 turns of tool calls, retries, and compaction ...]
 
