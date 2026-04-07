@@ -27,11 +27,110 @@ Contexto is a pnpm monorepo with the following packages:
 
 ## Commit Messages
 
-Use conventional commit prefixes when they fit:
-- `feat:` — new feature
-- `fix:` — bug fix
-- `docs:` — documentation
-- `chore:` — maintenance, dependencies
+We use [Conventional Commits](https://www.conventionalcommits.org/) with **package scopes**. Releases are auto-detected from squash merge commit messages (PR titles), so getting the format right matters.
+
+### Format
+
+```
+<type>(<scope>): <description>
+```
+
+### Scopes
+
+Use the package name as the scope:
+
+| Scope | Package |
+| --- | --- |
+| `contexto` | `@ekai/contexto` |
+| `mindmap` | `@ekai/mindmap` |
+
+Omit the scope for repo-wide changes (CI, root config, docs).
+
+### Types
+
+**Triggers a release:**
+
+| Type | Bump | Description |
+| --- | --- | --- |
+| `feat` | minor | New feature |
+| `fix` | patch | Bug fix |
+| `perf` | patch | Performance improvement |
+| `refactor` | patch | Code restructuring, no behavior change |
+
+**No release:**
+
+| Type | Description |
+| --- | --- |
+| `docs` | Documentation only |
+| `chore` | Maintenance, dependencies |
+| `test` | Adding or updating tests |
+| `ci` | CI/CD changes |
+| `style` | Formatting, whitespace |
+| `build` | Build system changes |
+
+### Breaking changes
+
+Append `!` after the scope to signal a **major** version bump:
+
+```
+feat(contexto)!: redesign plugin config
+fix(mindmap)!: change ClusterNode shape
+```
+
+### Examples
+
+```
+feat(contexto): add sliding window compaction
+fix(mindmap): beam search depth limiting
+feat(contexto)!: remove legacy v0 config
+docs: update README architecture section
+chore: bump pnpm to v9
+```
+
+### PR titles
+
+Since we squash merge, the **PR title becomes the commit message** on main. Use the same format for PR titles. The CI release workflow reads these to auto-detect version bumps.
+
+## Releases
+
+Releases are powered by [semantic-release](https://github.com/semantic-release/semantic-release) via [multi-semantic-release](https://github.com/dhoulb/multi-semantic-release). Maintainers trigger them manually from the GitHub Actions UI.
+
+### How to release
+
+1. Go to **Actions** tab on GitHub
+2. Select the **CI** workflow
+3. Click **Run workflow**
+4. Pick the package (`contexto`, `mindmap`, or `all`)
+5. Optionally enable **dry run** to preview without publishing
+
+### What happens
+
+semantic-release will:
+1. Analyze commits since the last release tag for that package (by file path, not just commit scope)
+2. Auto-detect the bump type (`feat` = minor, `fix`/`perf`/`refactor` = patch, `!` = major)
+3. Skip if no releasable commits (`docs`, `chore`, `test`, `ci`, `style`, `build` don't trigger releases)
+4. Bump the version in `package.json`
+5. Generate a `CHANGELOG.md` grouped by type (Features, Bug Fixes, Performance, Refactoring)
+6. Publish to npm
+7. Commit version bump + changelog with `[skip ci]`
+8. Create a git tag (e.g., `@ekai/contexto@0.1.12`) and GitHub Release
+
+### When to release
+
+- **Not every PR needs a release.** Batch related changes and release when ready.
+- **Use `all` when both packages changed together** (e.g., mindmap API change that contexto depends on).
+- If a package has no releasable commits, it's skipped automatically.
+
+### Forcing a release
+
+There is no manual bump override. The version is always derived from commits:
+- To force a **major** bump: use `feat(pkg)!:` or add a `BREAKING CHANGE:` footer
+- To force a release with no real changes: `git commit --allow-empty -m "fix(contexto): trigger release"`
+
+### Prerequisites
+
+- `NPM_TOKEN` must be set in repo secrets (Settings > Secrets > Actions)
+- Only maintainers with write access can trigger workflow dispatch
 
 ## What to Contribute
 

@@ -37,5 +37,9 @@
     "type": "git",
     "url": "https://github.com/ekailabs/contexto",
     "directory": "packages/mindmap"
+  },
+  "homepage": "https://github.com/ekailabs/contexto/tree/main/packages/mindmap",
+  "bugs": {
+    "url": "https://github.com/ekailabs/contexto/issues"
   }
 }

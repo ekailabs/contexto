@@ -23,6 +23,10 @@
     "url": "https://github.com/ekailabs/contexto",
     "directory": "packages/contexto"
   },
+  "homepage": "https://github.com/ekailabs/contexto/tree/main/packages/contexto",
+  "bugs": {
+    "url": "https://github.com/ekailabs/contexto/issues"
+  },
   "author": "Ekai Labs",
   "scripts": {
     "build": "tsc --noEmit"
