@@ -35,7 +35,8 @@ Turn 2:
 "Flag suspicious emails.
 Do NOT delete anything."
 
-[... 30 turns of tool calls, retries, and compaction ...]
+[... 30 more turns:
+tools, retries, compaction ...]
 
 Turn 35: Agent deletes 12 flagged emails.
 The constraint was lost in summarization.
