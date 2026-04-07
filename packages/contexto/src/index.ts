@@ -1,10 +1,12 @@
 import type { PluginConfig } from './types.js';
 import { RemoteBackend } from './client.js';
+import { LocalBackend } from './local/index.js';
 import { createContextEngine } from './engine/index.js';
 
-// Public API — use ContextoBackend to implement a custom (e.g. local) backend
 export type { ContextoBackend, SearchResult, WebhookPayload, Logger } from './types.js';
 export { RemoteBackend } from './client.js';
+export { LocalBackend } from './local/index.js';
+export type { LocalBackendConfig, EpisodeSummary } from './local/index.js';
 
 /** OpenClaw plugin definition. */
 export default {
@@ -20,15 +22,21 @@ export default {
       maxContextChars: { type: 'number' },
       compactThreshold: { type: 'number', default: 0.50 },
       compactionStrategy: { type: 'string', default: 'default' },
+      backend: { type: 'string', default: 'remote' },
+      storagePath: { type: 'string' },
     },
   },
 
   register(api: any) {
     const strategy = api.pluginConfig?.compactionStrategy ?? 'default';
+    const backendMode = api.pluginConfig?.backend ?? 'remote';
+
     const base = {
       apiKey: api.pluginConfig?.apiKey,
       contextEnabled: api.pluginConfig?.contextEnabled ?? true,
       maxContextChars: api.pluginConfig?.maxContextChars,
+      backend: backendMode as 'remote' | 'local',
+      storagePath: api.pluginConfig?.storagePath,
     };
 
     const config: PluginConfig = strategy === 'default'
@@ -41,6 +49,34 @@ export default {
 
     const logger = api.logger;
 
+    if (backendMode === 'local') {
+      // Resolve provider and apiKey from OpenClaw runtime defaults
+      const defaults = api.runtime?.agent?.defaults;
+      const provider = defaults?.provider ?? 'openrouter';
+      const apiKey = api.pluginConfig?.apiKey ?? defaults?.apiKey;
+
+      if (!apiKey) {
+        // Try resolving from runtime modelAuth as fallback
+        logger.warn('[contexto] No apiKey available for local backend — provide apiKey in plugin config or ensure OpenClaw runtime has a configured provider');
+        return;
+      }
+
+      // Set apiKey to a truthy value so engine guards (if (!this.config.apiKey)) pass
+      config.apiKey = config.apiKey || 'local';
+
+      const backend = new LocalBackend({
+        provider,
+        apiKey,
+        storagePath: config.storagePath,
+      }, logger);
+
+      const engine = createContextEngine(config, backend, logger);
+      api.registerContextEngine('contexto', () => engine);
+      logger.info(`[contexto] Plugin registered with local backend (provider: ${provider}, contextEnabled: ${config.contextEnabled})`);
+      return;
+    }
+
+    // Remote backend (default)
     if (!config.apiKey) {
       logger.warn('[contexto] Missing apiKey — ingestion and retrieval will be disabled');
       return;
