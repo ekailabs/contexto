@@ -111,29 +111,3 @@ ENV NODE_ENV=production
 EXPOSE 3000 4010
 VOLUME ["/app/packages/memory/data"]
 CMD ["/app/start-docker-fullstack.sh"]
-
-# ---------- openrouter + dashboard Cloud Run runtime (single container) ----------
-FROM node:20-alpine AS ekai-cloudrun
-WORKDIR /app
-ENV NODE_ENV=production
-
-# Memory package (workspace dependency of openrouter)
-COPY packages/memory/package.json packages/memory/pnpm-lock.yaml ./packages/memory/
-RUN cd packages/memory && pnpm install --frozen-lockfile --omit=dev
-COPY --from=memory-build /app/packages/memory/dist ./packages/memory/dist
-
-# OpenRouter — rewrite workspace ref to local file path before install
-COPY packages/openrouter/package.json packages/openrouter/pnpm-lock.yaml ./packages/openrouter/
-RUN cd packages/openrouter && \
-    sed -i 's|"@ekai/memory": "\*"|"@ekai/memory": "file:../../memory"|' package.json && \
-    pnpm install --frozen-lockfile --omit=dev
-COPY --from=openrouter-build /app/packages/openrouter/dist ./packages/openrouter/dist
-
-# Dashboard static export
-COPY --from=dashboard-embedded-build /app/packages/ui/dashboard/out ./dashboard-static
-
-RUN mkdir -p /app/packages/memory/data
-WORKDIR /app/packages/openrouter
-ENV DASHBOARD_STATIC_DIR=/app/dashboard-static
-EXPOSE 4010
-CMD ["node", "dist/server.js"]
