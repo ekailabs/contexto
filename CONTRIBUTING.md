@@ -1,47 +1,51 @@
-# Contributing to Ekai Gateway
+# Contributing to Contexto
 
-Thank you for considering contributing! Every contribution, big or small, makes a difference. We're grateful for your help and excited to see what you build.
+Thank you for considering contributing! Every contribution, big or small, makes a difference.
 
 ## Quick Start
 
-Here's how to get set up locally:
+1. **Local setup**: `pnpm install` then `cp .env.example .env` and add one provider key
+2. **Development**: `pnpm run dev`
+3. **Build**: `pnpm run build` (matches CI)
 
-1. **Local setup**: `npm install`; `cp .env.example .env`; add one provider key; `npm run dev`
-2. **Workflow**: Fork the repo, create a branch, make your changes, push to your fork, and create a PR on GitHub
-3. **Before pushing**: Run `npm run build` (matches CI) to catch workspace issues early
+## Monorepo Structure
 
-## Submitting Your PR
+Contexto is a pnpm monorepo with the following packages:
 
-Once you've made your changes:
+| Package | Path | Description |
+| --- | --- | --- |
+| `@ekai/contexto` | `packages/contexto/` | OpenClaw plugin, context engine |
+| `@ekai/mindmap` | `packages/mindmap/` | AGNES hierarchical clustering + beam search |
 
-- **Fork the repo**: If you haven't already, fork the repository on GitHub
-- **Push your branch**: `git push origin your-feature-branch`
-- **Create a PR**: Go to GitHub and create a pull request
-- **Wait for review**: We'll review and provide feedback if applicable
-- **Merge**: Once approved, your PR will be merged!
+## Workflow
 
-**A few friendly tips:**
-- Keep scope small and describe "problem → change" in a few lines
-- Use `feat:`/`fix:`/`chore:` commit message prefixes when they fit
-- Don't worry about being perfect!
+1. Fork the repo
+2. Create a branch (`git checkout -b your-feature`)
+3. Make your changes
+4. Run `pnpm run build` to catch issues early
+5. Push to your fork and create a PR
+
+## Commit Messages
+
+Use conventional commit prefixes when they fit:
+- `feat:` — new feature
+- `fix:` — bug fix
+- `docs:` — documentation
+- `chore:` — maintenance, dependencies
 
 ## What to Contribute
 
 Not sure where to start? We'd love help with:
-- Good first issues (great for getting started!)
+- [Good first issues](https://github.com/ekailabs/contexto/labels/good%20first%20issue)
 - Feature requests
 - Documentation improvements
 - Bug reports
 
-Every contribution matters, whether it's fixing a typo or adding a new feature.
-
 ## Getting Help
 
-Stuck or have questions? We're here to help:
 - Join our [Discord](https://discord.com/invite/5VsUUEfbJk) for real-time chat
-- Create an [issue](https://github.com/ekailabs/ekai-gateway/issues) to ask questions or report problems
+- Create an [issue](https://github.com/ekailabs/contexto/issues) to ask questions or report problems
 
 ---
 
-Thank you again for taking the time to contribute!
-
+Thank you for taking the time to contribute!
