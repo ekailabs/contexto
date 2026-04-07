@@ -104,7 +104,7 @@ If you are deciding whether this is worth installing, this is the short version.
 
 | | Default OpenClaw | **Contexto** |
 |---|---|---|
-| **When the context window fills** | Older turns get summarized and discarded | Full episodes get ingested and indexed |
+| **When the context window fills** | Older turns get compacted into a summary entry; recent messages stay intact | Full episodes get ingested and indexed |
 | **Keeps earlier instructions?** | Degrades over time | Yes, original episodes remain retrievable |
 | **Keeps topics separated?** | No, unrelated topics get blurred together | Yes, semantic clustering keeps branches distinct |
 | **Can you explain what was retrieved?** | No | Yes, full path tracing (`travel -> Japan -> visa docs`) |
