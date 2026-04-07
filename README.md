@@ -24,12 +24,6 @@
 
 ## The Problem in 15 Seconds
 
-<table>
-<tr>
-<td width="50%">
-
-**Without Contexto**
-
 ```text
 Turn 2:
 "Flag suspicious emails.
@@ -37,9 +31,17 @@ Do NOT delete anything."
 
 [... 30 more turns:
 tools, retries, compaction ...]
+```
 
+<table>
+<tr>
+<td width="50%">
+
+**Without Contexto**
+
+```text
 Turn 35: Agent deletes 12 flagged emails.
-The constraint was lost in summarization.
+The constraint was lost in compaction.
 ```
 
 </td>
