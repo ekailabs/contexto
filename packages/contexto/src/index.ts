@@ -23,7 +23,6 @@ export default {
       compactThreshold: { type: 'number', default: 0.50 },
       compactionStrategy: { type: 'string', default: 'default' },
       backend: { type: 'string', default: 'remote' },
-      storagePath: { type: 'string' },
     },
   },
 
@@ -36,7 +35,6 @@ export default {
       contextEnabled: api.pluginConfig?.contextEnabled ?? true,
       maxContextChars: api.pluginConfig?.maxContextChars,
       backend: backendMode as 'remote' | 'local',
-      storagePath: api.pluginConfig?.storagePath,
     };
 
     const config: PluginConfig = strategy === 'default'
@@ -67,7 +65,6 @@ export default {
       const backend = new LocalBackend({
         provider,
         apiKey,
-        storagePath: config.storagePath,
       }, logger);
 
       const engine = createContextEngine(config, backend, logger);

@@ -22,7 +22,6 @@ export interface LocalBackendConfig {
   apiKey: string;
   embedModel?: string;
   llmModel?: string;
-  storagePath?: string;
   storage?: MindmapStorage;
   mindmapConfig?: Partial<MindmapConfig>;
 }

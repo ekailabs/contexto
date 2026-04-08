@@ -5,7 +5,6 @@ export interface BaseConfig {
   minScore?: number;
   filter?: Record<string, unknown>;
   backend?: 'remote' | 'local';
-  storagePath?: string;
 }
 
 export interface DefaultConfig extends BaseConfig {

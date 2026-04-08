@@ -1,10 +1,11 @@
-import { Mindmap, jsonFileStorage, memoryStorage } from '@ekai/mindmap';
-import type { MindmapStorage } from '@ekai/mindmap';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { Mindmap, jsonFileStorage } from '@ekai/mindmap';
 import type { ContextoBackend, Logger, SearchResult, WebhookPayload } from '../types.js';
 import type { LocalBackendConfig } from './types.js';
 import { extractEpisodeText, summarizeEpisode } from './summarizer.js';
 
-const DEFAULT_STORAGE_PATH = '.contexto/mindmap.json';
+const STORAGE_PATH = join(homedir(), '.openclaw', 'data', 'contexto', 'mindmap.json');
 
 /** ContextoBackend implementation that runs the full pipeline locally. */
 export class LocalBackend implements ContextoBackend {
@@ -16,8 +17,7 @@ export class LocalBackend implements ContextoBackend {
     this.config = config;
     this.logger = logger;
 
-    const storage: MindmapStorage = config.storage
-      ?? jsonFileStorage(config.storagePath ?? DEFAULT_STORAGE_PATH);
+    const storage = config.storage ?? jsonFileStorage(STORAGE_PATH);
 
     this.mindmap = new Mindmap({
       provider: config.provider,
