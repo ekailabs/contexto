@@ -15,6 +15,11 @@
       "maxContextChars": {
         "type": "number",
         "description": "Maximum characters of context to inject (default: 2000)"
+      },
+      "backend": {
+        "type": "string",
+        "default": "remote",
+        "description": "Backend mode: 'remote' (hosted API) or 'local' (local pipeline with LLM summarization + mindmap)"
       }
     }
   }
