@@ -120,7 +120,24 @@ For the deeper technical reasoning:
 
 | Property | Type | Required | Description |
 | --- | --- | --- | --- |
-| `apiKey` | string | Yes | Your Contexto API key |
+| `apiKey` | string | Yes (remote) | Your Contexto API key |
+| `mode` | string | No | `remote` (default) or `local` |
+
+### Remote mode (default)
+
+Uses the hosted Contexto API. Get an API key at [getcontexto.com](https://getcontexto.com/).
+
+```bash
+openclaw config set plugins.entries.contexto.config.apiKey YOUR_KEY
+```
+
+### Local mode
+
+Runs the full pipeline locally: summarize via LLM, embed, cluster (AGNES), and persist to `~/.openclaw/data/contexto/mindmap.json`. Uses your OpenClaw provider and API key — no extra config needed.
+
+```bash
+openclaw config set plugins.entries.contexto.config.mode local
+```
 
 ## Community
 

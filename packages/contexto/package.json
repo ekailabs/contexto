@@ -31,6 +31,9 @@
   "scripts": {
     "build": "tsc --noEmit"
   },
+  "dependencies": {
+    "@ekai/mindmap": "^0.1.8"
+  },
   "peerDependencies": {
     "openclaw": "*"
   },
