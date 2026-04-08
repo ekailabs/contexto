@@ -1,7 +1,7 @@
 {
   "name": "@ekai/contexto",
-  "version": "0.1.11",
-  "description": "Openclaw plugin for smart context management",
+  "version": "0.1.12",
+  "description": "Context Engine for Long-running OpenClaw agents",
   "type": "module",
   "license": "Apache-2.0",
   "publishConfig": {
