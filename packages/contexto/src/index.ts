@@ -47,10 +47,15 @@ export default {
 
     const logger = api.logger;
 
+    logger.debug(`[contexto] pluginConfig: ${JSON.stringify(api.pluginConfig)}`);
+
     if (backendMode === 'local') {
       // Resolve provider and apiKey from OpenClaw runtime defaults
       const defaults = api.runtime?.agent?.defaults;
-      const provider = defaults?.provider ?? 'openrouter';
+      logger.info(`[contexto] runtime defaults: ${JSON.stringify(defaults)}`);
+      const SUPPORTED_PROVIDERS = new Set(['openrouter', 'openai']);
+      const rawProvider = defaults?.provider;
+      const provider = SUPPORTED_PROVIDERS.has(rawProvider) ? rawProvider : 'openrouter';
       const apiKey = api.pluginConfig?.apiKey ?? defaults?.apiKey;
 
       if (!apiKey) {
