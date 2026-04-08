@@ -18,7 +18,7 @@ export default {
     type: 'object',
     properties: {
       apiKey: { type: 'string' },
-      contextEnabled: { type: 'boolean', default: true },
+
       maxContextChars: { type: 'number' },
       compactThreshold: { type: 'number', default: 0.50 },
       compactionStrategy: { type: 'string', default: 'default' },
@@ -32,7 +32,6 @@ export default {
 
     const base = {
       apiKey: api.pluginConfig?.apiKey,
-      contextEnabled: api.pluginConfig?.contextEnabled ?? true,
       maxContextChars: api.pluginConfig?.maxContextChars,
       mode: backendMode as 'remote' | 'local',
     };
@@ -47,34 +46,41 @@ export default {
 
     const logger = api.logger;
 
-    logger.debug(`[contexto] pluginConfig: ${JSON.stringify(api.pluginConfig)}`);
-
     if (backendMode === 'local') {
-      // Resolve provider and apiKey from OpenClaw runtime defaults
-      const defaults = api.runtime?.agent?.defaults;
-      logger.info(`[contexto] runtime defaults: ${JSON.stringify(defaults)}`);
-      const SUPPORTED_PROVIDERS = new Set(['openrouter', 'openai']);
-      const rawProvider = defaults?.provider;
-      const provider = SUPPORTED_PROVIDERS.has(rawProvider) ? rawProvider : 'openrouter';
-      const apiKey = api.pluginConfig?.apiKey ?? defaults?.apiKey;
-
-      if (!apiKey) {
-        // Try resolving from runtime modelAuth as fallback
-        logger.warn('[contexto] No apiKey available for local backend — provide apiKey in plugin config or ensure OpenClaw runtime has a configured provider');
+      const modelAuth = api.runtime?.modelAuth;
+      if (!modelAuth?.resolveApiKeyForProvider) {
+        logger.warn('[contexto] Local mode requires modelAuth — not available');
         return;
       }
 
-      // Set apiKey to a truthy value so engine guards (if (!this.config.apiKey)) pass
-      config.apiKey = config.apiKey || 'local';
-
-      const backend = new LocalBackend({
-        provider,
-        apiKey,
-      }, logger);
-
-      const engine = createContextEngine(config, backend, logger);
-      api.registerContextEngine('contexto', () => engine);
-      logger.info(`[contexto] Plugin registered with local backend (provider: ${provider}, contextEnabled: ${config.contextEnabled})`);
+      // Resolve API key via .then() since register() must be synchronous
+      modelAuth.resolveApiKeyForProvider({ provider: 'openrouter', cfg: api.config })
+        .then((openrouterAuth: any) => {
+          if (openrouterAuth?.apiKey) {
+            return { provider: 'openrouter' as const, apiKey: openrouterAuth.apiKey };
+          }
+          return modelAuth.resolveApiKeyForProvider({ provider: 'openai', cfg: api.config })
+            .then((openaiAuth: any) => {
+              if (openaiAuth?.apiKey) {
+                return { provider: 'openai' as const, apiKey: openaiAuth.apiKey };
+              }
+              return null;
+            });
+        })
+        .then((result: { provider: 'openrouter' | 'openai'; apiKey: string } | null) => {
+          if (!result) {
+            logger.warn('[contexto] Local mode requires an OpenRouter or OpenAI API key configured in OpenClaw');
+            return;
+          }
+          config.apiKey = 'local';
+          const backend = new LocalBackend({ provider: result.provider, apiKey: result.apiKey }, logger);
+          const engine = createContextEngine(config, backend, logger);
+          api.registerContextEngine('contexto', () => engine);
+          logger.info(`[contexto] Plugin registered with local backend (provider: ${result.provider})`);
+        })
+        .catch((err: any) => {
+          logger.warn(`[contexto] Failed to resolve API key: ${err?.message ?? err}`);
+        });
       return;
     }
 
@@ -85,11 +91,8 @@ export default {
     }
 
     const backend = new RemoteBackend(config, logger);
-
     const engine = createContextEngine(config, backend, logger);
-
     api.registerContextEngine('contexto', () => engine);
-
-    logger.info(`[contexto] Plugin registered (contextEnabled: ${config.contextEnabled})`);
+    logger.info('[contexto] Plugin registered');
   },
 };
