@@ -4,7 +4,8 @@ module.exports = {
     ['@semantic-release/commit-analyzer', {
       preset: 'conventionalcommits',
       releaseRules: [
-        { type: 'feat', release: 'minor' },
+        { breaking: true, release: 'minor' },
+        { type: 'feat', release: 'patch' },
         { type: 'fix', release: 'patch' },
         { type: 'perf', release: 'patch' },
         { type: 'refactor', release: 'patch' },
