@@ -22,19 +22,19 @@ export default {
       maxContextChars: { type: 'number' },
       compactThreshold: { type: 'number', default: 0.50 },
       compactionStrategy: { type: 'string', default: 'default' },
-      backend: { type: 'string', default: 'remote' },
+      mode: { type: 'string', default: 'remote' },
     },
   },
 
   register(api: any) {
     const strategy = api.pluginConfig?.compactionStrategy ?? 'default';
-    const backendMode = api.pluginConfig?.backend ?? 'remote';
+    const backendMode = api.pluginConfig?.mode ?? 'remote';
 
     const base = {
       apiKey: api.pluginConfig?.apiKey,
       contextEnabled: api.pluginConfig?.contextEnabled ?? true,
       maxContextChars: api.pluginConfig?.maxContextChars,
-      backend: backendMode as 'remote' | 'local',
+      mode: backendMode as 'remote' | 'local',
     };
 
     const config: PluginConfig = strategy === 'default'

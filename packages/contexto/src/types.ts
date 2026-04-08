@@ -4,7 +4,7 @@ export interface BaseConfig {
   maxContextChars?: number;
   minScore?: number;
   filter?: Record<string, unknown>;
-  backend?: 'remote' | 'local';
+  mode?: 'remote' | 'local';
 }
 
 export interface DefaultConfig extends BaseConfig {
