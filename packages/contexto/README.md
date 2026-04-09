@@ -121,6 +121,40 @@ For the deeper technical reasoning:
 | Property | Type | Required | Description |
 | --- | --- | --- | --- |
 | `apiKey` | string | Yes | Your Contexto API key |
+| `contextEnabled` | boolean | No | Enable or disable context retrieval (default: `true`) |
+| `maxContextChars` | number | No | Maximum characters to inject as retrieved context |
+| `compactThreshold` | number | No | Fraction of token budget that triggers compaction (default: `0.50`) |
+| `compactionStrategy` | string | No | `"default"` or `"sliding-window"` (default: `"default"`) |
+| `rlmEnabled` | boolean | No | Enable RLM tools for processing large contexts (default: `false`) |
+
+## Large Context Processing (RLM)
+
+When a user sends a message that exceeds 50% of the available token budget — a PDF, a spreadsheet, a massive log dump — the standard approach of stuffing it into the prompt breaks down. Contexto includes optional support for **Recursive Language Model (RLM)** processing to handle these cases.
+
+When enabled, Contexto automatically detects oversized inputs, offloads them to an in-memory buffer, and gives the agent a set of six tools to explore, search, and reason over the content iteratively — without flooding the context window.
+
+### Enabling RLM
+
+Set `rlmEnabled` to `true` in your plugin config:
+
+```bash
+openclaw config set plugins.entries.contexto.config.rlmEnabled true
+```
+
+When disabled (the default), the plugin behaves exactly as before — no RLM tools are registered and no additional dependencies are loaded.
+
+### How It Works
+
+1. During context assembly, if the user's message exceeds 50% of the token budget, the content is moved to an in-memory **ContextBuffer** and the message is replaced with a brief instruction.
+2. The agent receives six RLM tools: **rlm_overview**, **rlm_peek**, **rlm_grep**, **rlm_slice**, **rlm_query**, and **rlm_repl** — covering structural exploration, pattern search, targeted extraction, sub-LLM reasoning, and sandboxed scripting.
+3. The agent iteratively explores and synthesizes an answer using these tools, keeping token usage bounded regardless of input size.
+4. Once complete, the synthesized result is ingested into the mindmap as an episode, making it available for future recall just like any other conversation context.
+
+RLM can also be invoked explicitly by the user, regardless of message size.
+
+Sub-LLM calls are routed through [pi-ai](https://docs.openclaw.ai/pi) via OpenRouter's auto-routing, which automatically selects an appropriate model. No additional API keys or provider SDKs are needed beyond what OpenClaw already manages.
+
+The RLM tools are provided by the [`@ekai/rlm`](../rlm/) package, which can also be used standalone outside of Contexto. See its [README](../rlm/README.md) for full tool documentation.
 
 ## Community
 

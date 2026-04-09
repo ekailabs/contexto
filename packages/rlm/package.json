@@ -1,0 +1,35 @@
+{
+  "name": "@ekai/rlm",
+  "version": "0.1.0",
+  "description": "Recursive Language Model tools for processing large contexts",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2"
+  },
+  "peerDependencies": {
+    "pdf-parse": ">=1.1.0",
+    "xlsx": ">=0.18.0"
+  },
+  "peerDependenciesMeta": {
+    "pdf-parse": { "optional": true },
+    "xlsx": { "optional": true }
+  }
+}
