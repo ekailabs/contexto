@@ -1,0 +1,16 @@
+{
+  "provider": "openrouter",
+  "embedModel": "openai/text-embedding-3-small",
+  "mindmap": {
+    "similarityThreshold": 0.5,
+    "maxDepth": 4,
+    "maxChildren": 10,
+    "rebuildInterval": 50
+  },
+  "search": {
+    "maxResults": 10,
+    "maxTokens": 4000,
+    "beamWidth": 3,
+    "minScore": 0.0
+  }
+}

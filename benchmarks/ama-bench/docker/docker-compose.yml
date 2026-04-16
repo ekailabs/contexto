@@ -1,0 +1,44 @@
+services:
+  bridge:
+    build:
+      context: ..
+      dockerfile: docker/bridge.Dockerfile
+    ports:
+      - "3456:3456"
+    environment:
+      - BRIDGE_PORT=3456
+      - API_KEY=${API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3456/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      bridge:
+        condition: service_healthy
+    environment:
+      - CONTEXTO_BRIDGE_URL=http://bridge:3456
+    command:
+      - --llm-server
+      - api
+      - --llm-config
+      - configs/${LLM_CONFIG:-gpt-5.2.yaml}
+      - --subset
+      - ${SUBSET:-openend}
+      - --method
+      - contexto
+      - --method-config
+      - configs/contexto.yaml
+      - --test-dir
+      - dataset/test
+      - --judge-config
+      - configs/${JUDGE_CONFIG:-llm_judge.yaml}
+      - --evaluate
+      - "True"
+    volumes:
+      - ../results:/app/AMA-Bench/results

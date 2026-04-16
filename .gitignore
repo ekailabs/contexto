@@ -75,3 +75,6 @@ my-app/
 
 # ROFL config (user-generated)
 rofl.yaml
+
+# Benchmark results
+benchmarks/**/results/
