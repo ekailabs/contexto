@@ -6,10 +6,23 @@ BENCH_DIR="$(dirname "$SCRIPT_DIR")"
 AMA_BENCH="$(cd "$BENCH_DIR/../../.." && pwd)/AMA-Bench"
 BRIDGE_PORT="${BRIDGE_PORT:-3456}"
 
+# Load .env if present
+if [ -f "$BENCH_DIR/.env" ]; then
+  set -a
+  source "$BENCH_DIR/.env"
+  set +a
+fi
+
+# Validate required vars
+if [ -z "${API_KEY:-}" ]; then
+  echo "ERROR: API_KEY not set. Export it or add to .env"
+  exit 1
+fi
+
 # Parse arguments (pass through to run.py)
-LLM_CONFIG="${LLM_CONFIG:-$AMA_BENCH/configs/gpt-4o.yaml}"
+LLM_CONFIG="${LLM_CONFIG:-$AMA_BENCH/configs/openrouter.yaml}"
 SUBSET="${SUBSET:-openend}"
-JUDGE_CONFIG="${JUDGE_CONFIG:-$AMA_BENCH/configs/llm_judge.yaml}"
+JUDGE_CONFIG="${JUDGE_CONFIG:-$AMA_BENCH/configs/llm_judge_openrouter.yaml}"
 METHOD_CONFIG="${METHOD_CONFIG:-$AMA_BENCH/configs/contexto.yaml}"
 EXTRA_ARGS="${@}"
 
@@ -19,7 +32,7 @@ echo "AMA-Bench dir: $AMA_BENCH"
 # Start bridge server in background
 echo "[1/3] Starting contexto bridge server on port $BRIDGE_PORT..."
 cd "$BENCH_DIR"
-BRIDGE_PORT=$BRIDGE_PORT bun src/server.ts &
+API_KEY=$API_KEY BRIDGE_PORT=$BRIDGE_PORT bun src/server.ts &
 BRIDGE_PID=$!
 
 # Ensure cleanup on exit
