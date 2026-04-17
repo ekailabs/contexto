@@ -41,6 +41,9 @@ importers:
 
   packages/contexto:
     dependencies:
+      '@ekai/mindmap':
+        specifier: ^0.1.8
+        version: 0.1.8
       openclaw:
         specifier: '*'
         version: 2026.4.5(@napi-rs/canvas@0.1.97)
@@ -400,6 +403,9 @@ packages:
 
   '@ekai/memory@0.0.1':
     resolution: {integrity: sha512-bMdR8X6UDhlLmwm1mUFuuZQv6ZMl9G1gB0fcH+iHA2q8lSeCRDDBibn7b+k2OXfP1rTtlY8OAFnWLV0mXvfLKw==}
+
+  '@ekai/mindmap@0.1.8':
+    resolution: {integrity: sha512-7Af9ShJ8c4d80HAw5MR0j2ypIUQwag6lgt/s5Mywm2EIZrl2uDVdM6VmjT+U2SjYBc/cbyjSwiHRfb3x93GWVA==}
 
   '@emnapi/core@1.9.1':
     resolution: {integrity: sha512-mukuNALVsoix/w1BJwFzwXBN/dHeejQtuVzcDsfOEsdpCumXb/E9j8w11h5S54tT1xhifGfbbSm/ICrObRb3KA==}
@@ -6551,6 +6557,10 @@ snapshots:
       sqlite-vec: 0.1.7
     transitivePeerDependencies:
       - supports-color
+
+  '@ekai/mindmap@0.1.8':
+    dependencies:
+      ml-hclust: 4.0.0
 
   '@emnapi/core@1.9.1':
     dependencies:

@@ -65,12 +65,12 @@ export abstract class AbstractContextEngine implements ContextEngine {
     if (tokenBudget != null) this.state.cachedTokenBudget = tokenBudget;
 
     const lastMsg = messages?.[messages.length - 1];
-    this.logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}, contextEnabled: ${this.config.contextEnabled}, hasApiKey: ${!!this.config.apiKey}`);
+    this.logger.info(`[contexto] assemble() called — ${messages?.length} messages, tokenBudget: ${tokenBudget}`);
     const lastMsgContent = lastMsg && 'content' in lastMsg ? lastMsg.content : undefined;
     this.logger.debug(`[contexto] last message — role: ${lastMsg?.role}, content type: ${typeof lastMsgContent}, isArray: ${Array.isArray(lastMsgContent)}, sample: ${JSON.stringify(lastMsgContent)?.slice(0, 200)}`);
 
-    if (!this.config.apiKey || !this.config.contextEnabled) {
-      this.logger.info(`[contexto] assemble() skipping — apiKey: ${!!this.config.apiKey}, contextEnabled: ${this.config.contextEnabled}`);
+    if (!this.config.apiKey) {
+      this.logger.info(`[contexto] assemble() skipping — not configured`);
       return { messages, estimatedTokens: 0 };
     }
 
