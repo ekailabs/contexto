@@ -24,12 +24,8 @@ export function estimatePayloadTokens(payloads: WebhookPayload[]): number {
   for (const p of payloads) {
     const data = p.data as Record<string, any> | undefined;
     if (!data) continue;
-    const allMessages = [
-      ...(data.userMessage ? [data.userMessage] : []),
-      ...(Array.isArray(data.assistantMessages) ? data.assistantMessages : []),
-      ...(Array.isArray(data.toolMessages) ? data.toolMessages : []),
-    ];
-    total += estimateMessageTokens(allMessages);
+    const msgs = Array.isArray(data.messages) ? data.messages : [];
+    total += estimateMessageTokens(msgs);
   }
   return total;
 }
@@ -41,20 +37,12 @@ export function buildEpisodePayload(
   sessionKey: string,
   runtimeContext?: Record<string, unknown>,
 ): WebhookPayload {
-  const userMessage = messages.find((m: any) => m.role === 'user');
-  const assistantMessages = messages.filter((m: any) => m.role === 'assistant');
-  const toolMessages = messages.filter((m: any) => m.role === 'tool' || m.role === 'tool_result');
-  const lastAssistant = assistantMessages[assistantMessages.length - 1];
-
   return buildPayload('episode', 'combined', sessionKey, {
     sessionId,
     model: runtimeContext?.model,
     provider: runtimeContext?.provider,
-    stopReason: lastAssistant?.stopReason,
   }, undefined, {
-    userMessage,
-    assistantMessages,
-    toolMessages,
+    messages,
   });
 }
 
