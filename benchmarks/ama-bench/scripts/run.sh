@@ -24,7 +24,7 @@ LLM_CONFIG="${LLM_CONFIG:-$AMA_BENCH/configs/openrouter.yaml}"
 SUBSET="${SUBSET:-openend}"
 JUDGE_CONFIG="${JUDGE_CONFIG:-$AMA_BENCH/configs/llm_judge_openrouter.yaml}"
 METHOD_CONFIG="${METHOD_CONFIG:-$AMA_BENCH/configs/contexto.yaml}"
-EXTRA_ARGS="${@}"
+EXTRA_ARGS="${*:-}"
 
 echo "=== Running AMA-Bench with contexto method ==="
 echo "AMA-Bench dir: $AMA_BENCH"

@@ -8,13 +8,13 @@ AMA_BENCH="$(cd "$BENCH_DIR/../../.." && pwd)/AMA-Bench"
 echo "=== AMA-Bench Setup for Contexto ==="
 echo "AMA-Bench: $AMA_BENCH"
 
-# 1. Clone AMA-Bench (delete if exists and clone latest)
-if [ -d "$AMA_BENCH" ]; then
-  echo "[1/4] Removing existing AMA-Bench..."
-  rm -rf "$AMA_BENCH"
+# 1. Clone AMA-Bench (if not already present)
+if [ ! -d "$AMA_BENCH" ]; then
+  echo "[1/4] Cloning AMA-Bench..."
+  git clone https://github.com/ekailabs/AMA-Bench.git "$AMA_BENCH"
+else
+  echo "[1/4] AMA-Bench already exists, skipping clone."
 fi
-echo "[1/4] Cloning AMA-Bench..."
-git clone https://github.com/ekailabs/AMA-Bench.git "$AMA_BENCH"
 
 # 2. Install Python dependencies
 echo "[2/4] Installing Python dependencies..."

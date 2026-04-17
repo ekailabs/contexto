@@ -160,10 +160,9 @@ bash scripts/sweep.sh
 
 Edit `configs/sweep.json` to change ranges. Results are saved to `results/sweep_<timestamp>/sweep_summary.csv`, ranked by accuracy.
 
-## Running with Docker Compose
+## Running with Docker Compose [WIP]
 
 No local Bun or Python needed. Everything runs in containers.
-TODO: fix errors on pip installation
 
 ```bash
 cd contexto/benchmarks/ama-bench/docker
