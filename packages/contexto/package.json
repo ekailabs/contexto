@@ -31,8 +31,17 @@
   "scripts": {
     "build": "tsc --noEmit"
   },
+  "dependencies": {
+    "@ekai/rlm": "workspace:*"
+  },
   "peerDependencies": {
-    "openclaw": "*"
+    "openclaw": "*",
+    "@mariozechner/pi-ai": "*"
+  },
+  "peerDependenciesMeta": {
+    "@mariozechner/pi-ai": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

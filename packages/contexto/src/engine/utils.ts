@@ -66,8 +66,9 @@ export function selectMessagesToEvict(
   };
 }
 
-/** Extract the firstKeptEntryId from the first message in an array (if available). */
-export function getFirstKeptEntryId(messages: any[]): string | undefined {
-  const first = messages.length > 0 ? messages[0] : null;
-  return first?.id ?? first?.entryId ?? undefined;
+/** Extract the firstKeptEntryId from the user message in the first kept episode payload. */
+export function getFirstKeptEntryId(kept: WebhookPayload[]): string | undefined {
+  if (kept.length === 0) return undefined;
+  const data = kept[0].data as Record<string, any> | undefined;
+  return data?.userMessage?.id ?? undefined;
 }

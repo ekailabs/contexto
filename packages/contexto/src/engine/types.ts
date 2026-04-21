@@ -16,6 +16,12 @@ export type CompactParams = MethodParams<'compact'>;
 export type SubagentSpawnParams = MethodParams<'prepareSubagentSpawn'>;
 export type SubagentEndedParams = MethodParams<'onSubagentEnded'>;
 
+/** Large context pending RLM processing. */
+export interface PendingContext {
+  content: string;
+  tokenEstimate: number;
+}
+
 // Internal state — not part of the SDK contract
 export interface CompactionState {
   bufferedMessages: WebhookPayload[];
@@ -23,6 +29,10 @@ export interface CompactionState {
   lastSessionKey: string;
   cachedTokenBudget: number | undefined;
   injectedItemIds: Set<string>;
+  /** Large contexts awaiting RLM subagent processing, keyed by sessionKey. */
+  pendingLargeContext: Map<string, PendingContext>;
+  /** Active RLM subagent sessions, keyed by childSessionKey → parentSessionKey. */
+  activeRlmSessions: Map<string, string>;
 }
 
 export function createCompactionState(): CompactionState {
@@ -32,5 +42,7 @@ export function createCompactionState(): CompactionState {
     lastSessionKey: '',
     cachedTokenBudget: undefined,
     injectedItemIds: new Set(),
+    pendingLargeContext: new Map(),
+    activeRlmSessions: new Map(),
   };
 }

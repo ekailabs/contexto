@@ -4,6 +4,7 @@ export interface BaseConfig {
   maxContextChars?: number;
   minScore?: number;
   filter?: Record<string, unknown>;
+  rlmEnabled?: boolean;
 }
 
 export interface DefaultConfig extends BaseConfig {
