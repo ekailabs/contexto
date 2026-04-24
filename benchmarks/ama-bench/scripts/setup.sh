@@ -31,12 +31,24 @@ else
 fi
 
 # 4. Install bridge dependencies
-echo "[4/4] Installing bridge dependencies..."
+echo "[4/5] Installing bridge dependencies..."
 cd "$BENCH_DIR" && pnpm install
+
+# 5. Pull Ollama embedding model (optional — won't hard-fail)
+echo "[5/5] Checking Ollama..."
+if command -v ollama >/dev/null 2>&1; then
+  echo "Pulling qwen3-embedding:0.6b (idempotent)..."
+  ollama pull qwen3-embedding:0.6b || echo "WARN: ollama pull failed — run 'ollama serve &' first, then retry."
+else
+  echo "Ollama not installed. To enable local embeddings:"
+  echo "  brew install ollama"
+  echo "  ollama serve &"
+  echo "  ollama pull qwen3-embedding:0.6b"
+fi
 
 echo ""
 echo "=== Setup complete ==="
 echo "Next steps:"
-echo "  1. Edit configs/default.json (provider, embedModel, mindmap params)"
-echo "  2. Export API_KEY=your-api-key"
+echo "  1. Ensure 'ollama serve' is running and qwen3-embedding:0.6b is pulled"
+echo "  2. (Optional) tune mindmap params in configs/default.json"
 echo "  3. Run: bash scripts/run.sh"

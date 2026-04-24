@@ -1,4 +1,5 @@
 {
+  "_comment": "MODE=local — fully self-hosted. Embed via Ollama, episodic + answer-gen + judge via local Qwen3-32B VLLM. Requires GPU box with 4+ GPUs (~80GB VRAM) and Ollama running locally. No API keys needed.",
   "embed": {
     "type": "ollama",
     "baseUrl": "http://localhost:11434",

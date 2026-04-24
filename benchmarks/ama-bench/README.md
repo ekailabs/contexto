@@ -28,11 +28,16 @@ Two repos:
 
 ## Prerequisites
 
+Always required:
 - [Bun](https://bun.sh) >= 1.0
 - Python >= 3.9
 - pnpm
 - `huggingface-cli` (`pip install huggingface_hub`)
-- An API key for [OpenRouter](https://openrouter.ai) or OpenAI (used for embeddings + LLM)
+
+Mode-specific (see [Modes](#modes) below):
+- **`MODE=local`** — Linux box with 4+ GPUs (≈80GB VRAM total) for VLLM, plus [Ollama](https://ollama.com) for embeddings. No API keys needed.
+- **`MODE=openai`** — `OPENAI_API_KEY` only. No GPUs, no Ollama.
+- **`MODE=hybrid`** — Ollama for embeddings + `OPENAI_API_KEY` for LLM/judge/summarizer. Mac-friendly, no GPUs.
 
 ## Running Locally
 
@@ -66,91 +71,117 @@ pip install -r requirements.txt
 huggingface-cli download AMA-bench/AMA-bench --repo-type dataset --local-dir dataset
 ```
 
-Or run the setup script which does all of the above:
+Or run the setup script which does all of the above (plus pulls the Ollama embedding model):
 
 ```bash
 cd contexto/benchmarks/ama-bench
 bash scripts/setup.sh
 ```
 
-### 3. Configure the bridge
+### 3. Pick a mode
 
-Create `contexto/benchmarks/ama-bench/.env`:
+`scripts/run.sh` exposes a single `MODE` switch that wires the bridge config + AMA-Bench LLM/judge consistently. Each mode maps to one preset in `configs/`.
+
+| `MODE` | Embed | Episodic summarizer | Answer-gen + Judge | Needs |
+|---|---|---|---|---|
+| `local` (default) | Ollama `qwen3-embedding:4b` | VLLM `Qwen/Qwen3-32B` | VLLM `Qwen/Qwen3-32B` | 4+ GPU box, Ollama, VLLM |
+| `openai` | OpenAI `text-embedding-3-small` | OpenAI `gpt-4.1-mini` | OpenAI (`gpt-5.2` / `gpt-5.4` judge) | `OPENAI_API_KEY` |
+| `hybrid` | Ollama `qwen3-embedding:4b` | OpenAI `gpt-4.1-mini` | OpenAI | Ollama + `OPENAI_API_KEY` |
+
+The preset files are `configs/{local,openai,hybrid}.json`. Edit them to tune `mindmap.*` / `search.*` or swap models — the bridge picks them up via the `BENCH_CONFIG` env var that `run.sh` sets.
+
+### 3a. (Ollama-using modes) install + start Ollama
+
+Skip if `MODE=openai`.
 
 ```bash
-# Embedding API key (used by the bridge for mindmap embeddings)
-API_KEY=your-openrouter-or-openai-key
+brew install ollama
+ollama serve &                          # keep running in the background
+ollama pull qwen3-embedding:4b          # ~2.5GB, one-time
 ```
 
-Tune mindmap parameters in `contexto/benchmarks/ama-bench/configs/default.json`:
+Ollama serves embeddings on `http://localhost:11434` with zero rate limits.
 
-```json
-{
-  "provider": "openrouter",
-  "embedModel": "openai/text-embedding-3-small",
-  "mindmap": {
-    "similarityThreshold": 0.5,
-    "maxDepth": 4,
-    "maxChildren": 10,
-    "rebuildInterval": 50
-  },
-  "search": {
-    "maxResults": 10,
-    "maxTokens": 4000,
-    "beamWidth": 3,
-    "minScore": 0.0
-  }
-}
+> Note: `@ekai/mindmap`'s package default is still `text-embedding-3-small`. The Ollama embedding is a **benchmark-only override** baked into the preset.
+
+### 3b. (`MODE=local` only) prep VLLM
+
+Skip for `openai` / `hybrid`.
+
+- Linux box with 4+ GPUs (≈80GB VRAM total — Qwen3-32B at `tensor_parallel_size=4`)
+- `pip install vllm`
+- Edit GPU IDs in `AMA-Bench/configs/qwen3-32B.yaml` (`vllm_launch.gpus`)
+
+`run.sh` auto-invokes `AMA-Bench/scripts/launch_vllm_32B.sh` (idempotent — skips if already up on the configured port). Answer-gen, judge, and the episodic summarizer all share the one VLLM endpoint.
+
+If you don't have GPUs locally, common alternatives: Lambda Labs, RunPod, Modal, Replicate, AWS EC2 (g6e.12xlarge), Bedrock (Qwen3-32B dense). Point `episodic.baseUrl` and the AMA-Bench yaml at the remote endpoint.
+
+### 4. (Cloud-using modes) set your OpenAI key
+
+Skip if `MODE=local`.
+
+`.env`:
+```
+OPENAI_API_KEY=sk-...
 ```
 
-### 4. Configure AMA-Bench LLM
-
-AMA-Bench needs an LLM config for answer generation and a judge config for scoring. Create these in `AMA-Bench/configs/`:
-
-```yaml
-# AMA-Bench/configs/openrouter.yaml
-provider: "openai"
-api_key: "your-openrouter-key"
-model: "openai/gpt-4o"
-base_url: "https://openrouter.ai/api/v1"
-max_tokens: 16000
-temperature: 0.0
-```
-
-```yaml
-# AMA-Bench/configs/llm_judge_openrouter.yaml
-provider: "openai"
-api_key: "your-openrouter-key"
-model: "openai/gpt-4o"
-base_url: "https://openrouter.ai/api/v1"
-max_tokens: 16000
-temperature: 0.0
-```
+Both `AMA-Bench/configs/gpt-5.2.yaml` and `llm_judge_api.yaml` are wired to read from `OPENAI_API_KEY` — no need to hard-code keys in yaml.
 
 ### 5. Run
 
 ```bash
 cd contexto/benchmarks/ama-bench
-bash scripts/run.sh
+bash scripts/run.sh                 # MODE=local (default)
+
+MODE=openai bash scripts/run.sh     # cloud-only
+MODE=hybrid bash scripts/run.sh     # local embed + cloud LLM
 ```
 
-This will:
-1. Start the bridge server (reads `configs/default.json` + `API_KEY` from `.env`)
-2. Run AMA-Bench with the `contexto` method (208 episodes, ~35s each)
-3. Evaluate answers with the LLM judge
-4. Save results to `AMA-Bench/results/`
-5. Shut down the bridge
+`run.sh` will:
+1. Validate the dependencies for the chosen mode (Ollama running? OpenAI key present?)
+2. Start the bridge with the matching `BENCH_CONFIG`
+3. Launch VLLM if `LLM_SERVER=vllm`
+4. Run AMA-Bench (208 episodes for `openend`)
+5. Save results to `AMA-Bench/results/` and shut down the bridge
 
-Override defaults:
+#### Per-knob overrides
+
+Any individual env var overrides the mode preset, so you can mix:
 
 ```bash
-LLM_CONFIG=../../../AMA-Bench/configs/openrouter.yaml \
-JUDGE_CONFIG=../../../AMA-Bench/configs/llm_judge_openrouter.yaml \
-SUBSET=openend \
-bash scripts/run.sh
+# Local VLLM answer-gen + OpenAI judge for comparison
+MODE=local JUDGE_SERVER=api JUDGE_CONFIG=$AMA_BENCH/configs/llm_judge_api.yaml \
+  bash scripts/run.sh
+
+# Hybrid mode but with a custom bridge config
+MODE=hybrid BENCH_CONFIG=./configs/my-experiment.json bash scripts/run.sh
+
+# Disable episodic layer for ablation (point at any preset and edit it,
+# or copy a preset and set "episodic": { "enabled": false })
+BENCH_CONFIG=./configs/no-episodic.json bash scripts/run.sh
 ```
 
-### 6. Parameter sweep (optional)
+Available env vars: `MODE`, `BENCH_CONFIG`, `LLM_SERVER`, `JUDGE_SERVER`, `LLM_CONFIG`, `JUDGE_CONFIG`, `SUBSET`, `BRIDGE_PORT`.
+
+### 6. Episodic summary layer
+
+The bridge runs every turn through an LLM **before** `mindmap.add()`, producing a structured summary (`status`, `summary`, `key_findings`, `evidence_refs`, `open_questions`, `confidence`) that mirrors the production `ekailabs-api-server` behavior. Only the summary (+ formatted key findings) is embedded; raw turn text is kept in `metadata.turn.rawContent` for reference.
+
+Each preset already wires `episodic` correctly:
+
+- `local.json` — Qwen3-32B on local VLLM, `jsonMode: false`, `noThink: true`
+- `openai.json` / `hybrid.json` — `gpt-4.1-mini` on OpenAI, `jsonMode: true`
+
+Knobs:
+- `jsonMode` — set `true` for OpenAI-style `response_format: json_object` (works on OpenAI; on VLLM requires `--guided-decoding-backend outlines`). Set `false` and rely on the system prompt's "JSON only" instruction otherwise.
+- `noThink: true` — Qwen3 is a hybrid reasoning model; summarization is factual extraction, so we append `/no_think` to skip the thinking phase (saves tokens + latency). Leave off for non-Qwen3 models.
+- `apiKey` — optional when `baseUrl` is localhost (VLLM accepts any value); otherwise reads `episodic.apiKey` → `API_KEY` → `OPENAI_API_KEY`.
+
+**Toggle off for ablation:** set `"episodic": { "enabled": false }` in your bench config; raw turn content is embedded directly.
+
+**Cost / volume (`MODE=openai` or `hybrid`):** one `gpt-4.1-mini` call per turn. Full `openend` subset (208 episodes × ~30–100 turns) ≈ 10k–20k summarization calls — pricing varies, check OpenAI's current rate. `MODE=local` is free apart from compute.
+
+### 7. Parameter sweep (optional)
 
 Grid-search over mindmap/search params to find the optimal config:
 
@@ -159,28 +190,6 @@ bash scripts/sweep.sh
 ```
 
 Edit `configs/sweep.json` to change ranges. Results are saved to `results/sweep_<timestamp>/sweep_summary.csv`, ranked by accuracy.
-
-## Running with Docker Compose [WIP]
-
-No local Bun or Python needed. Everything runs in containers.
-
-```bash
-cd contexto/benchmarks/ama-bench/docker
-cp .env.example .env   # set API_KEY
-docker compose up --build
-```
-
-The `bridge` container starts the server, the `runner` container clones AMA-Bench, downloads the dataset, and runs the benchmark.
-
-### CI
-
-```yaml
-- name: Run AMA-Bench
-  working-directory: benchmarks/ama-bench/docker
-  env:
-    API_KEY: ${{ secrets.API_KEY }}
-  run: docker compose up --build --abort-on-container-exit
-```
 
 ## Configuration Reference
 
@@ -214,31 +223,36 @@ The `bridge` container starts the server, the `runner` container clones AMA-Benc
 ## File Structure
 
 ```
-contexto/benchmarks/ama-bench/       # Bridge + config + scripts
-├── src/server.ts                    # Bridge server wrapping @ekai/mindmap
+contexto/benchmarks/ama-bench/        # Bridge + config + scripts
+├── src/
+│   ├── server.ts                     # Bridge server wrapping @ekai/mindmap
+│   └── episodic/                     # Production-parity summary layer
+│       ├── summary.ts
+│       ├── types.ts
+│       └── validation.ts
 ├── package.json
 ├── tsconfig.json
-├── .env                             # API_KEY (not committed)
+├── .env                              # OPENAI_API_KEY (not committed)
 ├── configs/
-│   ├── default.json                 # Mindmap + search parameters
-│   └── sweep.json                   # Parameter sweep ranges
+│   ├── default.json                  # Loaded if BENCH_CONFIG is unset
+│   ├── local.json                    # MODE=local preset
+│   ├── openai.json                   # MODE=openai preset
+│   ├── hybrid.json                   # MODE=hybrid preset
+│   └── sweep.json                    # Parameter sweep ranges
 ├── scripts/
-│   ├── setup.sh                     # One-time setup
-│   ├── run.sh                       # Run benchmark
-│   └── sweep.sh                     # Run parameter sweep
-├── docker/
-│   ├── docker-compose.yml
-│   ├── Dockerfile                   # AMA-Bench runner
-│   ├── bridge.Dockerfile            # Bridge server
-│   └── .env.example
-└── results/                         # Benchmark outputs (gitignored)
+│   ├── setup.sh                      # One-time setup
+│   ├── run.sh                        # Run benchmark (MODE-aware)
+│   └── sweep.sh                      # Run parameter sweep
+└── results/                          # Benchmark outputs (gitignored)
 
-AMA-Bench/                           # Fork of AMA-Bench
-├── src/method/contexto_method.py    # Python method adapter (thin HTTP client)
+AMA-Bench/                            # Sibling repo
+├── src/method/contexto_method.py     # Python method adapter (thin HTTP client)
 ├── configs/
-│   ├── contexto.yaml                # Method config (bridge_url only)
-│   ├── openrouter.yaml              # LLM config for answer generation
-│   └── llm_judge_openrouter.yaml    # LLM config for judge scoring
-├── dataset/                         # Downloaded via huggingface-cli
-└── results/                         # Benchmark outputs
+│   ├── contexto.yaml                 # Method config (bridge_url only)
+│   ├── qwen3-32B.yaml                # VLLM answer-gen
+│   ├── llm_judge.yaml                # VLLM judge
+│   ├── gpt-5.2.yaml                  # OpenAI answer-gen
+│   └── llm_judge_api.yaml            # OpenAI judge
+├── dataset/                          # Downloaded via huggingface-cli
+└── results/                          # Benchmark outputs
 ```
