@@ -17,8 +17,9 @@ fi
 #   local   → Ollama embed + VLLM (Qwen3-32B) for episodic + answer-gen + judge. No API keys, requires GPUs.
 #   openai  → OpenAI for everything (embed + episodic + answer-gen + judge). No GPUs, costs $$.
 #   hybrid  → Ollama embed (no rate limits) + OpenAI for episodic + answer-gen + judge. No GPUs.
+#   bedrock → Ollama embed + AWS Bedrock (Qwen3-32B) for episodic + answer-gen + judge. No GPUs, uses BEDROCK_API_KEY.
 # Any individual env var below can override the MODE preset.
-MODE="${MODE:-local}"
+MODE="${MODE:-bedrock}"
 
 case "$MODE" in
   local)
@@ -42,8 +43,24 @@ case "$MODE" in
     DEFAULT_LLM_CONFIG="$AMA_BENCH/configs/gpt-5.2.yaml"
     DEFAULT_JUDGE_CONFIG="$AMA_BENCH/configs/llm_judge_api.yaml"
     ;;
+  bedrock)
+    DEFAULT_BENCH_CONFIG="$BENCH_DIR/configs/bedrock.json"
+    DEFAULT_LLM_SERVER="api"
+    DEFAULT_JUDGE_SERVER="api"
+    DEFAULT_LLM_CONFIG="$AMA_BENCH/configs/bedrock.yaml"
+    DEFAULT_JUDGE_CONFIG="$AMA_BENCH/configs/llm_judge_bedrock.yaml"
+    if [ -z "${BEDROCK_API_KEY:-}" ]; then
+      echo "ERROR: MODE=bedrock requires BEDROCK_API_KEY in .env."
+      echo "  Get one from AWS Console → Bedrock → API keys (prefer long-term for full runs)."
+      exit 1
+    fi
+    # Bridge reads API_KEY; Python model_client reads OPENAI_API_KEY. Both paths hit
+    # Bedrock's OpenAI-compatible endpoint, so alias the single Bedrock bearer token to both.
+    export API_KEY="$BEDROCK_API_KEY"
+    export OPENAI_API_KEY="$BEDROCK_API_KEY"
+    ;;
   *)
-    echo "ERROR: unknown MODE='$MODE'. Valid: local | openai | hybrid"
+    echo "ERROR: unknown MODE='$MODE'. Valid: local | openai | hybrid | bedrock"
     exit 1
     ;;
 esac
@@ -120,7 +137,7 @@ fi
 # Start bridge server in background
 echo "[1/3] Starting contexto bridge server on port $BRIDGE_PORT..."
 cd "$BENCH_DIR"
-BRIDGE_PORT=$BRIDGE_PORT BENCH_CONFIG="$BENCH_CONFIG" API_KEY="${API_KEY:-}" OPENAI_API_KEY="${OPENAI_API_KEY:-}" bun src/server.ts &
+BRIDGE_PORT=$BRIDGE_PORT BENCH_CONFIG="$BENCH_CONFIG" API_KEY="${API_KEY:-}" OPENAI_API_KEY="${OPENAI_API_KEY:-}" EPISODIC_QUIET="${EPISODIC_QUIET:-1}" EPISODIC_DEBUG="${EPISODIC_DEBUG:-0}" EPISODIC_CONCURRENCY="${EPISODIC_CONCURRENCY:-8}" bun src/server.ts &
 BRIDGE_PID=$!
 
 # Ensure cleanup on exit

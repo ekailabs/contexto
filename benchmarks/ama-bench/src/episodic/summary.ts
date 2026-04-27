@@ -37,6 +37,7 @@ export interface SummarizerConfig {
   temperature?: number;         // default 0.2
   jsonMode?: boolean;           // default true — disable for VLLM backends without guided decoding
   noThink?: boolean;            // default false — if true, appends '/no_think' to user message (Qwen3 hybrid-reasoning models only)
+  maxInputChars?: number;       // default 10_000_000 (effectively off) — only set lower for small-context models (e.g. 40000 for 32k-ctx models like Bedrock Qwen3-32B)
 }
 
 export interface ConversationItemInput {
@@ -67,14 +68,26 @@ export function createSummarizer(config: SummarizerConfig): Summarizer {
   const temperature = config.temperature ?? 0.2;
   const jsonMode = config.jsonMode ?? true;
   const noThink = config.noThink ?? false;
+  const maxInputChars = config.maxInputChars ?? 10_000_000;
   const apiKey = config.apiKey ?? 'EMPTY'; // VLLM accepts any token; OpenAI requires a real key
   console.log(
-    `[episodic] initialized model=${config.model} baseUrl=${config.baseUrl} jsonMode=${jsonMode} noThink=${noThink}`,
+    `[episodic] initialized model=${config.model} baseUrl=${config.baseUrl} jsonMode=${jsonMode} noThink=${noThink} maxInputChars=${maxInputChars}`,
   );
 
   async function callLLM(content: string): Promise<unknown> {
+    // Guard against oversized turns (tool dumps, doc attachments) blowing past the
+    // model's context window. Truncate middle-out so prefix + suffix of the content
+    // survive — often more informative than a simple head-truncate.
+    let trimmed = content;
+    if (content.length > maxInputChars) {
+      const half = Math.floor(maxInputChars / 2);
+      trimmed =
+        content.slice(0, half) +
+        `\n\n[... ${content.length - maxInputChars} chars truncated for summarizer context window ...]\n\n` +
+        content.slice(content.length - half);
+    }
     // For Qwen3 hybrid-reasoning models, append /no_think to skip the thinking phase
-    const userContent = noThink ? `${content}\n\n/no_think` : content;
+    const userContent = noThink ? `${trimmed}\n\n/no_think` : trimmed;
     const body: Record<string, unknown> = {
       model: config.model,
       messages: [
@@ -85,18 +98,34 @@ export function createSummarizer(config: SummarizerConfig): Summarizer {
     };
     if (jsonMode) body.response_format = { type: 'json_object' };
 
-    const response = await fetch(config.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '(no body)');
-      throw new Error(`summarizer HTTP ${response.status}: ${body.slice(0, 200)}`);
+    // Retry transient errors (429 rate-limit, 5xx capacity/server errors) with
+    // exponential backoff. Bedrock's 235B-class models return 500s under bursty
+    // parallel load — a short retry usually succeeds.
+    const MAX_ATTEMPTS = 4;
+    const BASE_DELAY_MS = 1000;
+    let response: Response | null = null;
+    let lastError: string = '';
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      response = await fetch(config.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (response.ok) break;
+      const isTransient = response.status === 429 || response.status >= 500;
+      const bodyText = await response.text().catch(() => '(no body)');
+      lastError = `HTTP ${response.status}: ${bodyText.slice(0, 200)}`;
+      if (!isTransient || attempt === MAX_ATTEMPTS - 1) {
+        throw new Error(`summarizer ${lastError}`);
+      }
+      const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+    if (!response || !response.ok) {
+      throw new Error(`summarizer ${lastError || 'unreachable'}`);
     }
 
     const data = (await response.json()) as {
@@ -105,14 +134,55 @@ export function createSummarizer(config: SummarizerConfig): Summarizer {
     const text = data?.choices?.[0]?.message?.content;
     if (!text) throw new Error('Empty LLM response');
 
-    // Strip Qwen3 reasoning blocks if present, then markdown code fences
+    // Strip provider-specific reasoning wrappers before parsing:
+    //   <think>...</think>         — Qwen3 hybrid-reasoning output
+    //   <reasoning>...</reasoning> — gpt-oss reasoning output
+    //   <|channel|>...<|end|>      — gpt-oss harmony-format leakage
+    // Then strip any markdown code fences the model wraps the JSON in.
     const stripped = text
       .replace(/<think>[\s\S]*?<\/think>/g, '')
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
+      .replace(/<\|channel\|>[\s\S]*?<\|end\|>/g, '')
       .trim()
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/, '')
       .trim();
-    return JSON.parse(stripped);
+    try {
+      return tolerantJsonParse(stripped);
+    } catch (err) {
+      // One-time diagnostic: dump the raw model response shape so we can see what the
+      // provider actually returns (e.g. harmony channel markers from gpt-oss, or
+      // prose-wrapped JSON). Keeps the rest of the run quiet via EPISODIC_DEBUG guard.
+      if (process.env.EPISODIC_DEBUG === '1') {
+        console.error(
+          `[episodic] parse fail — raw content (first 600 chars):\n${text.slice(0, 600)}\n---`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Extract + parse the first JSON object from a model response, tolerating two
+   * common Qwen-without-guided-decoding failure modes:
+   *   1. Leading/trailing prose ("Here's the JSON: {...}. Let me know...")
+   *   2. Invalid string escapes (\p, \m, \x — Qwen sometimes literalizes backslashes)
+   */
+  function tolerantJsonParse(text: string): unknown {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error(`No JSON object found in response (head=${text.slice(0, 80)})`);
+    }
+    const body = text.slice(start, end + 1);
+    try {
+      return JSON.parse(body);
+    } catch {
+      // Escape unknown backslash sequences so the parser doesn't choke on \p, \m, etc.
+      // Leaves valid JSON escapes (\" \\ \/ \b \f \n \r \t \uXXXX) untouched.
+      const repaired = body.replace(/\\([^"\\/bfnrtu])/g, '\\\\$1');
+      return JSON.parse(repaired);
+    }
   }
 
   return {
@@ -158,6 +228,9 @@ export function createSummarizer(config: SummarizerConfig): Summarizer {
             timestamp: new Date().toISOString(),
           };
         } else {
+          // Log raw response structure to diagnose which fields the model dropped
+          const preview = JSON.stringify(raw).slice(0, 400);
+          console.warn(`[episodic] validation failed (${failures.join(',')}), raw: ${preview}`);
           summary = toDegradedSummary(raw, failures, traceRef, turn);
         }
       } catch (err) {

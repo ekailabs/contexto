@@ -13,6 +13,26 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createSummarizer, type Summarizer } from './episodic/summary.js';
 
+// --- Benchmark-only log suppression ---
+// The production-parity validator (episodic/validation.ts) logs a warning for every
+// turn that fails schema validation (e.g. empty key_findings on blocked turns — see
+// qwen3-coder-next behavior). In a 208-episode run that's hundreds of noisy lines.
+// Set EPISODIC_QUIET=1 to drop those specific warnings without touching the ported
+// production logic. All other logs (errors, bridge info) pass through unchanged.
+if (process.env.EPISODIC_QUIET === '1') {
+  const origWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    const first = typeof args[0] === 'string' ? args[0] : '';
+    if (
+      first.startsWith('[episodic] degraded summary') ||
+      first.startsWith('[episodic] validation failed')
+    ) {
+      return;
+    }
+    origWarn.apply(console, args);
+  };
+}
+
 // --- Config ---
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -95,6 +115,7 @@ interface EpisodicConfig {
   temperature?: number;
   jsonMode?: boolean;
   noThink?: boolean;
+  maxInputChars?: number;
 }
 
 const episodicCfg: EpisodicConfig = config.episodic ?? {};
@@ -119,6 +140,7 @@ if (episodicEnabled) {
     temperature: episodicCfg.temperature ?? 0.2,
     jsonMode: episodicCfg.jsonMode,
     noThink: episodicCfg.noThink,
+    maxInputChars: episodicCfg.maxInputChars,
   });
 } else {
   console.log('[episodic] disabled — raw turn content will be embedded directly');
@@ -145,6 +167,36 @@ interface ResetRequest {
 
 const mindmaps = new Map<string, Mindmap>();
 
+// --- Helpers ---
+
+/**
+ * Run `tasks` with at most `limit` in flight. Preserves input order in the output.
+ * Used to throttle summarizer fan-out — firing 50+ Promise.all requests at Bedrock's
+ * large models triggers 500s/429s from capacity limits.
+ */
+async function mapWithConcurrency<T, U>(
+  items: T[],
+  limit: number,
+  fn: (item: T, idx: number) => Promise<U>,
+): Promise<U[]> {
+  const results: U[] = new Array(items.length);
+  let next = 0;
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+const SUMMARIZER_CONCURRENCY = parseInt(
+  process.env.EPISODIC_CONCURRENCY ?? '8',
+  10,
+);
+
 // --- Handlers ---
 
 async function handleConstruct(body: ConstructRequest) {
@@ -157,8 +209,8 @@ async function handleConstruct(body: ConstructRequest) {
   // Only the summary content is embedded/stored; raw turn text is preserved
   // in metadata.turn.rawContent for debugging and ablation.
   const toStore = summarizer
-    ? await Promise.all(
-        items.map((item, idx) => summarizer!.summarizeTurn(item, episodeId, idx)),
+    ? await mapWithConcurrency(items, SUMMARIZER_CONCURRENCY, (item, idx) =>
+        summarizer!.summarizeTurn(item, episodeId, idx),
       )
     : items.map((item) => ({
         id: item.id,

@@ -1,0 +1,29 @@
+{
+  "_comment": "MODE=bedrock — Ollama embeddings + AWS Bedrock for everything. Answer-gen + judge on Qwen3-32B (16k ctx); summarizer on Qwen3-VL-235B-A22B (~256k ctx) with noThink=true to disable hybrid reasoning. Summarization + key-finding extraction is a factual task, not a reasoning one — reasoning models (gpt-oss) waste tokens thinking and leak <reasoning> blocks into the response. VL variant is what Bedrock exposes; vision capability is unused but doesn't hurt text workflows. Single BEDROCK_API_KEY.",
+  "embed": {
+    "type": "ollama",
+    "baseUrl": "http://localhost:11434",
+    "model": "qwen3-embedding:0.6b"
+  },
+  "episodic": {
+    "enabled": true,
+    "baseUrl": "https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions",
+    "model": "qwen.qwen3-vl-235b-a22b",
+    "temperature": 0.2,
+    "jsonMode": false,
+    "noThink": true,
+    "maxInputChars": 600000
+  },
+  "mindmap": {
+    "similarityThreshold": 0.5,
+    "maxDepth": 4,
+    "maxChildren": 10,
+    "rebuildInterval": 50
+  },
+  "search": {
+    "maxResults": 10,
+    "maxTokens": 4000,
+    "beamWidth": 3,
+    "minScore": 0.0
+  }
+}
