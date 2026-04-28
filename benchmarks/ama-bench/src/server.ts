@@ -77,7 +77,7 @@ function makeOllamaEmbedFn({ baseUrl, model }: { baseUrl: string; model: string 
 function buildEmbedFn(): EmbedFn {
   if (embedType === 'ollama') {
     const baseUrl = embedCfg.baseUrl ?? 'http://localhost:11434';
-    const model = embedCfg.model ?? 'qwen3-embedding:0.6b';
+    const model = embedCfg.model ?? 'qwen3-embedding:4b';
     console.log(`[bridge] Embed: ollama ${baseUrl} model=${model}`);
     return makeOllamaEmbedFn({ baseUrl, model });
   }
@@ -116,6 +116,7 @@ interface EpisodicConfig {
   jsonMode?: boolean;
   noThink?: boolean;
   maxInputChars?: number;
+  maxOutputTokens?: number;
 }
 
 const episodicCfg: EpisodicConfig = config.episodic ?? {};
@@ -126,11 +127,22 @@ if (episodicEnabled) {
   const baseUrl = episodicCfg.baseUrl ?? 'https://api.openai.com/v1/chat/completions';
   // Local endpoints (VLLM/Ollama/etc.) don't need a real API key
   const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1?\])/i.test(baseUrl);
+  // EPISODIC_API_KEY is preferred when set — used by mixed modes (e.g. bedrock-oai)
+  // where API_KEY/OPENAI_API_KEY are aliased to a different provider's key for the
+  // answer-gen + judge pipeline, but the summarizer needs a separate provider's key.
+  // BEDROCK_API_KEY is recognized directly so the bridge works without run.sh's aliasing.
+  // NOTE: || (not ??) — run.sh forwards unset vars as empty strings, which ?? would
+  // treat as a valid value and short-circuit on. We want empty-string to fall through.
   const apiKey =
-    episodicCfg.apiKey ?? process.env.API_KEY ?? process.env.OPENAI_API_KEY ?? '';
+    episodicCfg.apiKey ||
+    process.env.EPISODIC_API_KEY ||
+    process.env.BEDROCK_API_KEY ||
+    process.env.API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    '';
   if (!apiKey && !isLocal) {
     throw new Error(
-      'episodic.enabled=true but no API key found (set episodic.apiKey in configs/default.json, or API_KEY / OPENAI_API_KEY env var).',
+      'episodic.enabled=true but no API key found (set episodic.apiKey in the config, or one of: EPISODIC_API_KEY / BEDROCK_API_KEY / API_KEY / OPENAI_API_KEY env vars).',
     );
   }
   summarizer = createSummarizer({
@@ -141,6 +153,7 @@ if (episodicEnabled) {
     jsonMode: episodicCfg.jsonMode,
     noThink: episodicCfg.noThink,
     maxInputChars: episodicCfg.maxInputChars,
+    maxOutputTokens: episodicCfg.maxOutputTokens,
   });
 } else {
   console.log('[episodic] disabled — raw turn content will be embedded directly');
@@ -203,11 +216,13 @@ async function handleConstruct(body: ConstructRequest) {
   const { episodeId, items } = body;
 
   mindmaps.delete(episodeId);
+  const t0 = performance.now();
 
   // When the episodic layer is enabled, each raw turn is sent to an LLM that
   // produces a structured summary (production's SummaryService behavior).
   // Only the summary content is embedded/stored; raw turn text is preserved
   // in metadata.turn.rawContent for debugging and ablation.
+  const tSummStart = performance.now();
   const toStore = summarizer
     ? await mapWithConcurrency(items, SUMMARIZER_CONCURRENCY, (item, idx) =>
         summarizer!.summarizeTurn(item, episodeId, idx),
@@ -218,6 +233,7 @@ async function handleConstruct(body: ConstructRequest) {
         content: item.content,
         metadata: item.metadata,
       }));
+  const summarizeMs = performance.now() - tSummStart;
 
   const mindmap = createMindmap({
     embedFn,
@@ -225,10 +241,17 @@ async function handleConstruct(body: ConstructRequest) {
     config: mindmapConfig,
   });
 
+  const tBuildStart = performance.now();
   await mindmap.add(toStore);
+  const buildMs = performance.now() - tBuildStart;
+
   mindmaps.set(episodeId, mindmap);
 
   const state = await mindmap.getState();
+  const totalMs = performance.now() - t0;
+  console.log(
+    `[bridge] /construct ep=${episodeId} turns=${items.length} summarize=${summarizeMs.toFixed(0)}ms build=${buildMs.toFixed(0)}ms total=${totalMs.toFixed(0)}ms`,
+  );
   return {
     success: true,
     totalItems: state.stats.totalItems,

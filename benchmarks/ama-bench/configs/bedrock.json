@@ -1,9 +1,9 @@
 {
-  "_comment": "MODE=bedrock — Ollama embeddings + AWS Bedrock for everything. Answer-gen + judge on Qwen3-32B (16k ctx); summarizer on Qwen3-VL-235B-A22B (~256k ctx) with noThink=true to disable hybrid reasoning. Summarization + key-finding extraction is a factual task, not a reasoning one — reasoning models (gpt-oss) waste tokens thinking and leak <reasoning> blocks into the response. VL variant is what Bedrock exposes; vision capability is unused but doesn't hurt text workflows. Single BEDROCK_API_KEY.",
+  "_comment": "MODE=bedrock — Ollama embeddings + AWS Bedrock for everything. Answer-gen + judge on Qwen3-32B (16k ctx); summarizer on Qwen3-VL-235B-A22B (~256k ctx) with noThink=true to disable hybrid reasoning. maxInputChars=600000 — Bedrock returns silent 400s on the rare turn that exceeds the 256k token ceiling (≤3 / 208 episodes in practice), but tighter truncation hurts summary quality on long episodes far more than the 400s cost. Llama 4 / Nova would be cleaner (1M ctx) but aren't exposed on Bedrock's OpenAI-compat /chat/completions surface as of 2026-04. Single BEDROCK_API_KEY.",
   "embed": {
     "type": "ollama",
     "baseUrl": "http://localhost:11434",
-    "model": "qwen3-embedding:0.6b"
+    "model": "qwen3-embedding:4b"
   },
   "episodic": {
     "enabled": true,
@@ -12,17 +12,18 @@
     "temperature": 0.2,
     "jsonMode": false,
     "noThink": true,
-    "maxInputChars": 600000
+    "maxInputChars": 600000,
+    "maxOutputTokens": 4096
   },
   "mindmap": {
-    "similarityThreshold": 0.5,
+    "similarityThreshold": 0.45,
     "maxDepth": 4,
     "maxChildren": 10,
     "rebuildInterval": 50
   },
   "search": {
-    "maxResults": 10,
-    "maxTokens": 4000,
+    "maxResults": 30,
+    "maxTokens": 16000,
     "beamWidth": 3,
     "minScore": 0.0
   }

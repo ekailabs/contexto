@@ -18,6 +18,7 @@ fi
 #   openai  → OpenAI for everything (embed + episodic + answer-gen + judge). No GPUs, costs $$.
 #   hybrid  → Ollama embed (no rate limits) + OpenAI for episodic + answer-gen + judge. No GPUs.
 #   bedrock → Ollama embed + AWS Bedrock (Qwen3-32B) for episodic + answer-gen + judge. No GPUs, uses BEDROCK_API_KEY.
+#   bedrock-oai → bedrock for embed + answer-gen + judge, but episodic summarizer on gpt-4.1-mini via OpenRouter (1M ctx). Needs BEDROCK_API_KEY + OPENROUTER_API_KEY (or OPENAI_API_KEY for direct-OpenAI users).
 # Any individual env var below can override the MODE preset.
 MODE="${MODE:-bedrock}"
 
@@ -59,8 +60,30 @@ case "$MODE" in
     export API_KEY="$BEDROCK_API_KEY"
     export OPENAI_API_KEY="$BEDROCK_API_KEY"
     ;;
+  bedrock-oai)
+    DEFAULT_BENCH_CONFIG="$BENCH_DIR/configs/bedrock-oai.json"
+    DEFAULT_LLM_SERVER="api"
+    DEFAULT_JUDGE_SERVER="api"
+    DEFAULT_LLM_CONFIG="$AMA_BENCH/configs/bedrock.yaml"
+    DEFAULT_JUDGE_CONFIG="$AMA_BENCH/configs/llm_judge_bedrock.yaml"
+    if [ -z "${BEDROCK_API_KEY:-}" ]; then
+      echo "ERROR: MODE=bedrock-oai requires BEDROCK_API_KEY in .env (answer-gen + judge → Bedrock)."
+      exit 1
+    fi
+    # Summarizer key — prefer OPENROUTER_API_KEY, fall back to OPENAI_API_KEY for direct-OpenAI users.
+    SUMMARIZER_KEY="${OPENROUTER_API_KEY:-${OPENAI_API_KEY:-}}"
+    if [ -z "$SUMMARIZER_KEY" ]; then
+      echo "ERROR: MODE=bedrock-oai requires OPENROUTER_API_KEY (or OPENAI_API_KEY) in .env for the episodic summarizer."
+      exit 1
+    fi
+    # Capture the summarizer key BEFORE we alias OPENAI_API_KEY to the Bedrock key for the
+    # Python answer-gen + judge pipeline.
+    export EPISODIC_API_KEY="$SUMMARIZER_KEY"
+    export API_KEY="$BEDROCK_API_KEY"
+    export OPENAI_API_KEY="$BEDROCK_API_KEY"
+    ;;
   *)
-    echo "ERROR: unknown MODE='$MODE'. Valid: local | openai | hybrid | bedrock"
+    echo "ERROR: unknown MODE='$MODE'. Valid: local | openai | hybrid | bedrock | bedrock-oai"
     exit 1
     ;;
 esac
@@ -94,7 +117,7 @@ if [ "$EMBED_TYPE" = "ollama" ]; then
   fi
   if ! curl -sf "$OLLAMA_URL/api/tags" | grep -q "$EMBED_MODEL_HINT"; then
     echo "ERROR: embedding model not found in Ollama"
-    echo "  Pull: ollama pull qwen3-embedding:0.6b"
+    echo "  Pull: ollama pull qwen3-embedding:4b"
     exit 1
   fi
   echo "Ollama OK ($OLLAMA_URL) — $EMBED_MODEL_HINT present"
@@ -137,7 +160,7 @@ fi
 # Start bridge server in background
 echo "[1/3] Starting contexto bridge server on port $BRIDGE_PORT..."
 cd "$BENCH_DIR"
-BRIDGE_PORT=$BRIDGE_PORT BENCH_CONFIG="$BENCH_CONFIG" API_KEY="${API_KEY:-}" OPENAI_API_KEY="${OPENAI_API_KEY:-}" EPISODIC_QUIET="${EPISODIC_QUIET:-1}" EPISODIC_DEBUG="${EPISODIC_DEBUG:-0}" EPISODIC_CONCURRENCY="${EPISODIC_CONCURRENCY:-8}" bun src/server.ts &
+BRIDGE_PORT=$BRIDGE_PORT BENCH_CONFIG="$BENCH_CONFIG" API_KEY="${API_KEY:-}" OPENAI_API_KEY="${OPENAI_API_KEY:-}" BEDROCK_API_KEY="${BEDROCK_API_KEY:-}" EPISODIC_API_KEY="${EPISODIC_API_KEY:-}" EPISODIC_QUIET="${EPISODIC_QUIET:-1}" EPISODIC_DEBUG="${EPISODIC_DEBUG:-0}" EPISODIC_CONCURRENCY="${EPISODIC_CONCURRENCY:-8}" bun src/server.ts &
 BRIDGE_PID=$!
 
 # Ensure cleanup on exit

@@ -38,6 +38,7 @@ export interface SummarizerConfig {
   jsonMode?: boolean;           // default true — disable for VLLM backends without guided decoding
   noThink?: boolean;            // default false — if true, appends '/no_think' to user message (Qwen3 hybrid-reasoning models only)
   maxInputChars?: number;       // default 10_000_000 (effectively off) — only set lower for small-context models (e.g. 40000 for 32k-ctx models like Bedrock Qwen3-32B)
+  maxOutputTokens?: number;     // default 4096 — sent as max_tokens. Without this OpenRouter/Bedrock often truncate mid-JSON.
 }
 
 export interface ConversationItemInput {
@@ -69,9 +70,10 @@ export function createSummarizer(config: SummarizerConfig): Summarizer {
   const jsonMode = config.jsonMode ?? true;
   const noThink = config.noThink ?? false;
   const maxInputChars = config.maxInputChars ?? 10_000_000;
+  const maxOutputTokens = config.maxOutputTokens ?? 4096;
   const apiKey = config.apiKey ?? 'EMPTY'; // VLLM accepts any token; OpenAI requires a real key
   console.log(
-    `[episodic] initialized model=${config.model} baseUrl=${config.baseUrl} jsonMode=${jsonMode} noThink=${noThink} maxInputChars=${maxInputChars}`,
+    `[episodic] initialized model=${config.model} baseUrl=${config.baseUrl} jsonMode=${jsonMode} noThink=${noThink} maxInputChars=${maxInputChars} maxOutputTokens=${maxOutputTokens}`,
   );
 
   async function callLLM(content: string): Promise<unknown> {
@@ -95,6 +97,7 @@ export function createSummarizer(config: SummarizerConfig): Summarizer {
         { role: 'user', content: userContent },
       ],
       temperature,
+      max_tokens: maxOutputTokens,
     };
     if (jsonMode) body.response_format = { type: 'json_object' };
 
@@ -122,6 +125,9 @@ export function createSummarizer(config: SummarizerConfig): Summarizer {
         throw new Error(`summarizer ${lastError}`);
       }
       const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
+      console.warn(
+        `[episodic] retry ${attempt + 1}/${MAX_ATTEMPTS - 1} — ${lastError} — backing off ${Math.round(delay)}ms`,
+      );
       await new Promise((r) => setTimeout(r, delay));
     }
     if (!response || !response.ok) {

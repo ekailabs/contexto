@@ -85,12 +85,13 @@ bash scripts/setup.sh
 
 | `MODE` | Embed | Episodic summarizer | Answer-gen + Judge | Needs |
 |---|---|---|---|---|
-| `bedrock` (default) | Ollama `qwen3-embedding:0.6b` | Bedrock Qwen3-VL-235B-A22B (`/no_think`) (~256k ctx) | Bedrock `qwen.qwen3-32b-v1:0` (16k ctx) | Ollama + `BEDROCK_API_KEY` |
-| `local` | Ollama `qwen3-embedding:0.6b` | VLLM `Qwen/Qwen3-32B` | VLLM `Qwen/Qwen3-32B` | 4+ GPU box, Ollama, VLLM |
+| `bedrock` (default) | Ollama `qwen3-embedding:4b` | Bedrock Qwen3-VL-235B-A22B (`/no_think`) (~256k ctx) | Bedrock `qwen.qwen3-32b-v1:0` (16k ctx) | Ollama + `BEDROCK_API_KEY` |
+| `local` | Ollama `qwen3-embedding:4b` | VLLM `Qwen/Qwen3-32B` | VLLM `Qwen/Qwen3-32B` | 4+ GPU box, Ollama, VLLM |
 | `openai` | OpenAI `text-embedding-3-small` | OpenAI `gpt-4.1-mini` | OpenAI (`gpt-5.2` / `gpt-5.4` judge) | `OPENAI_API_KEY` |
-| `hybrid` | Ollama `qwen3-embedding:0.6b` | OpenAI `gpt-4.1-mini` | OpenAI | Ollama + `OPENAI_API_KEY` |
+| `hybrid` | Ollama `qwen3-embedding:4b` | OpenAI `gpt-4.1-mini` | OpenAI | Ollama + `OPENAI_API_KEY` |
+| `bedrock-oai` | Ollama `qwen3-embedding:4b` | OpenRouter `openai/gpt-4.1-mini` (1M ctx) | Bedrock `qwen.qwen3-32b-v1:0` (16k ctx) | Ollama + `BEDROCK_API_KEY` + `OPENROUTER_API_KEY` |
 
-The preset files are `configs/{local,openai,hybrid,bedrock}.json`. Edit them to tune `mindmap.*` / `search.*` or swap models — the bridge picks them up via the `BENCH_CONFIG` env var that `run.sh` sets.
+The preset files are `configs/{local,openai,hybrid,bedrock,bedrock-oai}.json`. Edit them to tune `mindmap.*` / `search.*` or swap models — the bridge picks them up via the `BENCH_CONFIG` env var that `run.sh` sets.
 
 ### 3a. (Ollama-using modes) install + start Ollama
 
@@ -206,55 +207,59 @@ Edit `configs/sweep.json` to change ranges. Results are saved to `results/sweep_
 
 Latest full-benchmark run on the `openend` subset (208 episodes, 2496 questions) using `MODE=bedrock`:
 
-- **Embed**: Ollama `qwen3-embedding:0.6b`
-- **Episodic summarizer**: Bedrock `qwen.qwen3-vl-235b-a22b` (`/no_think`, ~256k ctx)
+- **Embed**: Ollama `qwen3-embedding:4b`
+- **Episodic summarizer**: Bedrock `qwen.qwen3-vl-235b-a22b` (`/no_think`, ~256k ctx, `maxInputChars=600000`)
 - **Answer-gen**: Bedrock `qwen.qwen3-32b-v1:0`
 - **Judge**: Bedrock `qwen.qwen3-32b-v1:0`
+- **Mindmap**: `similarityThreshold=0.45`
+- **Search**: `maxResults=30`, `maxTokens=16000`, `beamWidth=3`
+
+Up from a baseline of 0.2568 (using `qwen3-embedding:0.6b`, `similarityThreshold=0.5`, `maxResults=10`, `maxTokens=4000`) — net **+1.7 points overall**, with the largest task-level gains on `2048` (+18.1) and `minihack` (+6.9), and the largest QA-type gain on Type B (+4.9 across 596 questions).
 
 ### Overall
 
 | Metric | Value |
 |---|---|
 | Total questions | 2496 |
-| Average score | 0.2568 |
-| Accuracy | **0.2568** |
+| Average score | 0.2740 |
+| Accuracy | **0.2740** |
 
 ### By task type
 
 | Task | Accuracy | Questions |
 |---|---:|---:|
-| 2048 | 0.1528 | 72 |
-| alfworld | 0.1750 | 360 |
-| babaisai | 0.4444 | 72 |
-| candy_crush | 0.5694 | 72 |
-| crafter | 0.3194 | 72 |
-| gaia_level1 | 0.3250 | 120 |
-| gaia_level2 | 0.2944 | 180 |
-| gaia_level3 | 0.5000 | 60 |
-| minihack | 0.3472 | 72 |
-| spider2 | 0.1454 | 612 |
-| swebench | 0.2500 | 432 |
-| webarena | 0.3414 | 372 |
+| 2048 | 0.3333 | 72 |
+| alfworld | 0.1806 | 360 |
+| babaisai | 0.3194 | 72 |
+| candy_crush | 0.4861 | 72 |
+| crafter | 0.3472 | 72 |
+| gaia_level1 | 0.3417 | 120 |
+| gaia_level2 | 0.3222 | 180 |
+| gaia_level3 | 0.3833 | 60 |
+| minihack | 0.4167 | 72 |
+| spider2 | 0.1748 | 612 |
+| swebench | 0.2708 | 432 |
+| webarena | 0.3656 | 372 |
 
 ### By domain
 
 | Domain | Accuracy | Questions |
 |---|---:|---:|
-| EMBODIED_AI | 0.1750 | 360 |
-| Game | 0.3667 | 360 |
+| EMBODIED_AI | 0.1806 | 360 |
+| Game | 0.3806 | 360 |
 | OPENWORLD_QA | 0.3389 | 360 |
-| SOFTWARE | 0.2500 | 432 |
-| TEXT2SQL | 0.1454 | 612 |
-| WEB | 0.3414 | 372 |
+| SOFTWARE | 0.2708 | 432 |
+| TEXT2SQL | 0.1748 | 612 |
+| WEB | 0.3656 | 372 |
 
 ### By QA type
 
 | Type | Accuracy | Questions |
 |---|---:|---:|
-| A | 0.2622 | 839 |
-| B | 0.3003 | 596 |
-| C | 0.2581 | 647 |
-| D | 0.1812 | 414 |
+| A | 0.2646 | 839 |
+| B | 0.3490 | 596 |
+| C | 0.2736 | 647 |
+| D | 0.1860 | 414 |
 
 ## Configuration Reference
 
