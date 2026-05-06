@@ -25,6 +25,8 @@ Contexto is a pnpm monorepo with the following packages:
 4. Run `pnpm run build` to catch issues early
 5. Push to your fork and create a PR
 
+When updating `packages/contexto/package.json` for a new OpenClaw gateway version, keep `peerDependencies.openclaw` aligned with `openclaw.compat.minGatewayVersion` so older incompatible installs receive an install-time warning.
+
 ## Commit Messages
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) with **package scopes**. Releases are auto-detected from squash merge commit messages (PR titles), so getting the format right matters.
