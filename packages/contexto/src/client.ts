@@ -27,12 +27,12 @@ export class RemoteBackend implements ContextoBackend {
 
       if (!response.ok) {
         const body = await response.text().catch(() => '(no body)');
-        this.logger.warn(`[contexto] webhook HTTP ${response.status}: ${response.statusText} — body: ${body}`);
+        this.logger.error(`[contexto] webhook HTTP ${response.status}: ${response.statusText} — body: ${body}`);
       } else {
         this.logger.info(`[contexto] webhook OK ${response.status} for ${payloads.length} events`);
       }
     } catch (err) {
-      this.logger.warn(`[contexto] webhook failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.error(`[contexto] webhook failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -50,10 +50,10 @@ export class RemoteBackend implements ContextoBackend {
       }
 
       const body = await response.text().catch(() => '');
-      this.logger.warn(`[contexto] /v1/mindmap/search HTTP ${response.status}: ${body.slice(0, 200)}`);
+      this.logger.error(`[contexto] /v1/mindmap/search HTTP ${response.status}: ${body.slice(0, 200)}`);
       return null;
     } catch (err) {
-      this.logger.warn(`[contexto] /v1/mindmap/search failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.error(`[contexto] /v1/mindmap/search failed: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
   }
