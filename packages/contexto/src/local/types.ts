@@ -17,9 +17,18 @@ export interface EpisodeSummary {
   open_questions?: string[];
 }
 
-export interface LocalBackendConfig {
+export interface ResolvedCredentials {
   provider: 'openrouter' | 'openai';
   apiKey: string;
+}
+
+export interface LocalBackendConfig {
+  /**
+   * Resolved credentials, or a function that resolves them lazily on first use.
+   * Lazy resolution lets the plugin call registerContextEngine synchronously
+   * during register() while deferring async API-key lookup to first ingest/search.
+   */
+  credentials: ResolvedCredentials | (() => Promise<ResolvedCredentials | null>);
   embedModel?: string;
   llmModel?: string;
   storage?: MindmapStorage;

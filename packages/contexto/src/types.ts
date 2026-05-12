@@ -1,5 +1,6 @@
 export interface BaseConfig {
   apiKey: string;
+  contextEnabled?: boolean;
 
   maxContextChars?: number;
   minScore?: number;

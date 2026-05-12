@@ -12,6 +12,11 @@
         "default": "default",
         "description": "Compaction Strategy in the context engine"
       },
+      "contextEnabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable context retrieval and injection (default: true)"
+      },
       "maxContextChars": {
         "type": "number",
         "description": "Maximum characters of context to inject (default: 2000)"

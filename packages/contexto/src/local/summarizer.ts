@@ -72,6 +72,13 @@ export function extractEpisodeText(payload: WebhookPayload): string {
     if (text) parts.push(`A: ${text}`);
   }
 
+  // Tool messages — preserve tool output so tool-derived facts remain retrievable
+  const toolMessages = Array.isArray(data.toolMessages) ? data.toolMessages : [];
+  for (const msg of toolMessages) {
+    const text = extractMessageText(msg);
+    if (text) parts.push(`T: ${text}`);
+  }
+
   return parts.join('\n');
 }
 

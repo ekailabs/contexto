@@ -2,30 +2,65 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Mindmap, jsonFileStorage } from '@ekai/mindmap';
 import type { ContextoBackend, Logger, SearchResult, WebhookPayload } from '../types.js';
-import type { LocalBackendConfig } from './types.js';
+import type { LocalBackendConfig, ResolvedCredentials } from './types.js';
 import { extractEpisodeText, summarizeEpisode } from './summarizer.js';
 
 const STORAGE_PATH = join(homedir(), '.openclaw', 'data', 'contexto', 'mindmap.json');
 
 /** ContextoBackend implementation that runs the full pipeline locally. */
 export class LocalBackend implements ContextoBackend {
-  private mindmap: Mindmap;
   private config: LocalBackendConfig;
   private logger: Logger;
+  private mindmapPromise: Promise<Mindmap | null> | null = null;
 
   constructor(config: LocalBackendConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
+  }
 
-    const storage = config.storage ?? jsonFileStorage(STORAGE_PATH);
+  /** Resolve credentials and build the Mindmap on first use, caching the result. */
+  private async getMindmap(): Promise<Mindmap | null> {
+    if (!this.mindmapPromise) {
+      this.mindmapPromise = this.initMindmap();
+    }
+    return this.mindmapPromise;
+  }
 
-    this.mindmap = new Mindmap({
-      provider: config.provider,
-      apiKey: config.apiKey,
-      embedModel: config.embedModel,
+  private async initMindmap(): Promise<Mindmap | null> {
+    let creds: ResolvedCredentials | null;
+    try {
+      creds = typeof this.config.credentials === 'function'
+        ? await this.config.credentials()
+        : this.config.credentials;
+    } catch (err) {
+      this.logger.warn(`[contexto:local] Credential resolution failed: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+
+    if (!creds?.apiKey) {
+      this.logger.warn('[contexto:local] No API key available — local backend disabled');
+      return null;
+    }
+
+    const storage = this.config.storage ?? jsonFileStorage(STORAGE_PATH);
+
+    return new Mindmap({
+      provider: creds.provider,
+      apiKey: creds.apiKey,
+      embedModel: this.config.embedModel,
       storage,
-      config: config.mindmapConfig,
+      config: this.config.mindmapConfig,
     });
+  }
+
+  private async getCredentials(): Promise<ResolvedCredentials | null> {
+    try {
+      return typeof this.config.credentials === 'function'
+        ? await this.config.credentials()
+        : this.config.credentials;
+    } catch {
+      return null;
+    }
   }
 
   async ingest(payload: WebhookPayload | WebhookPayload[]): Promise<void> {
@@ -42,6 +77,12 @@ export class LocalBackend implements ContextoBackend {
       return;
     }
 
+    const mindmap = await this.getMindmap();
+    if (!mindmap) return;
+
+    const creds = await this.getCredentials();
+    if (!creds) return;
+
     try {
       const items: Array<{ id: string; role: string; content: string; timestamp?: string; metadata?: Record<string, unknown> }> = [];
 
@@ -54,8 +95,8 @@ export class LocalBackend implements ContextoBackend {
 
         const traceRef = crypto.randomUUID();
         const summary = await summarizeEpisode(text, {
-          provider: this.config.provider,
-          apiKey: this.config.apiKey,
+          provider: creds.provider,
+          apiKey: creds.apiKey,
           model: this.config.llmModel,
         }, this.logger);
 
@@ -90,7 +131,7 @@ export class LocalBackend implements ContextoBackend {
       }
 
       if (items.length > 0) {
-        await this.mindmap.add(items);
+        await mindmap.add(items);
         this.logger.info(`[contexto:local] Ingested ${items.length} episode(s) into mindmap`);
       }
     } catch (err) {
@@ -104,8 +145,11 @@ export class LocalBackend implements ContextoBackend {
     filter?: Record<string, unknown>,
     minScore?: number,
   ): Promise<SearchResult | null> {
+    const mindmap = await this.getMindmap();
+    if (!mindmap) return null;
+
     try {
-      const result = await this.mindmap.search(query, {
+      const result = await mindmap.search(query, {
         maxResults,
         filter,
         minScore,
