@@ -1,0 +1,16 @@
+{
+  "name": "@ekai/ama-bench-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HTTP bridge between AMA-Bench Python framework and @ekai/mindmap",
+  "type": "module",
+  "scripts": {
+    "start": "bun src/server.ts"
+  },
+  "dependencies": {
+    "@ekai/mindmap": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

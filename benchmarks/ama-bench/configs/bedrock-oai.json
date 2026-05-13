@@ -1,0 +1,30 @@
+{
+  "_comment": "MODE=bedrock-oai — same as bedrock for embed + answer-gen + judge, but episodic summarization runs on gpt-4.1-mini via OpenRouter (1M context). Avoids the Bedrock Qwen3-VL 256k-token ceiling that causes silent 400s and timeouts on long tool-output turns. Requires BEDROCK_API_KEY + OPENROUTER_API_KEY in .env.",
+  "embed": {
+    "type": "ollama",
+    "baseUrl": "http://localhost:11434",
+    "model": "qwen3-embedding:4b"
+  },
+  "episodic": {
+    "enabled": true,
+    "baseUrl": "https://openrouter.ai/api/v1/chat/completions",
+    "model": "openai/gpt-4.1-mini",
+    "temperature": 0.2,
+    "jsonMode": true,
+    "noThink": false,
+    "maxInputChars": 3000000,
+    "maxOutputTokens": 4096
+  },
+  "mindmap": {
+    "similarityThreshold": 0.45,
+    "maxDepth": 4,
+    "maxChildren": 10,
+    "rebuildInterval": 50
+  },
+  "search": {
+    "maxResults": 10,
+    "maxTokens": 16000,
+    "beamWidth": 3,
+    "minScore": 0.0
+  }
+}

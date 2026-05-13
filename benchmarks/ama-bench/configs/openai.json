@@ -1,0 +1,27 @@
+{
+  "_comment": "MODE=openai — fully cloud. Embed + episodic + answer-gen + judge all hit OpenAI. Slowest + most expensive but no GPUs required. Requires OPENAI_API_KEY in .env.",
+  "embed": {
+    "type": "openai",
+    "model": "text-embedding-3-small"
+  },
+  "episodic": {
+    "enabled": true,
+    "baseUrl": "https://api.openai.com/v1/chat/completions",
+    "model": "gpt-4.1-mini",
+    "temperature": 0.2,
+    "jsonMode": true,
+    "noThink": false
+  },
+  "mindmap": {
+    "similarityThreshold": 0.5,
+    "maxDepth": 4,
+    "maxChildren": 10,
+    "rebuildInterval": 50
+  },
+  "search": {
+    "maxResults": 10,
+    "maxTokens": 4000,
+    "beamWidth": 3,
+    "minScore": 0.0
+  }
+}
