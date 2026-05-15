@@ -14,10 +14,10 @@ This guide walks through configuring Codex to use ekai-gateway for unified multi
 
 ## Install and Run the Gateway
 ```bash
-git clone https://github.com/ekailabs/ekai-gateway.git
-cd ekai-gateway
-npm install
-npm run dev
+git clone https://github.com/ekailabs/contexto.git
+cd contexto
+pnpm install
+pnpm run dev
 ```
 
 ## Configure Environment
@@ -75,4 +75,4 @@ codex --model "claude-sonnet-4-20250514"
 ## Troubleshooting
 - 401/403 errors: ensure the corresponding provider API key is set in `.env` and has access to the selected model.
 - 404/Model not found: confirm the model name is supported and correctly spelled.
-- Network errors: verify `npm run dev` is running and `OPENAI_BASE_URL`/`base_url` points to the correct port.
+- Network errors: verify `pnpm run dev` is running and `OPENAI_BASE_URL`/`base_url` points to the correct port.

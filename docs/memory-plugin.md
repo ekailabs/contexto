@@ -18,7 +18,7 @@ Both use the same `@ekai/memory` engine underneath.
 ### Install
 
 ```bash
-npm install @ekai/memory
+pnpm add @ekai/memory
 ```
 
 ### SDK Quickstart
@@ -67,7 +67,7 @@ app.use(createMemoryRouter(memory._store, memory._extractFn));
 Run memory as its own HTTP service:
 
 ```bash
-npm run start -w @ekai/memory
+pnpm --filter @ekai/memory run start
 # Memory service listening on :4005
 ```
 

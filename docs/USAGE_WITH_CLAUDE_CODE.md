@@ -14,10 +14,10 @@ This guide shows how to run Claude Code through ekai-gateway for multi‑provide
 
 ## Install and Run the Gateway
 ```bash
-git clone https://github.com/ekailabs/ekai-gateway.git
-cd ekai-gateway
-npm install
-npm run dev
+git clone https://github.com/ekailabs/contexto.git
+cd contexto
+pnpm install
+pnpm run dev
 ```
 
 ## Configure Environment
@@ -60,5 +60,5 @@ Notes
 
 ## Troubleshooting
 - 401/403 errors: verify the relevant API key is present in `.env` and the provider allows the chosen model.
-- Connection refused: ensure `npm run dev` is active and `ANTHROPIC_BASE_URL` matches the gateway port.
+- Connection refused: ensure `pnpm run dev` is active and `ANTHROPIC_BASE_URL` matches the gateway port.
 - Model not found: confirm the model name is supported by its provider and spelled correctly.

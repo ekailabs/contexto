@@ -42,8 +42,8 @@ Deploy your own private ekai-gateway instance on Oasis Network using ROFL (Runti
 
 ```bash
 # 1. Clone
-git clone https://github.com/ekailabs/ekai-gateway.git
-cd ekai-gateway
+git clone https://github.com/ekailabs/contexto.git
+cd contexto
 
 # 2. Create rofl.yaml from template
 cp rofl.yaml.template rofl.yaml
