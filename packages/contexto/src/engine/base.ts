@@ -87,18 +87,24 @@ export abstract class AbstractContextEngine implements ContextEngine {
     this.logger.info(`[contexto] Fetching context for query: "${query.slice(0, 100)}"`);
     const filter = { source: 'summary', ...this.config.filter };
     const minScore = this.config.minScore ?? DEFAULT_MIN_SCORE;
-    const result = await this.backend.search(query, DEFAULT_MAX_RESULTS, filter, minScore);
+    const maxResults = this.config.maxResults ?? DEFAULT_MAX_RESULTS;
+    const result = await this.backend.search(query, maxResults, filter, minScore);
 
     if (!result?.items?.length) {
       return { messages, estimatedTokens: 0 };
     }
 
-    const itemSummary = result.items.map((r: any, i: number) => `[${i}] ${r.item?.content?.length ?? 0} chars`).join(', ');
+    const itemSummary = result.items.map((r, i) => `[${i}] ${r.item?.content?.length ?? 0} chars`).join(', ');
     this.logger.info(`[contexto] Mindmap returned ${result.items.length} items (${itemSummary}), paths: ${JSON.stringify(result.paths)}`);
 
-    // Deduplicate: filter out items already injected in this session
-    const filtered = result.items.filter((r: any) => {
-      const id = (r.item ?? r).id;
+    // Deduplicate: filter out items already injected in this session.
+    // The dedup key is the inner item's id; older defensive code used
+    // ``(r.item ?? r).id`` to also support a raw-item shape, but both
+    // backends (local + remote) wrap items in ``{item, score, ...}``
+    // and ``MindmapItem.id`` is required — so the inner access is
+    // always defined.
+    const filtered = result.items.filter((r) => {
+      const id = r.item?.id;
       return !id || !this.state.injectedItemIds.has(id);
     });
 
@@ -112,7 +118,7 @@ export abstract class AbstractContextEngine implements ContextEngine {
 
     // Record injected item IDs
     for (const r of filtered) {
-      const id = (r.item ?? r).id;
+      const id = r.item?.id;
       if (id) this.state.injectedItemIds.add(id);
     }
 

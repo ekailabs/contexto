@@ -4,7 +4,14 @@ import { LocalBackend } from './local/index.js';
 import type { ResolvedCredentials } from './local/index.js';
 import { createContextEngine } from './engine/index.js';
 
-export type { ContextoBackend, SearchResult, WebhookPayload, Logger } from './types.js';
+export type {
+  ContextoBackend,
+  MindmapItem,
+  ScoredMindmapItem,
+  SearchResult,
+  WebhookPayload,
+  Logger,
+} from './types.js';
 export { RemoteBackend } from './client.js';
 export { LocalBackend } from './local/index.js';
 export type { LocalBackendConfig, ResolvedCredentials, EpisodeSummary } from './local/index.js';
@@ -21,6 +28,9 @@ export default {
       apiKey: { type: 'string' },
       contextEnabled: { type: 'boolean', default: true },
       maxContextChars: { type: 'number' },
+      maxResults: { type: 'number', default: 7 },
+      minScore: { type: 'number', default: 0.45 },
+      filter: { type: 'object' },
       compactThreshold: { type: 'number', default: 0.50 },
       compactionStrategy: { type: 'string', default: 'default' },
       mode: { type: 'string', default: 'remote' },
@@ -36,6 +46,9 @@ export default {
       apiKey: api.pluginConfig?.apiKey,
       contextEnabled: api.pluginConfig?.contextEnabled ?? true,
       maxContextChars: api.pluginConfig?.maxContextChars,
+      maxResults: api.pluginConfig?.maxResults,
+      minScore: api.pluginConfig?.minScore,
+      filter: api.pluginConfig?.filter,
       mode: backendMode as 'remote' | 'local',
     };
 

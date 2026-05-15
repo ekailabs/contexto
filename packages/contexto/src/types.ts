@@ -3,7 +3,16 @@ export interface BaseConfig {
   contextEnabled?: boolean;
 
   maxContextChars?: number;
+  /** Max number of memory items to retrieve per assemble() call. Default: 7. */
+  maxResults?: number;
+  /** Minimum similarity score for an item to be considered relevant. Default: 0.45. */
   minScore?: number;
+  /**
+   * Optional metadata-equality filter merged into the backend search.
+   * The engine always pins ``source: 'summary'`` — anything you set here is
+   * spread on top, so passing ``{ source: 'episode' }`` switches the kind
+   * of items returned. Pass ``{}`` to keep the default.
+   */
   filter?: Record<string, unknown>;
   mode?: 'remote' | 'local';
 }
@@ -31,9 +40,31 @@ export interface WebhookPayload {
   data?: Record<string, unknown>;
 }
 
+/**
+ * One memory item carried in a mindmap search result. Matches
+ * ``@ekai/mindmap``'s ``ConversationItem`` shape (the storage record),
+ * minus the embedding vector which the search layer never echoes back
+ * to callers. Re-exposed here so backend implementers (#116) don't
+ * have to import from a different package to learn the field names.
+ */
+export interface MindmapItem {
+  id: string;
+  role: string;
+  content: string;
+  timestamp?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** A search hit: the item + its similarity score + an estimated token cost. */
+export interface ScoredMindmapItem {
+  item: MindmapItem;
+  score: number;
+  estimatedTokens: number;
+}
+
 /** Shape returned by the mindmap search endpoint (ScoredQueryResult). */
 export interface SearchResult {
-  items: any[];
+  items: ScoredMindmapItem[];
   paths?: string[][];
 }
 

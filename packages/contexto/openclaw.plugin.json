@@ -21,6 +21,20 @@
         "type": "number",
         "description": "Maximum characters of context to inject (default: 2000)"
       },
+      "maxResults": {
+        "type": "number",
+        "default": 7,
+        "description": "Maximum number of memory items to retrieve per assemble() call (default: 7)"
+      },
+      "minScore": {
+        "type": "number",
+        "default": 0.45,
+        "description": "Minimum similarity score for a memory item to be considered relevant (default: 0.45)"
+      },
+      "filter": {
+        "type": "object",
+        "description": "Optional metadata-equality filter merged into the backend search. The engine pins source='summary'; anything set here is spread on top."
+      },
       "mode": {
         "type": "string",
         "default": "remote",

@@ -122,6 +122,11 @@ For the deeper technical reasoning:
 | --- | --- | --- | --- |
 | `apiKey` | string | Yes (remote) | Your Contexto API key |
 | `mode` | string | No | `remote` (default) or `local` |
+| `contextEnabled` | boolean | No | Set to `false` to disable context retrieval and injection (default: `true`) |
+| `maxContextChars` | number | No | Cap on the assembled context block, in characters (default: `2000`) |
+| `maxResults` | number | No | Max number of memory items retrieved per `assemble()` call (default: `7`) |
+| `minScore` | number | No | Minimum similarity score a candidate item must exceed (default: `0.45`) |
+| `filter` | object | No | Metadata-equality filter merged into backend search; engine pins `source: 'summary'` and your filter is spread on top |
 
 ### Remote mode (default)
 

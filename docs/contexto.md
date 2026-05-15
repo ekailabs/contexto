@@ -29,3 +29,15 @@ To ensure the agent always has access to your latest thoughts, Contexto implemen
 
 - **Live Tracking:** It listens to the configured `knowledgeFolder` (your Obsidian vault).
 - **Auto-Embedding:** Any changes, additions, or modifications to your markdown files trigger a debounced update. The system automatically recompiles and embeds the new information into the QMD index, keeping the knowledge base perpetually fresh.
+
+## 4. Tuning Retrieval
+
+Three retrieval knobs are exposed through the plugin config — defaults match what's hardwired into `engine/base.ts` and what `Mindmap.search` uses internally:
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `maxResults` | `7` | Upper bound on items returned per `assemble()` call before dedup against the already-injected set. |
+| `minScore` | `0.45` | Similarity floor. Items scoring below this are dropped before formatting. |
+| `filter` | `{}` | Metadata-equality filter merged into the backend search. The engine pins `source: 'summary'`; anything you set here is spread on top, so passing `{ source: 'episode' }` switches the kind of items returned. |
+
+See the package [README's Configuration table](../packages/contexto/README.md#configuration) for the full property list.
