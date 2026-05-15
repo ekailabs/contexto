@@ -18,13 +18,13 @@ This is a quick-start for running Ekai Gateway locally. For detailed client setu
 
 1. Clone the repository  
    ```bash
-   git clone https://github.com/ekailabs/ekai-gateway.git
-   cd ekai-gateway
+   git clone https://github.com/ekailabs/contexto.git
+   cd contexto
    ```
 
 2. Install dependencies  
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. Copy and edit the environment file  
@@ -42,8 +42,8 @@ This is a quick-start for running Ekai Gateway locally. For detailed client setu
 
 4. Build and start the Gateway  
    ```bash
-   npm run build
-   npm start
+   pnpm run build
+   pnpm start
    ```
 
 After startup:

@@ -2,7 +2,7 @@
 
 > Ekai is the universal context layer for agentic AI. Below you’ll find quick links to get started and learn more.
 
-[![GitHub - ekailabs/ekai-gateway](https://img.shields.io/badge/GitHub-ekailabs%2Fekai--gateway-181717?logo=github&logoColor=white)](https://github.com/ekailabs/ekai-gateway)
+[![GitHub - ekailabs/contexto](https://img.shields.io/badge/GitHub-ekailabs%2Fcontexto-181717?logo=github&logoColor=white)](https://github.com/ekailabs/contexto)
 
 - [Getting Started](getting-started.md)
 - [Architecture Overview](architecture-overview.md)
