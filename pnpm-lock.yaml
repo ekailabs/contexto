@@ -45,7 +45,7 @@ importers:
         specifier: ^0.1.8
         version: 0.1.8
       openclaw:
-        specifier: '*'
+        specifier: '>=2026.4.5'
         version: 2026.4.5(@napi-rs/canvas@0.1.97)
     devDependencies:
       '@types/node':

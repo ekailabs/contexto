@@ -35,7 +35,7 @@
     "@ekai/mindmap": "^0.1.8"
   },
   "peerDependencies": {
-    "openclaw": "*"
+    "openclaw": ">=2026.4.5"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
