@@ -292,6 +292,8 @@ class TestStatus:
         status = engine.get_status()
         assert status["auth_state"] == "ok"
         assert status["last_api_error"] is None
+        assert status["consecutive_ingest_failures"] == 0
+        assert status["last_ingest_failure"] is None
         # ABC defaults still present
         assert "context_length" in status
         assert "compression_count" in status
@@ -416,17 +418,51 @@ class TestCompressIngest:
         # But no search
         assert backend.search_calls == []
 
-    def test_ingest_failure_preserves_original_messages(self) -> None:
+    def test_ingest_failure_preserves_original_messages(self, caplog: pytest.LogCaptureFixture) -> None:
         engine, backend = _build_engine(
             ingest_succeeds=False,
             search_result=SearchResult(items=[], paths=[]),
         )
         msgs = _conversation(20)
-        result = engine.compress(msgs)
+        with caplog.at_level(logging.WARNING, logger="plugins.context_engine.contexto"):
+            result = engine.compress(msgs)
         assert backend.ingest_calls
         assert result == msgs
         assert backend.search_calls == []
         assert engine.compression_count == 0
+        assert engine.consecutive_ingest_failures == 1
+        assert engine.last_ingest_failure == "ingest returned False"
+        assert any("preserving original messages" in r.message for r in caplog.records)
+
+    def test_ingest_failure_after_backend_error_does_not_warn_twice(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        engine, backend = _build_engine(
+            search_result=SearchResult(items=[], paths=[]),
+        )
+        backend.force_error = ApiError(category="network", message="boom")
+        with caplog.at_level(logging.WARNING, logger="plugins.context_engine.contexto"):
+            result = engine.compress(_conversation(20))
+        assert result == _conversation(20)
+        assert engine.consecutive_ingest_failures == 1
+        assert engine.last_ingest_failure == "network: boom"
+        assert not any("preserving original messages" in r.message for r in caplog.records)
+
+    def test_successful_ingest_resets_failure_counter(self) -> None:
+        engine, backend = _build_engine(
+            ingest_succeeds=False,
+            search_result=SearchResult(items=[], paths=[]),
+        )
+        msgs = _conversation(20)
+        engine.compress(msgs)
+        assert engine.consecutive_ingest_failures == 1
+
+        backend.ingest_succeeds = True
+        result = engine.compress(msgs)
+        assert len(result) < len(msgs)
+        assert engine.consecutive_ingest_failures == 0
+        assert engine.last_ingest_failure is None
 
 
 class TestCompressRetrieve:

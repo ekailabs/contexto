@@ -93,6 +93,8 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
       - `injected_item_ids`: dedup across compactions and tool calls.
       - `auth_state`: "ok" | "degraded" | "auth_error"
       - `last_api_error`: human-readable last error string.
+      - `consecutive_ingest_failures`: fail-closed compaction counter.
+      - `last_ingest_failure`: last fail-closed ingest reason.
     """
 
     @classmethod
@@ -112,6 +114,8 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
         self.injected_item_ids: set[str] = set()
         self.auth_state: str = "ok"
         self.last_api_error: str | None = None
+        self.consecutive_ingest_failures: int = 0
+        self.last_ingest_failure: str | None = None
         if backend is None:
             backend = RemoteBackend(
                 config,
@@ -190,6 +194,8 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
         status = super().get_status()
         status["auth_state"] = self.auth_state
         status["last_api_error"] = self.last_api_error
+        status["consecutive_ingest_failures"] = self.consecutive_ingest_failures
+        status["last_ingest_failure"] = self.last_ingest_failure
         return status
 
     # -------------------------------------------------- backend observers
@@ -247,10 +253,12 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
             session_key=self.session_id,
             runtime_context={"model": self.model, "provider": self.provider},
         )
+        previous_api_error = self.last_api_error
         ingest_ok = self.client.ingest([payload])
         if not ingest_ok:
-            logger.warning("[contexto] ingest failed; preserving original messages")
+            self._record_ingest_failure(previous_api_error)
             return messages
+        self._record_ingest_success()
 
         head_and_tail = system_messages + head + tail
         self.compression_count += 1
@@ -328,6 +336,26 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
         if "item" in entry and isinstance(entry["item"], dict):
             return entry["item"].get("id")
         return entry.get("id")
+
+    def _record_ingest_failure(self, previous_api_error: str | None) -> None:
+        self.consecutive_ingest_failures += 1
+        self.last_ingest_failure = self.last_api_error or "ingest returned False"
+        msg = (
+            "[contexto] ingest failed; preserving original messages "
+            "(consecutive failures: %d, reason: %s)"
+        )
+        args = (self.consecutive_ingest_failures, self.last_ingest_failure)
+        # If the backend already emitted a concrete error for this call, avoid
+        # a second warning. If it returned False silently (for example during
+        # rate-limit suppression), keep one visible engine-boundary signal.
+        if self.last_api_error != previous_api_error:
+            logger.debug(msg, *args)
+        else:
+            logger.warning(msg, *args)
+
+    def _record_ingest_success(self) -> None:
+        self.consecutive_ingest_failures = 0
+        self.last_ingest_failure = None
 
     def _estimate_tokens(self, messages: list[dict[str, Any]]) -> int:
         text_buffer: list[str] = []
