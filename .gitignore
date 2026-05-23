@@ -75,3 +75,22 @@ my-app/
 
 # ROFL config (user-generated)
 rofl.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+build/
+*.whl
+

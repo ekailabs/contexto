@@ -1,0 +1,20 @@
+name: contexto
+description: Contexto context engine — full episodes + mindmap retrieval (remote)
+version: 0.1.0
+# Auth and tunables are env-var driven. No YAML config block.
+env_vars:
+  - name: CONTEXTO_API_KEY
+    required: true
+    description: API key from getcontexto.com
+  - name: CONTEXTO_ENABLED
+    default: "true"
+  - name: CONTEXTO_MAX_CONTEXT_CHARS
+    default: "2000"
+  - name: CONTEXTO_MIN_SCORE
+    default: "0.45"
+  - name: CONTEXTO_MAX_RESULTS
+    default: "7"
+  - name: CONTEXTO_SEARCH_TIMEOUT
+    default: "10"
+  - name: CONTEXTO_INGEST_TIMEOUT
+    default: "30"

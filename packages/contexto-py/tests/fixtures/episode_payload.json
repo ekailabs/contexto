@@ -1,0 +1,98 @@
+{
+  "basic": {
+    "inputs": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi there!"
+        }
+      ],
+      "sessionId": "s-abc",
+      "sessionKey": "s-abc",
+      "runtimeContext": {
+        "model": "gpt-4o",
+        "provider": "openai"
+      }
+    },
+    "serialized": "{\"event\":{\"type\":\"episode\",\"action\":\"combined\"},\"sessionKey\":\"s-abc\",\"timestamp\":\"2026-05-23T18:30:00.000Z\",\"context\":{\"sessionId\":\"s-abc\",\"model\":\"gpt-4o\",\"provider\":\"openai\"},\"data\":{\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"},{\"role\":\"assistant\",\"content\":\"Hi there!\"}]}}"
+  },
+  "no_runtime_context": {
+    "inputs": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "q"
+        }
+      ],
+      "sessionId": "s-no-rt",
+      "sessionKey": "s-no-rt",
+      "runtimeContext": null
+    },
+    "serialized": "{\"event\":{\"type\":\"episode\",\"action\":\"combined\"},\"sessionKey\":\"s-no-rt\",\"timestamp\":\"2026-05-23T18:30:00.000Z\",\"context\":{\"sessionId\":\"s-no-rt\"},\"data\":{\"messages\":[{\"role\":\"user\",\"content\":\"q\"}]}}"
+  },
+  "only_model_set": {
+    "inputs": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "q"
+        }
+      ],
+      "sessionId": "s-model-only",
+      "sessionKey": "s-model-only",
+      "runtimeContext": {
+        "model": "gpt-4o-mini"
+      }
+    },
+    "serialized": "{\"event\":{\"type\":\"episode\",\"action\":\"combined\"},\"sessionKey\":\"s-model-only\",\"timestamp\":\"2026-05-23T18:30:00.000Z\",\"context\":{\"sessionId\":\"s-model-only\",\"model\":\"gpt-4o-mini\"},\"data\":{\"messages\":[{\"role\":\"user\",\"content\":\"q\"}]}}"
+  },
+  "distinct_session_key": {
+    "inputs": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "sessionId": "s-id-1",
+      "sessionKey": "s-key-2",
+      "runtimeContext": {
+        "model": "claude-opus-4-7",
+        "provider": "anthropic"
+      }
+    },
+    "serialized": "{\"event\":{\"type\":\"episode\",\"action\":\"combined\"},\"sessionKey\":\"s-key-2\",\"timestamp\":\"2026-05-23T18:30:00.000Z\",\"context\":{\"sessionId\":\"s-id-1\",\"model\":\"claude-opus-4-7\",\"provider\":\"anthropic\"},\"data\":{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}}"
+  },
+  "multipart_content": {
+    "inputs": {
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Look at this:"
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "https://x.test/y.png"
+              }
+            }
+          ]
+        }
+      ],
+      "sessionId": "s-multi",
+      "sessionKey": "s-multi",
+      "runtimeContext": {
+        "model": "gpt-4o",
+        "provider": "openai"
+      }
+    },
+    "serialized": "{\"event\":{\"type\":\"episode\",\"action\":\"combined\"},\"sessionKey\":\"s-multi\",\"timestamp\":\"2026-05-23T18:30:00.000Z\",\"context\":{\"sessionId\":\"s-multi\",\"model\":\"gpt-4o\",\"provider\":\"openai\"},\"data\":{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Look at this:\"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"https://x.test/y.png\"}}]}]}}"
+  }
+}
