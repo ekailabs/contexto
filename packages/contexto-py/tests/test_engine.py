@@ -416,14 +416,17 @@ class TestCompressIngest:
         # But no search
         assert backend.search_calls == []
 
-    def test_ingest_failure_still_runs_search(self) -> None:
+    def test_ingest_failure_preserves_original_messages(self) -> None:
         engine, backend = _build_engine(
             ingest_succeeds=False,
             search_result=SearchResult(items=[], paths=[]),
         )
-        engine.compress(_conversation(20))
+        msgs = _conversation(20)
+        result = engine.compress(msgs)
         assert backend.ingest_calls
-        assert backend.search_calls  # still ran
+        assert result == msgs
+        assert backend.search_calls == []
+        assert engine.compression_count == 0
 
 
 class TestCompressRetrieve:

@@ -247,7 +247,10 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
             session_key=self.session_id,
             runtime_context={"model": self.model, "provider": self.provider},
         )
-        self.client.ingest([payload])
+        ingest_ok = self.client.ingest([payload])
+        if not ingest_ok:
+            logger.warning("[contexto] ingest failed; preserving original messages")
+            return messages
 
         head_and_tail = system_messages + head + tail
         self.compression_count += 1

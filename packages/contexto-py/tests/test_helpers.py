@@ -161,6 +161,14 @@ class TestFormatSearchResults:
         out = format_search_results(items)
         assert out == "## Relevant Context\n\n- direct"
 
+    def test_handles_non_dict_item(self) -> None:
+        out = format_search_results(["bare string item"])
+        assert out == "## Relevant Context\n\n- bare string item"
+
+    def test_handles_non_dict_wrapped_item(self) -> None:
+        out = format_search_results([{"item": "wrapped string item"}])
+        assert out == "## Relevant Context\n\n- wrapped string item"
+
 
 class TestBuildEpisodePayload:
     @pytest.fixture(scope="class")

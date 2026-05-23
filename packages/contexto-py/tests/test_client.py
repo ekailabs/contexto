@@ -282,6 +282,29 @@ class TestSearch:
         backend.search("q", max_results=5, filter=None, min_score=0.1)
         assert success_count[0] == 1
 
+    @pytest.mark.parametrize("body", [
+        [],
+        "not an object",
+        42,
+        None,
+    ])
+    def test_non_object_2xx_response_returns_none(self, body) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=body)
+
+        backend = _make_backend(handler)
+        assert backend.search("q", max_results=5, filter=None, min_score=0.1) is None
+
+    def test_malformed_items_and_paths_default_to_empty_lists(self) -> None:
+        def handler(req: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"items": "bad", "paths": {"bad": True}})
+
+        backend = _make_backend(handler)
+        result = backend.search("q", max_results=5, filter=None, min_score=0.1)
+        assert result is not None
+        assert result.items == []
+        assert result.paths == []
+
 
 class TestTimeouts:
     def test_search_uses_search_timeout(self) -> None:

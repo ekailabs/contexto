@@ -69,12 +69,13 @@ def format_search_results(items: list[Any]) -> str:
         else:
             item = entry
         metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+        content = item.get("content", "") if isinstance(item, dict) else str(item)
 
         if metadata.get("source") != "summary":
-            rendered.append(f"- {item.get('content', '')}")
+            rendered.append(f"- {content}")
             continue
 
-        parts: list[str] = [item.get("content", "")]
+        parts: list[str] = [content]
 
         evidence_refs = metadata.get("evidence_refs")
         if isinstance(evidence_refs, list) and len(evidence_refs) > 0:

@@ -129,9 +129,14 @@ class RemoteBackend:
         except ValueError:
             logger.error("Search response was not valid JSON")
             return None
+        if not isinstance(data, dict):
+            logger.error("Search response JSON was not an object")
+            return None
+        items = data.get("items", [])
+        paths = data.get("paths", [])
         return SearchResult(
-            items=list(data.get("items", []) or []),
-            paths=list(data.get("paths", []) or []),
+            items=items if isinstance(items, list) else [],
+            paths=paths if isinstance(paths, list) else [],
         )
 
     # --- internals ---
