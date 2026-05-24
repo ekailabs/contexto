@@ -162,6 +162,12 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
         tokens = prompt_tokens if prompt_tokens is not None else self.last_prompt_tokens
         return (tokens / self.context_length) >= self.threshold_percent
 
+    def should_compress_preflight(self, messages: list[dict[str, Any]]) -> bool:
+        """Cheap fallback when a provider path has not reported prompt_tokens yet."""
+        if not self.context_length or not self.has_content_to_compress(messages):
+            return False
+        return (self._estimate_tokens(messages) / self.context_length) >= self.threshold_percent
+
     def has_content_to_compress(self, messages: list[dict[str, Any]]) -> bool:
         non_system = [m for m in messages if m.get("role") != "system"]
         return len(non_system) > self.protect_first_n + self.protect_last_n

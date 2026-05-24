@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from .helpers import format_search_results
+
 CONTEXTO_SEARCH_SCHEMA: dict[str, Any] = {
     "name": "contexto_search",
     "description": (
@@ -69,6 +71,7 @@ def _coerce_max_results(raw: Any) -> int:
 def _degraded(note: str) -> str:
     import json
     return json.dumps({
+        "context": "",
         "items": [],
         "paths": [],
         "status": "degraded",
@@ -104,6 +107,7 @@ def contexto_search(engine: Any, args: dict[str, Any]) -> str:
 
     if result is None:
         return json.dumps({
+            "context": "",
             "items": [],
             "paths": [],
             "status": "degraded",
@@ -122,7 +126,12 @@ def contexto_search(engine: Any, args: dict[str, Any]) -> str:
         if item_id is not None:
             engine.injected_item_ids.add(item_id)
 
+    context = format_search_results(filtered_items) if filtered_items else ""
+    if len(context) > engine.config.max_context_chars:
+        context = context[: engine.config.max_context_chars] + "…"
+
     return json.dumps({
+        "context": context,
         "items": filtered_items,
         "paths": list(result.paths),
     })

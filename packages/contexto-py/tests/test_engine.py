@@ -130,6 +130,24 @@ class TestShouldCompress:
         engine.last_prompt_tokens = 9000
         assert engine.should_compress() is True
 
+    def test_preflight_fallback_uses_message_estimate(self) -> None:
+        engine, _ = _build_engine()
+        engine.update_model("claude-test", context_length=100)
+        msgs = _conversation(20)
+        for msg in msgs:
+            if msg["role"] != "system":
+                msg["content"] = "x" * 20
+        assert engine.should_compress_preflight(msgs) is True
+
+    def test_preflight_fallback_requires_compressible_content(self) -> None:
+        engine, _ = _build_engine()
+        engine.update_model("claude-test", context_length=10)
+        msgs = [
+            {"role": "system", "content": "x" * 1000},
+            {"role": "user", "content": "x" * 1000},
+        ]
+        assert engine.should_compress_preflight(msgs) is False
+
 
 class TestHasContentToCompress:
     def test_false_when_only_protected(self) -> None:
@@ -273,6 +291,8 @@ class TestTools:
         result = engine.handle_tool_call("contexto_search", {"query": "q"})
         parsed = json.loads(result)
         assert parsed["items"] == items
+        assert "## Relevant Context" in parsed["context"]
+        assert "hi" in parsed["context"]
 
     def test_handle_tool_call_unknown_returns_error_json(self) -> None:
         engine, _ = _build_engine()

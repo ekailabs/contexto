@@ -98,6 +98,7 @@ class TestResultShape:
         result = contexto_search(engine, {"query": "x"})
         assert isinstance(result, str)
         parsed = json.loads(result)
+        assert "context" in parsed
         assert "items" in parsed
         assert "paths" in parsed
 
@@ -105,17 +106,30 @@ class TestResultShape:
         engine, _ = _engine(SearchResult(items=[], paths=[]))
         result = contexto_search(engine, {"query": "x"})
         parsed = json.loads(result)
+        assert parsed["context"] == ""
         assert parsed["items"] == []
         assert parsed["paths"] == []
 
-    def test_passes_through_items_and_paths(self) -> None:
-        items = [{"item": {"id": "i1", "content": "hi"}}, {"item": {"id": "i2", "content": "ho"}}]
+    def test_returns_formatted_context_items_and_paths(self) -> None:
+        items = [
+            {"item": {"id": "i1", "content": "hi", "metadata": {"source": "summary"}}},
+            {"item": {"id": "i2", "content": "ho", "metadata": {"source": "raw"}}},
+        ]
         paths = [{"id": "p1"}]
         engine, _ = _engine(SearchResult(items=items, paths=paths))
         result = contexto_search(engine, {"query": "x"})
         parsed = json.loads(result)
+        assert parsed["context"] == "## Relevant Context\n\nhi\n\n- ho"
         assert parsed["items"] == items
         assert parsed["paths"] == paths
+
+    def test_formatted_context_honors_max_context_chars(self) -> None:
+        items = [{"item": {"id": "i1", "content": "x" * 200}}]
+        engine, _ = _engine(SearchResult(items=items, paths=[]), max_context_chars=40)
+        result = contexto_search(engine, {"query": "x"})
+        parsed = json.loads(result)
+        assert len(parsed["context"]) == 41
+        assert parsed["context"].endswith("…")
 
 
 class TestDedup:
