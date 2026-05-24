@@ -33,12 +33,9 @@ All config is via env vars. Only `CONTEXTO_API_KEY` is required.
 | `CONTEXTO_SEARCH_TIMEOUT` | `10` | HTTP timeout (seconds) for search calls |
 | `CONTEXTO_INGEST_TIMEOUT` | `30` | HTTP timeout (seconds) for ingest calls |
 
-Invalid or out-of-range values (non-numeric, negative, NaN, or outside the noted
-range) fall back to the default and emit a `WARNING` — they never abort registration.
+Invalid, out-of-range, or NaN values fall back to the default with a `WARNING`; they never block registration.
 
-`CONTEXTO_MAX_RESULTS` governs the automatic recall the engine runs during
-compaction. The model-facing `contexto_search` tool takes its own optional
-`max_results` argument (default `5`) for explicit, on-demand recall.
+`CONTEXTO_MAX_RESULTS` sets recall breadth at compaction time. The `contexto_search` tool takes its own `max_results` (default `5`) for on-demand recall.
 
 ## Status
 
@@ -54,10 +51,7 @@ Health is observable via the engine's `get_status()`:
 }
 ```
 
-When an ingest fails, `compress()` fails closed: it preserves the original
-messages, skips retrieval, and does not advance the compaction count — so
-unpersisted conversation history is never silently dropped. The counters above
-make a sustained outage (e.g. a rate-limit window) observable.
+On ingest failure, `compress()` fails closed — original messages kept, retrieval skipped, compaction count unchanged — so unpersisted history is never dropped. The counters above surface a sustained outage (e.g. a rate-limit window).
 
 Hermes' `/status` command surfaces only token-level fields directly; `auth_state` transitions are logged at INFO so they appear in hermes-agent logs.
 
