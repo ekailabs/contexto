@@ -46,6 +46,33 @@ class TestDetectHermesContextEngineDir:
         monkeypatch.setattr(install, "_discover_via_sys_path", lambda: None)
         assert install.detect_hermes_context_engine_dir() is None
 
+    def test_via_env_var_namespace_package_no_init(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # PEP-420 namespace layout: plugins/context_engine/ exists with NO __init__.py.
+        root = tmp_path / "ns_hermes"
+        (root / "plugins" / "context_engine").mkdir(parents=True)
+        monkeypatch.setenv("HERMES_AGENT_ROOT", str(root))
+        path = install.detect_hermes_context_engine_dir()
+        assert path == root / "plugins" / "context_engine"
+
+    def test_discover_via_sys_path_uses_namespace_search_locations(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Simulate find_spec returning a namespace-package spec: origin is None,
+        # directory only reachable via submodule_search_locations.
+        ns_dir = tmp_path / "site" / "plugins" / "context_engine"
+        ns_dir.mkdir(parents=True)
+
+        class _NamespaceSpec:
+            origin = None
+            submodule_search_locations = [str(ns_dir)]
+
+        monkeypatch.setattr(
+            install.importlib.util, "find_spec", lambda name: _NamespaceSpec()
+        )
+        assert install._discover_via_sys_path() == ns_dir
+
 
 class TestInstallPlugin:
     def test_creates_symlink_to_package(

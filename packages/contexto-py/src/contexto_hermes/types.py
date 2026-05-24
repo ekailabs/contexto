@@ -7,6 +7,7 @@ must succeed whenever CONTEXTO_API_KEY is set, regardless of other env-var hygie
 from __future__ import annotations
 
 import logging
+import math
 import os
 from dataclasses import dataclass, field
 from typing import Any, TypeAlias
@@ -36,32 +37,63 @@ def _env_bool(key: str, default: bool) -> bool:
     return default
 
 
-def _env_int(key: str, default: int) -> int:
-    """Parse an int env var. Returns default on missing/invalid, with WARNING."""
+def _env_int(
+    key: str,
+    default: int,
+    *,
+    minimum: int | None = None,
+    maximum: int | None = None,
+) -> int:
+    """Parse an int env var. Returns default on missing/invalid/out-of-range, with WARNING."""
     raw = os.environ.get(key)
     if raw is None:
         return default
     try:
-        return int(raw)
+        value = int(raw)
     except (TypeError, ValueError):
         logger.warning(
             "Invalid integer for %s=%r; using default %s", key, raw, default
         )
         return default
+    if (minimum is not None and value < minimum) or (maximum is not None and value > maximum):
+        logger.warning(
+            "Out-of-range integer for %s=%r (expected %s..%s); using default %s",
+            key, raw, minimum, maximum, default,
+        )
+        return default
+    return value
 
 
-def _env_float(key: str, default: float) -> float:
-    """Parse a float env var. Returns default on missing/invalid, with WARNING."""
+def _env_float(
+    key: str,
+    default: float,
+    *,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float:
+    """Parse a float env var. Returns default on missing/invalid/out-of-range/NaN, with WARNING."""
     raw = os.environ.get(key)
     if raw is None:
         return default
     try:
-        return float(raw)
+        value = float(raw)
     except (TypeError, ValueError):
         logger.warning(
             "Invalid float for %s=%r; using default %s", key, raw, default
         )
         return default
+    if not math.isfinite(value):
+        logger.warning(
+            "Non-finite float for %s=%r; using default %s", key, raw, default
+        )
+        return default
+    if (minimum is not None and value < minimum) or (maximum is not None and value > maximum):
+        logger.warning(
+            "Out-of-range float for %s=%r (expected %s..%s); using default %s",
+            key, raw, minimum, maximum, default,
+        )
+        return default
+    return value
 
 
 @dataclass
@@ -85,11 +117,11 @@ class ContextoConfig:
         return cls(
             api_key=api_key,
             context_enabled=_env_bool("CONTEXTO_ENABLED", default=True),
-            max_context_chars=_env_int("CONTEXTO_MAX_CONTEXT_CHARS", default=2000),
-            min_score=_env_float("CONTEXTO_MIN_SCORE", default=0.45),
-            max_results=_env_int("CONTEXTO_MAX_RESULTS", default=7),
-            search_timeout=_env_float("CONTEXTO_SEARCH_TIMEOUT", default=10.0),
-            ingest_timeout=_env_float("CONTEXTO_INGEST_TIMEOUT", default=30.0),
+            max_context_chars=_env_int("CONTEXTO_MAX_CONTEXT_CHARS", default=2000, minimum=1),
+            min_score=_env_float("CONTEXTO_MIN_SCORE", default=0.45, minimum=0.0, maximum=1.0),
+            max_results=_env_int("CONTEXTO_MAX_RESULTS", default=7, minimum=1),
+            search_timeout=_env_float("CONTEXTO_SEARCH_TIMEOUT", default=10.0, minimum=0.0),
+            ingest_timeout=_env_float("CONTEXTO_INGEST_TIMEOUT", default=30.0, minimum=0.0),
         )
 
 

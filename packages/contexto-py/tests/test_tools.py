@@ -131,6 +131,16 @@ class TestResultShape:
         assert len(parsed["context"]) == 41
         assert parsed["context"].endswith("…")
 
+    def test_zero_max_context_chars_does_not_collapse_to_ellipsis(self) -> None:
+        # Guard against a degenerate cap (e.g. directly constructed config): the
+        # context must not collapse to just "…" — truncation is skipped instead.
+        items = [{"item": {"id": "i1", "content": "real recalled content"}}]
+        engine, _ = _engine(SearchResult(items=items, paths=[]), max_context_chars=0)
+        result = contexto_search(engine, {"query": "x"})
+        parsed = json.loads(result)
+        assert parsed["context"] != "…"
+        assert "real recalled content" in parsed["context"]
+
 
 class TestDedup:
     def test_filters_already_injected_ids(self) -> None:

@@ -187,6 +187,24 @@ class TestUpdateFromResponse:
         assert engine.last_prompt_tokens == 50
         # Should not raise on missing completion/total
 
+    def test_numeric_string_token_counts_coerced(self) -> None:
+        engine, _ = _build_engine()
+        engine.update_from_response({
+            "prompt_tokens": "1000",
+            "completion_tokens": "1.5",
+            "total_tokens": "1200",
+        })
+        assert engine.last_prompt_tokens == 1000
+        assert engine.last_completion_tokens == 1  # "1.5" -> float -> int
+        assert engine.last_total_tokens == 1200
+
+    def test_non_numeric_token_counts_preserve_prior_value(self) -> None:
+        engine, _ = _build_engine()
+        engine.update_from_response({"prompt_tokens": 500})
+        # A later malformed usage dict must not crash and must not corrupt state.
+        engine.update_from_response({"prompt_tokens": "n/a"})
+        assert engine.last_prompt_tokens == 500
+
 
 class TestUpdateModel:
     def test_recalculates_threshold(self) -> None:

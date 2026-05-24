@@ -127,7 +127,7 @@ def contexto_search(engine: Any, args: dict[str, Any]) -> str:
             engine.injected_item_ids.add(item_id)
 
     context = format_search_results(filtered_items) if filtered_items else ""
-    if len(context) > engine.config.max_context_chars:
+    if engine.config.max_context_chars > 0 and len(context) > engine.config.max_context_chars:
         context = context[: engine.config.max_context_chars] + "…"
 
     return json.dumps({

@@ -29,6 +29,22 @@ logger = logging.getLogger("plugins.context_engine.contexto")
 _RECALL_LEAD_IN = "[Recalled context from previous conversations]"
 
 
+def _coerce_token(value: Any, fallback: int) -> int:
+    """Coerce a provider-reported token count to int, never raising.
+
+    Handles ints, floats, and numeric strings (including "1.5"). On anything
+    non-numeric, returns the prior value so a malformed usage dict is a no-op
+    rather than a crash.
+    """
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return fallback
+
+
 def _load_base():
     """Return Hermes' ContextEngine ABC, or a minimal stub when running outside Hermes.
 
@@ -133,12 +149,17 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
     def update_from_response(self, usage: dict[str, Any]) -> None:
         if not isinstance(usage, dict):
             return
+        # Token counts come from upstream provider responses; some OpenAI-compatible
+        # providers emit them as strings (e.g. "1234") or omit/garble them. Coerce
+        # defensively so a malformed usage dict never crashes Hermes' response path.
         if "prompt_tokens" in usage:
-            self.last_prompt_tokens = int(usage["prompt_tokens"] or 0)
+            self.last_prompt_tokens = _coerce_token(usage["prompt_tokens"], self.last_prompt_tokens)
         if "completion_tokens" in usage:
-            self.last_completion_tokens = int(usage["completion_tokens"] or 0)
+            self.last_completion_tokens = _coerce_token(
+                usage["completion_tokens"], self.last_completion_tokens
+            )
         if "total_tokens" in usage:
-            self.last_total_tokens = int(usage["total_tokens"] or 0)
+            self.last_total_tokens = _coerce_token(usage["total_tokens"], self.last_total_tokens)
 
     def update_model(
         self,
@@ -298,7 +319,7 @@ class ContextoEngine(_load_base()):  # type: ignore[misc]
             return head_and_tail
 
         context_block = format_search_results(filtered_items)
-        if len(context_block) > self.config.max_context_chars:
+        if self.config.max_context_chars > 0 and len(context_block) > self.config.max_context_chars:
             context_block = context_block[: self.config.max_context_chars] + "…"
 
         retrieved_pair = [

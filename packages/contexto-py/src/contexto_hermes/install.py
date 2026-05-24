@@ -34,22 +34,32 @@ class InstallResult:
 
 
 def _discover_via_sys_path() -> Path | None:
-    """Find plugins/context_engine/ via the same import path Hermes uses."""
+    """Find plugins/context_engine/ via the same import path Hermes uses.
+
+    Handles both regular packages (``spec.origin`` points at ``__init__.py``)
+    and PEP-420 namespace packages (``spec.origin`` is None — the directory is
+    only reachable via ``submodule_search_locations``), which Hermes plugin
+    host trees commonly use.
+    """
     spec = importlib.util.find_spec("plugins.context_engine")
-    if spec is None or spec.origin is None:
+    if spec is None:
         return None
-    return Path(spec.origin).parent
+    if spec.origin is not None:
+        return Path(spec.origin).parent
+    for location in spec.submodule_search_locations or []:
+        return Path(location)
+    return None
 
 
 def detect_hermes_context_engine_dir() -> Path | None:
     env = os.environ.get("HERMES_AGENT_ROOT")
     if env:
         candidate = Path(env).expanduser().resolve() / "plugins" / "context_engine"
-        if (candidate / "__init__.py").exists():
+        if candidate.is_dir():
             return candidate
 
     discovered = _discover_via_sys_path()
-    if discovered is not None and (discovered / "__init__.py").exists():
+    if discovered is not None and discovered.is_dir():
         return discovered
 
     return None
