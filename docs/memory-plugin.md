@@ -1,19 +1,8 @@
 # Memory
 
-Agent-centric, local-first semantic memory. Your agent reflects on conversations and decides what to learn — memory is first-person, not a passive database about users.
+Agent-centric, local-first semantic memory. Your agent reflects on conversations and decides what to learn -- memory is first-person, not a passive database about users.
 
-## Two Ways to Use
-
-| Path | Best for |
-|------|----------|
-| **SDK / HTTP API** | Embedding memory into your own Node/TS app or service |
-| **OpenClaw Plugin** | Drop-in memory for OpenClaw agents (zero code) |
-
-Both use the same `@ekai/memory` engine underneath.
-
----
-
-## Way 1: SDK / HTTP API
+## SDK / HTTP API
 
 ### Install
 
@@ -87,80 +76,7 @@ npm run start -w @ekai/memory
 | GET | `/v1/graph/triples` | Query semantic triples |
 | GET | `/v1/graph/visualization` | Graph visualization data |
 
-All endpoints accept an `agent` query/body param. Full API reference: [`memory/README.md`](../memory/README.md).
-
----
-
-## Way 2: OpenClaw Plugin (@ekai/contexto)
-
-### Install
-
-```bash
-openclaw plugins install @ekai/contexto
-```
-
-Or from source:
-
-```bash
-openclaw plugins install ./integrations/openclaw
-```
-
-### Configure
-
-In your OpenClaw config:
-
-```json5
-{
-  plugins: {
-    allow: ["@ekai/contexto"],
-    entries: {
-      "@ekai/contexto": {
-        enabled: true,
-        config: {
-          "dbPath": "~/.openclaw/ekai/memory.db",
-          "provider": "openai",
-          "apiKey": "sk-..."
-        }
-      }
-    }
-  }
-}
-```
-
-### How It Works
-
-Two lifecycle hooks plus one slash command — no code required:
-
-1. **`agent_end`** — After each conversation turn, new messages are normalized, redacted (secrets stripped), and ingested into memory.
-
-2. **`before_prompt_build`** — Before the agent responds, the last user message is used to search memory. Up to 5 relevant memories are prepended as context (capped at 2000 chars).
-
-3. **`/memory-bootstrap`** — Manually backfills existing OpenClaw session JSONL transcripts into memory. Runs in the background and logs progress.
-
-Delta tracking is persisted to `{dbPath}.progress.json` so only new messages are ingested, even across restarts.
-
-### Bootstrap Existing History
-
-If installing on an existing OpenClaw instance, backfill historical sessions:
-
-```
-/memory-bootstrap
-```
-
-The command is auth-gated, returns immediately, and runs in the background. If bootstrap is already running or completed, it returns a no-op status message.
-
-Bootstrap scans `{stateDir}/agents/*/sessions/*.jsonl`, skips `.reset.` files, and skips malformed JSON lines with warnings.
-
-Progress is tracked in `{dbPath}.progress.json`, so bootstrap resumes if interrupted.
-
-Note: `agent_end` ingests with `userId` scoping when available, while bootstrap currently ingests historical sessions without `userId`.
-
-### Verify
-
-```bash
-openclaw plugins list       # should show @ekai/contexto
-openclaw hooks list         # should show plugin:@ekai/contexto:* hooks
-```
+All endpoints accept an `agent` query/body param. Full API reference: [`packages/memory/README.md`](../packages/memory/README.md).
 
 ---
 
@@ -188,15 +104,6 @@ openclaw hooks list         # should show plugin:@ekai/contexto:* hooks
 | `MEMORY_DB_PATH` | `./memory.db` | SQLite file path |
 | `MEMORY_PORT` | `4005` | Standalone server port |
 | `MEMORY_CORS_ORIGIN` | `*` | CORS origins (standalone mode) |
-
-### Plugin Config (@ekai/contexto)
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `dbPath` | `~/.openclaw/ekai/memory.db` | Path to SQLite memory file |
-| `provider` | env-based | LLM provider (`openai`, `gemini`, `openrouter`) |
-| `apiKey` | env-based | API key for the selected provider |
-| `bootstrapDelayMs` | `1000` | Delay between sessions during `/memory-bootstrap` |
 
 ### Supported Providers
 
@@ -229,4 +136,4 @@ Semantic triples are tagged with a domain — `user`, `world`, or `self`. User-d
 
 ---
 
-For the full data model, retrieval pipeline, and consolidation details, see [`memory/README.md`](../memory/README.md). For plugin development, see [`integrations/openclaw/README.md`](../integrations/openclaw/README.md).
+For the full data model, retrieval pipeline, and consolidation details, see [`packages/memory/README.md`](../packages/memory/README.md).
