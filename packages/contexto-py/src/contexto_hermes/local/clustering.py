@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable
 
 import numpy as np
 from scipy.cluster.hierarchy import linkage
@@ -234,9 +233,15 @@ class Clusterer:
         embeddings = np.asarray([it.embedding for it in items], dtype=np.float64)
         if not np.isfinite(embeddings).all():
             raise ValueError("embeddings contain non-finite values")
+        if (np.linalg.norm(embeddings, axis=1) == 0.0).any():
+            # Cosine distance is undefined for zero vectors — scipy emits NaN,
+            # which would silently merge everything at distance 0 below.
+            raise ValueError("embeddings contain zero vectors")
         Z = linkage(embeddings, method="average", metric="cosine")
-        # scipy may produce tiny negatives for identical points; clamp to 0.
-        Z = np.where(np.isnan(Z), 0.0, Z)
+        # Identical points can yield tiny negative distances (float error);
+        # clamp those and any residual NaNs to 0. (Index/count columns are
+        # non-negative, so a whole-matrix clamp is safe.)
+        Z = np.where(np.isnan(Z) | (Z < 0.0), 0.0, Z)
         tree = _build_dendrogram(Z, len(items))
 
         distance_threshold = 1.0 - self._config.similarity_threshold

@@ -29,6 +29,11 @@
 # gateway run` (not `gateway run`) because the entrypoint's `gateway` → `hermes
 # gateway` wrap only fires when `gateway` is the first container arg — inside
 # our `sh -c` it isn't, and `gateway` isn't a standalone binary.
+# Data dir: defaults to a dedicated scratch dir so the test gateway never
+# touches a live ~/.hermes (two gateways sharing state.db / gateway.lock — or
+# host-network port collisions with one already running — will corrupt state).
+# Opt into your real home only when no host gateway is running:
+#   CONTEXTO_E2E_HOME=$HOME/.hermes docker compose -f e2e/docker-compose.hermes-local.yml --env-file e2e/.env up
 services:
   gateway:
     image: hermes-agent
@@ -36,7 +41,7 @@ services:
     restart: "no"
     network_mode: host
     volumes:
-      - ${HOME}/.hermes:/opt/data
+      - ${CONTEXTO_E2E_HOME:-/tmp/hermes-contexto-e2e}:/opt/data
       - ../src/contexto_hermes:/opt/hermes/plugins/context_engine/contexto:ro
     environment:
       - HERMES_UID=${HERMES_UID:-10000}

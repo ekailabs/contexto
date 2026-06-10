@@ -70,6 +70,16 @@ export HERMES_UID=$(id -u) HERMES_GID=$(id -g)
 docker compose -f e2e/docker-compose.hermes-local.yml --env-file e2e/.env up
 ```
 
+The container's data dir defaults to `/tmp/hermes-contexto-e2e` on the host so
+the test gateway never shares state with a live `~/.hermes`. If you want it to
+use your real Hermes home (e.g. to exercise your existing config), make sure no
+host gateway is running first — the compose file uses host networking, and two
+gateways sharing `state.db`/`gateway.lock` will corrupt state — then:
+
+```bash
+CONTEXTO_E2E_HOME=$HOME/.hermes docker compose -f e2e/docker-compose.hermes-local.yml --env-file e2e/.env up
+```
+
 If you'd rather bake everything into the image, copy `src/contexto_hermes` to
 `hermes-agent/plugins/context_engine/contexto/` (as a real directory, not a
 symlink) and add `numpy scipy` to the venv before `docker build`. You can then
@@ -78,7 +88,7 @@ drop both the bind mount and the install step from the compose file.
 After driving a chat session that triggers `compress()`, the mindmap lands at:
 
 ```
-~/.hermes/data/contexto/mindmap.json
+${CONTEXTO_E2E_HOME:-/tmp/hermes-contexto-e2e}/data/contexto/mindmap.json
 ```
 
 (Inside the container that resolves to `/opt/data/data/contexto/mindmap.json`
@@ -87,7 +97,7 @@ via `$HERMES_HOME`.)
 Quick check:
 
 ```bash
-jq '.version, .stats' ~/.hermes/data/contexto/mindmap.json
+jq '.version, .stats' "${CONTEXTO_E2E_HOME:-/tmp/hermes-contexto-e2e}/data/contexto/mindmap.json"
 ```
 
 ## Files in this directory
