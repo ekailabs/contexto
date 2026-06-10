@@ -173,9 +173,12 @@ class TestNeverRaisesContract:
         backend = _make_backend(base_config, embed_fail=True)
         assert backend.ingest([_payload("x")]) is False
 
-    def test_search_on_empty_store_returns_None(self, base_config):
+    def test_search_on_empty_store_returns_empty_result(self, base_config):
+        # Empty store is "no results", not a failure — None is reserved for errors.
         backend = _make_backend(base_config)
-        assert backend.search("anything", max_results=5) is None
+        result = backend.search("anything", max_results=5)
+        assert result is not None
+        assert result.items == [] and result.paths == []
 
     def test_search_embed_failure_returns_None(self, base_config):
         # Ingest with working embedder, then swap to a failing embedder for search.
@@ -249,9 +252,10 @@ class TestSearchShape:
         scores = [e["score"] for e in result.items]
         assert scores == sorted(scores, reverse=True)
 
-    def test_returns_none_when_no_results_pass_filter(self, base_config):
+    def test_empty_result_when_no_results_pass_filter(self, base_config):
         backend = _make_backend(base_config)
         backend.ingest([_payload("hi")])
-        # Filter on metadata that doesn't exist.
+        # Filter on metadata that doesn't exist — no matches, but not a failure.
         result = backend.search("hi", max_results=5, filter={"source": "raw"})
-        assert result is None
+        assert result is not None
+        assert result.items == []

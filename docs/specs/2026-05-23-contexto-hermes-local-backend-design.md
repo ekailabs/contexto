@@ -97,7 +97,7 @@ Same duck-typed contract as `RemoteBackend`. Mirrors TS `LocalBackend` in `packa
 
 - `__init__(config: LocalBackendConfig, *, embedder=None, summarizer=None, store=None, embed_transport=None, llm_transport=None)` — stores config; lazy `Store.load()` on first ingest/search. Uses the module-level logger (`plugins.context_engine.contexto`) — matches the Python-idiomatic pattern used by `RemoteBackend`, not the TS `logger: Logger` arg. The keyword-only kwargs are test seams that let unit tests inject fakes or `httpx.MockTransport`; production code constructs with just the config.
 - `ingest(payloads: list[WebhookPayload]) -> bool` — embed + (optionally) summarize + insert. Returns success. Never raises.
-- `search(query: str, max_results: int, filter: dict | None = None, min_score: float | None = None) -> SearchResult | None` — embed query, beam-search tree, score, return top-K wrapped as `{"item": ConversationItem-dict, "score": float}` per TS `ScoredQueryResult`. Returns `None` on failure OR when no items survive filtering (matches TS). Never raises.
+- `search(query: str, max_results: int, filter: dict | None = None, min_score: float | None = None) -> SearchResult | None` — embed query, beam-search tree, score, return top-K wrapped as `{"item": ConversationItem-dict, "score": float}` per TS `ScoredQueryResult`. Returns `None` only on failure; an empty result set (empty store, nothing survives filtering) is an empty `SearchResult` — matching `RemoteBackend`, so the tool layer can distinguish "no matches" from "backend down". Never raises.
 
 ### `extractor.py`
 
@@ -307,9 +307,9 @@ Explicit `CONTEXTO_LOCAL_PROVIDER` wins and requires its matching key. Explicit 
 1. Embed the query.
 2. Run beam search over the cluster tree, collecting terminal nodes and their items.
 3. Apply the metadata filter (exact-match on each provided key), score remaining items by cosine similarity, apply `min_score`, slice to `max_results`.
-4. Return a `SearchResult` with `items` and `paths`. Return `None` when the result list is empty.
+4. Return a `SearchResult` with `items` and `paths` (possibly empty).
 
-`search` returns `None` when the store is empty (no cluster tree yet), when no items survive filtering, or on any failure. The empty-store guard short-circuits before retrieval is invoked.
+`search` returns `None` only on failure (embed error, unexpected exception). An empty store (no cluster tree yet) or a query where no items survive filtering returns an empty `SearchResult`. The empty-store guard short-circuits before the query embedding is requested.
 
 ## 10. Error contract
 
@@ -323,7 +323,7 @@ Explicit `CONTEXTO_LOCAL_PROVIDER` wins and requires its matching key. Explicit 
 | `store.load()` corrupt file | file quarantined; fresh empty state returned. | ERROR |
 | `scipy.linkage` failure (NaN, etc.) | `ingest`: `False`. | ERROR |
 | Local construction failure | `from_env_local()` returns `None`; `register()` skips registration. | ERROR |
-| Empty store / no results on search | `search`: `None`. | (not logged) |
+| Empty store / no results on search | `search`: empty `SearchResult` (not a failure). | (not logged) |
 
 No `ApiError` / `on_error` / `on_success` callbacks in v1 of the local backend.
 
@@ -332,7 +332,7 @@ No `ApiError` / `on_error` / `on_success` callbacks in v1 of the local backend.
 Located in `contexto-py/tests/local/`.
 
 - **Per-module unit tests.** Extractor (Q:/A:/T: prefixes, envelope stripping); labeler (STOP_WORDS, 0/1/n-item branches); embedder + summarizer (`httpx.MockTransport`, provider model selection, fallback paths, `build_synthetic_summary` shape); clustering (rebuild policy, scipy golden outputs, centroid invariants); retrieval (synthetic trees, beam pruning, `paths` are labels not IDs); store (round-trip, atomic-write, corrupt-file quarantine, parent-dir creation).
-- **Integration round-trip.** `tests/local/test_round_trip.py` instantiates `LocalBackend` with fake embedder/summarizer, ingests fixture episodes (40 → confirms `new_total < 100` rebuild; +20 → confirms threshold reuse), searches, asserts top-K item IDs, reinstantiates against the same path and confirms stats reload. Empty-store guard test: construct against a fresh path, patch `retrieval.beam_search` to raise, call `search` — passes iff the guard fires and `search` returns `None`.
+- **Integration round-trip.** `tests/local/test_round_trip.py` instantiates `LocalBackend` with fake embedder/summarizer, ingests fixture episodes (40 → confirms `new_total < 100` rebuild; +20 → confirms threshold reuse), searches, asserts top-K item IDs, reinstantiates against the same path and confirms stats reload. Empty-store guard test: construct against a fresh path, patch `retrieval.beam_search` to raise, call `search` — passes iff the guard fires and `search` returns an empty `SearchResult` without invoking retrieval.
 - **Provider/key matrix.** One parametrized test per row of §7's table, covering explicit/implicit provider selection and explicit/key mismatch.
 - **Registration.** `local` with no provider key (error + no registration); `local` with one of the two keys (constructs `LocalBackend`); `remote` with no `CONTEXTO_API_KEY` (existing behavior preserved); invalid `CONTEXTO_BACKEND` value (warns + falls back to remote).
 - **Behavioral fixtures.** `tests/fixtures/local-backend/` holds small JSON files of `(seed_items, queries, expected_top_k_ids)` for cheap regression coverage.

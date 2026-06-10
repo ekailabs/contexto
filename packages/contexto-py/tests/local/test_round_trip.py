@@ -138,9 +138,10 @@ class TestRoundTrip:
 
 
 class TestEmptyStoreGuard:
-    def test_empty_store_returns_none(self, cfg):
+    def test_empty_store_returns_empty_result(self, cfg):
         # Patch beam_search to raise; the empty-store guard must short-circuit
-        # before retrieval is invoked.
+        # before retrieval is invoked, returning empty results (not None —
+        # that's reserved for failures).
         backend = _make_backend(cfg)
         import contexto_hermes.local.backend as mod
         original = mod.beam_search
@@ -150,6 +151,8 @@ class TestEmptyStoreGuard:
 
         mod.beam_search = boom
         try:
-            assert backend.search("anything", max_results=5) is None
+            result = backend.search("anything", max_results=5)
+            assert result is not None
+            assert result.items == [] and result.paths == []
         finally:
             mod.beam_search = original

@@ -1,7 +1,10 @@
 """LocalBackend orchestrator. Same duck-typed contract as RemoteBackend.
 
 `ingest` + `search` **never raise.** All errors land here, converted to
-`False` / `None`.
+`False` / `None`. A search that simply finds nothing (empty store, nothing
+above `min_score`) returns an empty `SearchResult` — `None` is reserved for
+failures, matching `RemoteBackend`, so the tool layer can tell "no matches"
+apart from "backend down".
 """
 
 from __future__ import annotations
@@ -162,11 +165,8 @@ class LocalBackend:
         summary: EpisodeSummary,
         embedding: list[float],
     ) -> ConversationItem:
-        content_parts = [summary.summary]
-        if summary.key_findings:
-            findings = "\n".join(f"- {f}" for f in summary.key_findings)
-            content_parts.append(f"\nKey findings:\n{findings}")
-        content = "\n".join(content_parts)
+        # Stored content is exactly what was embedded.
+        content = self._embed_input(summary)
 
         metadata: dict[str, Any] = {
             "source": "summary",
@@ -198,7 +198,9 @@ class LocalBackend:
     ) -> SearchResult | None:
         state = self._load_state()
         if state.root is None or state.stats.total_items == 0:
-            return None
+            # Empty store is a valid "no results" answer, not a failure.
+            # Short-circuits before the embed call.
+            return SearchResult(items=[], paths=[])
 
         try:
             query_emb = self._embedder.embed(query)
@@ -215,9 +217,6 @@ class LocalBackend:
             filter=filter,
             min_score=min_score,
         )
-
-        if not result.scored:
-            return None
 
         # Spec §5 (retrieval) + TS ScoredQueryResult parity: each result is a
         # wrapper {"item": {...}, "score": float} so callers can rank or
