@@ -45,7 +45,7 @@ All config is via env vars. Invalid, out-of-range, or NaN values fall back to th
 | `CONTEXTO_BACKEND` | `remote` | `remote` or `local` |
 | `CONTEXTO_ENABLED` | `true` | When `false`, ingestion still happens but retrieval injection is disabled |
 | `CONTEXTO_MAX_CONTEXT_CHARS` | `2000` | Cap on retrieved-context-block size in chars (must be ≥ 1) |
-| `CONTEXTO_MIN_SCORE` | `0.45` | Minimum similarity score for retrieved items (0.0–1.0) |
+| `CONTEXTO_MIN_SCORE` | `0.45` remote / `0.35` local | Minimum similarity score for retrieved items (0.0–1.0). Local summaries span a whole drop slice, so relevant hits score lower. |
 | `CONTEXTO_MAX_RESULTS` | `7` | Items fetched per automatic recall at compaction time |
 | `CONTEXTO_SEARCH_TIMEOUT` | `10` | HTTP timeout (seconds) for search calls |
 | `CONTEXTO_INGEST_TIMEOUT` | `30` | HTTP timeout (seconds) for ingest calls |

@@ -135,7 +135,10 @@ class ContextoConfig:
             api_key="",  # unused; LocalBackend uses provider-specific creds
             context_enabled=_env_bool("CONTEXTO_ENABLED", default=True),
             max_context_chars=_env_int("CONTEXTO_MAX_CONTEXT_CHARS", default=2000, minimum=1),
-            min_score=_env_float("CONTEXTO_MIN_SCORE", default=0.45, minimum=0.0, maximum=1.0),
+            # Lower than remote's 0.45: locally one summary spans a whole drop
+            # slice, so query-to-summary cosine for a relevant hit often lands
+            # in the 0.35–0.45 band.
+            min_score=_env_float("CONTEXTO_MIN_SCORE", default=0.35, minimum=0.0, maximum=1.0),
             max_results=_env_int("CONTEXTO_MAX_RESULTS", default=7, minimum=1),
             search_timeout=_env_float("CONTEXTO_SEARCH_TIMEOUT", default=10.0, minimum=0.0),
             ingest_timeout=_env_float("CONTEXTO_INGEST_TIMEOUT", default=30.0, minimum=0.0),

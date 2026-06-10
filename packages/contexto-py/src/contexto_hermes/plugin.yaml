@@ -15,6 +15,7 @@ env_vars:
     default: "2000"
   - name: CONTEXTO_MIN_SCORE
     default: "0.45"
+    description: Minimum similarity for retrieved items. Default 0.45 (remote) / 0.35 (local).
   - name: CONTEXTO_MAX_RESULTS
     default: "7"
   - name: CONTEXTO_SEARCH_TIMEOUT
