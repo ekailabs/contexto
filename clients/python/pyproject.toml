@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contexto"
+version = "0.1.0"
+description = "Python client for the self-hosted Contexto memory engine."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "ekailabs" }]
+dependencies = [
+  "httpx>=0.25",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7",
+]
+
+[project.urls]
+Homepage = "https://github.com/ekailabs/contexto"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["contexto*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "live: requires a running Contexto selfhost (skips if CONTEXTO_BASE_URL is unreachable)",
+]

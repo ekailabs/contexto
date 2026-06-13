@@ -1,0 +1,40 @@
+name: Python Client CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'clients/python/**'
+      - '.github/workflows/python.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'clients/python/**'
+      - '.github/workflows/python.yml'
+
+jobs:
+  test:
+    name: pytest (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/python
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: clients/python/pyproject.toml
+
+      - name: Install
+        run: pip install -e ".[test]"
+
+      - name: Run unit tests (live tests skip — no selfhost in CI)
+        run: pytest -v --tb=short
