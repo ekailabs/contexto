@@ -138,7 +138,7 @@ export interface QueryResult {
 
 export type EmbedFn = (input: string, sector: SectorName) => Promise<number[]>;
 
-export type ExtractFn = (text: string) => Promise<IngestComponents>;
+export type ExtractFn = (text: string, userId?: string) => Promise<IngestComponents>;
 
 export interface GraphTraversalOptions {
   maxDepth?: number;

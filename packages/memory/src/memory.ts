@@ -100,7 +100,7 @@ export class Memory {
       }
     }
 
-    const components = await this.extractFn(sourceText);
+    const components = await this.extractFn(sourceText, opts?.userId);
     if (!components) return { stored: 0, ids: [] };
 
     const rows = await this.store.ingest(components, agent, {

@@ -140,7 +140,7 @@ export function createMemoryRouter(store: SqliteMemoryStore, extractFn?: Extract
     let finalComponents: IngestComponents | undefined;
 
     try {
-      finalComponents = await doExtract(sourceText);
+      finalComponents = await doExtract(sourceText, userId);
     } catch (err: any) {
       return res.status(500).json({ error: err.message ?? 'extraction failed' });
     }
